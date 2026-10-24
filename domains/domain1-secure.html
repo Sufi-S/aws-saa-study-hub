@@ -72,6 +72,11 @@
         <li><a href="#kms-diagram">KMS &amp; Encryption &mdash; Envelope Encryption Diagram</a></li>
         <li><a href="#kms-gotchas">KMS &amp; Encryption &mdash; Exam Gotchas</a></li>
         <li><a href="#kms-practice">KMS &amp; Encryption &mdash; Practice Questions</a></li>
+        <li><a href="#sg-learn"><strong>Security Groups vs NACLs</strong> &mdash; Learn from Zero</a></li>
+        <li><a href="#sg-real-world">Security Groups vs NACLs &mdash; Real-World Scenarios</a></li>
+        <li><a href="#sg-diagram">Security Groups vs NACLs &mdash; VPC Traffic Flow Diagram</a></li>
+        <li><a href="#sg-gotchas">Security Groups vs NACLs &mdash; Exam Gotchas</a></li>
+        <li><a href="#sg-practice">Security Groups vs NACLs &mdash; Practice Questions</a></li>
       </ol>
     </nav>
 
@@ -1735,6 +1740,694 @@
             </ul>
             <p><strong>Key exam clue:</strong> "Cross-Region DR" + "decrypt without calling back to the primary Region" = multi-Region KMS key.</p>
             <p><strong>Takeaway:</strong> Multi-Region KMS keys solve the cross-Region decryption problem for DR without requiring cross-Region API calls or re-encryption.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================= -->
+    <!-- TOPIC 4: Security Groups vs NACLs             -->
+    <!-- ============================================= -->
+
+    <hr class="topic-divider" style="margin-top:4rem;">
+
+    <div class="page-header" style="border-bottom:none;padding-bottom:0;margin-bottom:1.5rem;">
+      <h1 style="display:flex;align-items:center;gap:0.6rem;font-size:1.75rem;">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="var(--domain1)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        Security Groups vs Network ACLs
+      </h1>
+      <p>Instance-level stateful filtering, subnet-level stateless filtering, and how both work together to secure VPC traffic.</p>
+    </div>
+
+    <!-- SG SECTION 1: Learn from Zero -->
+    <section class="topic-section" id="sg-learn">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain1)" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        Learn from Zero
+      </h2>
+
+      <h3>Network Security Fundamentals</h3>
+      <p>A <strong>Virtual Private Cloud (VPC)</strong> is your isolated section of the AWS cloud. Inside a VPC, you launch EC2 instances, databases, load balancers, and other resources. Without network security rules, any device that can reach your VPC could send traffic to any resource on any port &mdash; which is extremely dangerous.</p>
+      <p>Every network packet has a <strong>source IP address</strong> (where the packet comes from) and a <strong>destination IP address</strong> (where it is going). A <strong>port</strong> is a numbered endpoint on a server that identifies a specific service:</p>
+      <ul>
+        <li><strong>Port 80</strong> &mdash; HTTP (unencrypted web traffic)</li>
+        <li><strong>Port 443</strong> &mdash; HTTPS (encrypted web traffic)</li>
+        <li><strong>Port 22</strong> &mdash; SSH (remote Linux administration)</li>
+        <li><strong>Port 3389</strong> &mdash; RDP (remote Windows administration)</li>
+        <li><strong>Port 3306</strong> &mdash; MySQL/Aurora database</li>
+      </ul>
+      <p><strong>Inbound traffic</strong> flows into a resource (a client sending a request to your web server). <strong>Outbound traffic</strong> flows out from a resource (your server sending a response back, or initiating a call to an external API).</p>
+      <p>Good network security means each resource exposes <em>only the ports and sources it needs</em>. A web server should accept HTTPS on port 443 from the internet, but a database should accept connections only from the application servers that need it &mdash; never from the internet.</p>
+
+      <div class="key-concept">
+        <strong>Core principle:</strong> AWS provides <strong>two layers</strong> of VPC network filtering: <strong>security groups</strong> (at the network interface level) and <strong>network ACLs</strong> (at the subnet level). They complement each other &mdash; traffic must pass both to reach a resource.
+      </div>
+
+      <p>Consider a typical three-tier application:</p>
+      <ul>
+        <li>A <strong>web server</strong> in a public subnet accepts HTTPS from the internet.</li>
+        <li>An <strong>application server</strong> in a private subnet accepts requests only from the web server.</li>
+        <li>A <strong>database</strong> in a private subnet accepts connections only from the application server.</li>
+      </ul>
+      <p>Each tier needs different network rules. Security groups control what each individual resource allows. NACLs control what the entire subnet allows. Together they create a defense-in-depth architecture.</p>
+
+      <h3>Security Groups</h3>
+      <p>A <strong>security group</strong> is a virtual firewall that controls traffic at the <strong>network interface (ENI) level</strong>. When you associate a security group with an EC2 instance, it controls what traffic can reach and leave that specific instance. A security group is <em>not</em> applied to an entire subnet &mdash; it is attached to the network interfaces of individual resources.</p>
+
+      <h4>Inbound and Outbound Rules</h4>
+      <p>Each security group has separate <strong>inbound rules</strong> (controlling incoming traffic) and <strong>outbound rules</strong> (controlling outgoing traffic). Each rule specifies:</p>
+      <ul>
+        <li><strong>Protocol</strong> &mdash; TCP, UDP, ICMP, or all traffic.</li>
+        <li><strong>Port range</strong> &mdash; a single port (443) or a range (1024&ndash;65535).</li>
+        <li><strong>Source</strong> (for inbound) or <strong>Destination</strong> (for outbound) &mdash; a CIDR block (10.0.0.0/16), a specific IP (203.0.113.50/32), or another security group ID.</li>
+      </ul>
+
+      <h4>Stateful Behavior</h4>
+      <p>Security groups are <strong>stateful</strong>. This means they track connections. If an inbound rule allows traffic in, the response traffic is <em>automatically allowed out</em> &mdash; you do not need a separate outbound rule for the response. Similarly, if an outbound rule allows traffic out, the response coming back in is automatically allowed.</p>
+
+      <div class="key-concept">
+        <strong>What stateful means in practice:</strong> You allow inbound HTTPS on port 443. A client sends a request to your server. The server sends back a response on an ephemeral port. Because the security group is stateful, it remembers the inbound connection and automatically permits the response &mdash; no outbound rule needed for that specific response.
+      </div>
+
+      <h4>Allow Rules Only &mdash; No Explicit Deny</h4>
+      <p>Security groups support <strong>only allow rules</strong>. You cannot write a rule that says "deny traffic from IP 10.0.1.50." If traffic does not match any allow rule, it is <em>implicitly denied</em>. This means security groups work on a whitelist model: everything is blocked unless you explicitly allow it.</p>
+      <p>All rules in a security group are evaluated together. If <em>any</em> rule allows the traffic, it is permitted. There is no rule ordering or priority &mdash; rules are combined as a union.</p>
+
+      <h4>Multiple Security Groups</h4>
+      <p>You can associate <strong>multiple security groups</strong> with a single network interface (up to 5 by default). When multiple security groups are attached, all their rules are <em>aggregated</em>. If any rule across any attached security group allows the traffic, it passes. Adding a more permissive security group expands what is allowed &mdash; it does not override or restrict rules from other attached security groups.</p>
+
+      <h4>Default Security Group</h4>
+      <p>Every VPC comes with a <strong>default security group</strong>. Its default rules:</p>
+      <ul>
+        <li><strong>Inbound:</strong> Allows all traffic from other resources associated with the same default security group (self-referencing rule). Denies all other inbound traffic.</li>
+        <li><strong>Outbound:</strong> Allows all outbound traffic to any destination.</li>
+      </ul>
+      <p>A <strong>new custom security group</strong> (one you create) has different defaults:</p>
+      <ul>
+        <li><strong>Inbound:</strong> Denies all inbound traffic (no rules).</li>
+        <li><strong>Outbound:</strong> Allows all outbound traffic to any destination.</li>
+      </ul>
+
+      <div class="gotcha">
+        <h4>Default Outbound Rules</h4>
+        <p>Both the default SG and new custom SGs allow <strong>all outbound traffic</strong> by default. This is convenient but may be too permissive for production environments. Review outbound rules and restrict them when the architecture requires it (for example, limiting a database server to only communicate with specific application servers).</p>
+      </div>
+
+      <h4>Security Group References</h4>
+      <p>Instead of specifying an IP address as a source, you can reference <strong>another security group</strong>. This is extremely powerful for multi-tier architectures:</p>
+      <pre style="background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius-sm);padding:1rem;overflow-x:auto;font-size:0.82rem;line-height:1.5;color:var(--text-secondary);"><code>Database Security Group — Inbound Rules:
+Type        Port    Source
+MySQL/Aurora  3306    sg-0abc123 (App Server SG)</code></pre>
+      <p>This rule says: "Allow MySQL traffic on port 3306, but <em>only</em> from resources that have the App Server security group attached." If the app servers scale from 2 to 20 instances, the rule still works &mdash; no IP updates needed. This is the recommended approach for tier-to-tier communication.</p>
+
+      <h4>Restricting Administrative Access</h4>
+      <p>Never allow SSH (port 22) or RDP (port 3389) from <code>0.0.0.0/0</code> (the entire internet). Instead, restrict these ports to specific trusted CIDR blocks (your office IP range, a VPN endpoint, or a bastion host security group).</p>
+
+      <h3>Network ACLs (NACLs)</h3>
+      <p>A <strong>network access control list (NACL)</strong> is a firewall at the <strong>subnet level</strong>. Every subnet in a VPC is associated with exactly one NACL. The NACL filters all traffic entering and leaving the subnet, regardless of which resources are inside.</p>
+
+      <h4>Inbound and Outbound NACL Rules</h4>
+      <p>Like security groups, NACLs have separate inbound and outbound rule sets. Each rule specifies:</p>
+      <ul>
+        <li><strong>Rule number</strong> &mdash; determines evaluation order (lower numbers are evaluated first).</li>
+        <li><strong>Protocol</strong> &mdash; TCP, UDP, ICMP, or all.</li>
+        <li><strong>Port range</strong> &mdash; a single port or range.</li>
+        <li><strong>Source</strong> (inbound) or <strong>Destination</strong> (outbound) &mdash; a CIDR block.</li>
+        <li><strong>Action</strong> &mdash; <strong>ALLOW</strong> or <strong>DENY</strong>.</li>
+      </ul>
+
+      <h4>Stateless Behavior</h4>
+      <p>NACLs are <strong>stateless</strong>. They do not track connections. Every packet is evaluated independently against the rules &mdash; both the request <em>and</em> the response. If you allow inbound traffic on port 443, you must <em>also</em> create an outbound rule allowing the response traffic. The response typically goes back on an <strong>ephemeral port</strong> (1024&ndash;65535), so you need to allow outbound traffic on that range.</p>
+
+      <div class="key-concept">
+        <strong>Why ephemeral ports matter:</strong> When a client connects to your web server on port 443, the client picks a random high port (e.g., 52413) for its side of the connection. Your server sends the response <em>to</em> that ephemeral port. If the NACL's outbound rules do not allow traffic on ephemeral ports (1024&ndash;65535), the response is silently dropped &mdash; even though the security group would have allowed it.
+      </div>
+
+      <h4>Rule Numbering and First-Match Evaluation</h4>
+      <p>NACL rules are evaluated in <strong>ascending order by rule number</strong>. The first rule that matches the traffic is applied, and no further rules are checked. This is fundamentally different from security groups, where all rules are combined.</p>
+      <pre style="background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius-sm);padding:1rem;overflow-x:auto;font-size:0.82rem;line-height:1.5;color:var(--text-secondary);"><code>Inbound NACL Rules:
+Rule#   Type    Port    Source          Action
+100     HTTPS   443     0.0.0.0/0       ALLOW
+200     SSH     22      10.0.0.0/16     ALLOW
+300     ALL     ALL     192.168.1.0/24  DENY
+*       ALL     ALL     0.0.0.0/0       DENY</code></pre>
+      <p>Traffic from 192.168.1.50 on port 443 hits rule 100 first (ALLOW HTTPS from anywhere), so it is <strong>allowed</strong> &mdash; rule 300 is never reached. But traffic from 192.168.1.50 on port 3306 does not match rules 100 or 200, reaches rule 300 (DENY from 192.168.1.0/24), and is <strong>denied</strong>.</p>
+
+      <h4>The Final <code>*</code> Rule</h4>
+      <p>Every NACL has an immutable <strong><code>*</code> (asterisk) rule</strong> at the bottom with action DENY. If traffic does not match any numbered rule, this catch-all rule denies it. You cannot edit or remove this rule.</p>
+
+      <h4>Default NACL vs Custom NACL</h4>
+      <div class="table-wrap">
+        <table class="comparison-table">
+          <thead>
+            <tr><th>Feature</th><th>Default NACL</th><th>Custom NACL (newly created)</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Inbound rules</td><td>Allow all traffic (rule 100: ALLOW ALL)</td><td>Deny all traffic (only the * DENY rule)</td></tr>
+            <tr><td>Outbound rules</td><td>Allow all traffic (rule 100: ALLOW ALL)</td><td>Deny all traffic (only the * DENY rule)</td></tr>
+            <tr><td>Effect</td><td>All traffic passes through &mdash; transparent</td><td>All traffic blocked until you add allow rules</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>The default NACL allows everything, which is why subnets work out of the box. A custom NACL denies everything &mdash; if you create one and associate it with a subnet without adding rules, <em>all traffic to and from that subnet is blocked</em>.</p>
+
+      <h4>IPv4 and IPv6</h4>
+      <p>NACL rules are address-family specific. If your VPC uses both IPv4 and IPv6, you need rules for both. An IPv4 ALLOW rule does not cover IPv6 traffic from the same source.</p>
+
+      <h3>Security Groups vs NACLs &mdash; Complete Comparison</h3>
+      <div class="table-wrap">
+        <table class="comparison-table">
+          <thead>
+            <tr><th>Feature</th><th>Security Group</th><th>Network ACL (NACL)</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Scope</td><td>Network interface (ENI) level</td><td>Subnet level</td></tr>
+            <tr><td>Stateful / Stateless</td><td><strong>Stateful</strong> &mdash; tracks connections</td><td><strong>Stateless</strong> &mdash; evaluates every packet</td></tr>
+            <tr><td>Rule types</td><td>Allow only</td><td>Allow <strong>and</strong> Deny</td></tr>
+            <tr><td>Rule evaluation</td><td>All rules evaluated together (union)</td><td>Rules evaluated in order by number (first match)</td></tr>
+            <tr><td>Return traffic</td><td>Automatically allowed</td><td>Must be explicitly allowed by rules</td></tr>
+            <tr><td>Default behavior</td><td>Custom SG: deny all inbound, allow all outbound</td><td>Default NACL: allow all. Custom NACL: deny all</td></tr>
+            <tr><td>SG references</td><td class="check">&#10003; Can reference other SGs as source/dest</td><td class="cross">&#10007; CIDR blocks only</td></tr>
+            <tr><td>Deny rules</td><td class="cross">&#10007; Not supported</td><td class="check">&#10003; Supported</td></tr>
+            <tr><td>Applies to</td><td>Only resources associated with the SG</td><td>All traffic entering/leaving the subnet</td></tr>
+            <tr><td>Best for</td><td>Resource-specific access control</td><td>Subnet-wide deny rules, IP blocking</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p><strong>Practical consequences of this table:</strong></p>
+      <ul>
+        <li>Security groups are the <strong>primary tool</strong> for controlling access to individual resources. The stateful behavior and SG references make them simpler to manage for most use cases.</li>
+        <li>NACLs provide a <strong>secondary defense layer</strong> and are the only way to create an explicit deny rule (such as blocking a specific IP). But their stateless nature makes them harder to manage &mdash; you must handle ephemeral ports and return traffic manually.</li>
+        <li>A security group ALLOW does <strong>not</strong> override a NACL DENY. Traffic must be permitted by both layers.</li>
+        <li>Adding a permissive security group to a resource <strong>expands</strong> what is allowed &mdash; it cannot restrict rules from other attached SGs.</li>
+      </ul>
+
+      <h3>How Both Controls Work Together</h3>
+      <p>Consider a request flowing through a three-tier architecture:</p>
+      <ol>
+        <li><strong>Internet client &rarr; Internet Gateway &rarr; public subnet boundary:</strong> The public subnet's <strong>NACL inbound rules</strong> evaluate the packet. If allowed, it enters the subnet.</li>
+        <li><strong>Public subnet &rarr; web server ENI:</strong> The web server's <strong>security group inbound rules</strong> evaluate the packet. If allowed (e.g., TCP 443 from 0.0.0.0/0), the packet reaches the web server.</li>
+        <li><strong>Web server &rarr; private subnet boundary:</strong> The web server's <strong>SG outbound rules</strong> evaluate the request to the app server (stateful: if allowed, the return is auto-allowed). The public subnet's <strong>NACL outbound rules</strong> evaluate the departing packet. The private subnet's <strong>NACL inbound rules</strong> evaluate the arriving packet.</li>
+        <li><strong>Private subnet &rarr; app server ENI:</strong> The app server's <strong>security group inbound rules</strong> evaluate the packet (e.g., allow from the web server's SG).</li>
+        <li><strong>App server &rarr; database:</strong> Same pattern: app server SG outbound, private subnet NACL outbound, database subnet NACL inbound, database SG inbound (e.g., MySQL 3306 from app server SG).</li>
+        <li><strong>Response traffic flows back:</strong> Security groups automatically permit return traffic (stateful). NACLs require explicit outbound/inbound rules in the return direction, including ephemeral ports.</li>
+      </ol>
+
+      <div class="key-concept">
+        <strong>Critical point:</strong> An overly restrictive NACL can break otherwise valid security-group-authorized traffic. If the app server's security group allows inbound from the web server, but the private subnet's NACL blocks that source CIDR, the connection fails. Traffic must pass <strong>all</strong> network controls along its path.
+      </div>
+
+      <p>Network controls are not the only cause of connectivity issues. Route tables, IGW/NAT configuration, DNS resolution, resource health, and VPC peering/endpoint configuration can all contribute. When troubleshooting, check the entire path &mdash; not just security groups and NACLs.</p>
+
+      <h3>Practical Rule Examples</h3>
+
+      <h4>Example 1: Web Server Security Group</h4>
+      <pre style="background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius-sm);padding:1rem;overflow-x:auto;font-size:0.82rem;line-height:1.5;color:var(--text-secondary);"><code>Web Server SG — Inbound Rules:
+Type    Port    Source          Note
+HTTPS   443     0.0.0.0/0       Public web traffic
+HTTP    80      0.0.0.0/0       Redirect to HTTPS (optional)
+SSH     22      10.0.5.0/24     Bastion host subnet only
+
+Web Server SG — Outbound Rules:
+Type    Port    Destination     Note
+Custom  8080    sg-app-server   App server communication
+HTTPS   443     0.0.0.0/0       External API calls</code></pre>
+      <p>Port 80 is often included to redirect HTTP requests to HTTPS. If your ALB handles this redirect, you may not need port 80 on the instance at all. SSH is restricted to the bastion subnet &mdash; never open to 0.0.0.0/0.</p>
+
+      <h4>Example 2: Private Database Security Group</h4>
+      <pre style="background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius-sm);padding:1rem;overflow-x:auto;font-size:0.82rem;line-height:1.5;color:var(--text-secondary);"><code>Database SG — Inbound Rules:
+Type          Port    Source              Note
+MySQL/Aurora  3306    sg-app-server       App tier only
+
+Database SG — Outbound Rules:
+(None needed for responses — SG is stateful)</code></pre>
+      <p>The database only allows connections from resources with the app server SG &mdash; not from the web tier, not from the internet. If the app tier scales, new instances automatically get access because the rule references the SG, not individual IPs.</p>
+
+      <h4>Example 3: NACL Deny Rule for IP Blocking</h4>
+      <pre style="background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius-sm);padding:1rem;overflow-x:auto;font-size:0.82rem;line-height:1.5;color:var(--text-secondary);"><code>Public Subnet NACL — Inbound Rules:
+Rule#   Type    Port    Source          Action
+ 50     ALL     ALL     198.51.100.0/24 DENY     ← Block malicious range
+100     HTTPS   443     0.0.0.0/0       ALLOW
+200     SSH     22      10.0.5.0/24     ALLOW
+  *     ALL     ALL     0.0.0.0/0       DENY</code></pre>
+      <p>Rule 50 denies all traffic from 198.51.100.0/24 <em>before</em> rule 100 can allow HTTPS from that range. This is impossible with a security group alone because security groups cannot express deny rules. The NACL provides the subnet-level IP block.</p>
+
+      <h4>Example 4: Stateless Return Traffic Failure</h4>
+      <p>An application server initiates an HTTPS call to an external API. The security group allows outbound HTTPS (port 443). But the private subnet NACL has restrictive inbound rules that <strong>do not allow ephemeral ports</strong> (1024&ndash;65535) from the external API's IP range.</p>
+      <p><strong>Result:</strong> The request goes out, but the API's response arrives on an ephemeral port and is <em>dropped by the NACL</em>. The application sees a timeout. The security group would have allowed the response (it is stateful), but the NACL evaluated the return packet independently and blocked it.</p>
+      <p><strong>Fix:</strong> Add an inbound NACL rule allowing TCP on ports 1024&ndash;65535 from the relevant source CIDR.</p>
+
+    </section>
+
+    <hr class="topic-divider">
+
+    <!-- SG SECTION 2: Real-World Scenarios -->
+    <section class="topic-section" id="sg-real-world">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain2)" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        When Real Architects Actually Use This
+      </h2>
+
+      <div class="real-world">
+        <h4>Scenario A: Secure Three-Tier Web Application</h4>
+        <p><strong>Requirement:</strong> A company hosts a web application with a public web tier (ALB + EC2), a private application tier, and a private RDS database. Only the web tier should be internet-facing. The database must never receive traffic from the internet.</p>
+        <p><strong>Solution:</strong></p>
+        <ul>
+          <li><strong>Web server SG:</strong> Allow inbound HTTPS (443) from the ALB security group or from 0.0.0.0/0 if directly internet-facing. Allow outbound to the app server SG on the application port.</li>
+          <li><strong>App server SG:</strong> Allow inbound from the web server SG on the application port (e.g., 8080). Allow outbound to the database SG on port 3306.</li>
+          <li><strong>Database SG:</strong> Allow inbound on port 3306 <em>only</em> from the app server SG. No internet-facing rules.</li>
+          <li><strong>NACLs:</strong> The public subnet NACL allows HTTPS and ephemeral ports. The private subnets use NACLs that deny all internet-originating traffic as an additional guardrail.</li>
+        </ul>
+        <p><strong>Why SG references?</strong> If the app tier auto-scales from 2 to 50 instances, the database SG rule still works &mdash; it references the SG, not IPs. No rule updates needed during scaling events.</p>
+        <p><strong>Trade-off:</strong> Security groups alone handle most filtering. NACLs add defense-in-depth but increase operational complexity because of their stateless nature.</p>
+        <p><strong>Common mistake:</strong> Opening the database SG to the entire VPC CIDR (e.g., 10.0.0.0/16) instead of a specific SG reference. This allows every resource in the VPC to connect to the database, violating least privilege.</p>
+      </div>
+
+      <div class="real-world">
+        <h4>Scenario B: Allow HTTPS but Restrict Administrative Access</h4>
+        <p><strong>Requirement:</strong> A web server needs public HTTPS access, but SSH must be limited to the operations team's VPN IP range (10.100.0.0/16). The security team wants a subnet-level restriction as backup.</p>
+        <p><strong>Solution:</strong></p>
+        <ul>
+          <li><strong>Security group:</strong> Allow inbound TCP 443 from 0.0.0.0/0. Allow inbound TCP 22 from 10.100.0.0/16 only.</li>
+          <li><strong>NACL (optional additional layer):</strong> Add a DENY rule for TCP 22 from 0.0.0.0/0 with a <em>higher</em> rule number than an ALLOW for TCP 22 from 10.100.0.0/16. This ensures even if someone misconfigures the security group to open SSH broadly, the NACL blocks it at the subnet level.</li>
+        </ul>
+        <p><strong>Why this matters:</strong> Unrestricted SSH (0.0.0.0/0 on port 22) is one of the most common AWS security misconfigurations. It exposes instances to brute-force attacks from the entire internet. AWS Security Hub and Trusted Advisor flag this automatically.</p>
+        <p><strong>Trade-off:</strong> Using NACLs for SSH restriction adds a layer but requires maintaining rules in two places. Most teams rely on security groups plus a bastion host or AWS Systems Manager Session Manager (which eliminates SSH entirely).</p>
+      </div>
+
+      <div class="real-world">
+        <h4>Scenario C: Block a Specific IP Address Range</h4>
+        <p><strong>Requirement:</strong> A security team detects attack traffic from the CIDR range 198.51.100.0/24 and needs to block it immediately across all resources in the public subnet.</p>
+        <p><strong>Solution:</strong> Add a NACL inbound <strong>DENY</strong> rule with a <em>low rule number</em> (e.g., 50) for all traffic from 198.51.100.0/24. Because NACLs evaluate rules in order, this DENY is processed before any ALLOW rules that might match the same source.</p>
+        <p><strong>Why a NACL and not a security group?</strong> Security groups do not support deny rules. You could remove the offending IP from allow rules, but if the SG allows 0.0.0.0/0 (common for web servers), there is no way to carve out an exception. A NACL DENY is the correct tool for explicit IP blocking.</p>
+        <p><strong>Trade-off:</strong> NACL changes take effect immediately for all resources in the subnet. For broader or more dynamic IP blocking (thousands of ranges), AWS WAF with IP sets on an ALB or CloudFront is more practical.</p>
+        <p><strong>Common mistake:</strong> Adding the DENY rule with a high rule number (e.g., 500) after an ALLOW on rule 100 that matches the same traffic. The ALLOW on 100 fires first, and the DENY on 500 is never reached.</p>
+      </div>
+
+      <div class="real-world">
+        <h4>Scenario D: Troubleshoot Broken Application Connectivity</h4>
+        <p><strong>Requirement:</strong> An application server can send HTTP requests to an internal API in another subnet, but the connection times out. Both resources were working yesterday.</p>
+        <p><strong>Systematic troubleshooting:</strong></p>
+        <ol>
+          <li><strong>Security group inbound:</strong> Does the API server's SG allow inbound on the API port from the app server's SG or CIDR?</li>
+          <li><strong>Security group outbound:</strong> Does the app server's SG allow outbound to the API server's port? (Usually yes by default, but check.)</li>
+          <li><strong>NACL inbound on API subnet:</strong> Does the API subnet's NACL allow inbound traffic from the app server's CIDR on the correct port?</li>
+          <li><strong>NACL outbound on app subnet:</strong> Does the app subnet's NACL allow outbound traffic to the API server's CIDR?</li>
+          <li><strong>NACL return traffic:</strong> Do both subnets' NACLs allow ephemeral port traffic in the return direction?</li>
+          <li><strong>Route tables:</strong> Does a route exist between the two subnets? Were any routes changed?</li>
+          <li><strong>Resource health:</strong> Is the API server running and the service listening on the expected port?</li>
+          <li><strong>VPC connectivity:</strong> If the subnets are in different VPCs, check peering connections or Transit Gateway routes.</li>
+        </ol>
+        <p><strong>Key insight:</strong> A connection timeout does not automatically prove a security group or NACL is blocking traffic. Missing routes, stopped services, DNS failures, and network interface issues produce the same symptom. Always check the full path.</p>
+      </div>
+
+      <div class="real-world">
+        <h4>Scenario E: Restrict East-West Traffic Between Subnets</h4>
+        <p><strong>Requirement:</strong> A company runs two application teams in separate private subnets. Team A's resources must not communicate with Team B's resources for compliance isolation.</p>
+        <p><strong>Solution:</strong></p>
+        <ul>
+          <li><strong>Security groups (primary):</strong> Each team's resources use a dedicated SG that only allows inbound from its own team's SG. Neither SG references the other.</li>
+          <li><strong>NACLs (additional enforcement):</strong> Add NACL DENY rules on each subnet blocking traffic from the other subnet's CIDR. This provides subnet-level enforcement even if someone misconfigures a security group.</li>
+        </ul>
+        <p><strong>Why SGs are primary:</strong> Security groups provide resource-level granularity and are easier to manage with scaling. NACLs operate at the subnet level and cannot distinguish between individual resources within a subnet.</p>
+        <p><strong>Trade-off:</strong> NACLs add administrative overhead because you must maintain DENY rules, handle ephemeral ports for legitimate traffic, and update rules when subnet CIDRs change. For strict isolation, consider separate VPCs instead of relying solely on network controls within a single VPC.</p>
+      </div>
+
+      <div class="real-world">
+        <h4>Scenario F: New Service Tier Causes Intermittent Failures</h4>
+        <p><strong>Requirement:</strong> A team adds a caching tier (ElastiCache) in a new subnet. Existing web and app servers can reach the cache, but responses are intermittent &mdash; some requests work, others time out.</p>
+        <p><strong>Diagnosis:</strong></p>
+        <ul>
+          <li><strong>Security group:</strong> The cache SG allows inbound on the Redis port from the app server SG &mdash; this is correct and stateful, so responses are auto-allowed.</li>
+          <li><strong>NACL on the cache subnet:</strong> A newly created custom NACL was associated with the cache subnet. It has an inbound ALLOW for the Redis port, but <strong>no outbound rule allowing ephemeral ports</strong> back to the app servers.</li>
+          <li><strong>Result:</strong> Inbound requests reach the cache (NACL inbound ALLOW + SG ALLOW). The SG allows the response (stateful). But the NACL is stateless and drops the response because there is no matching outbound rule for ephemeral ports.</li>
+        </ul>
+        <p><strong>Fix:</strong> Add a NACL outbound rule allowing TCP on ports 1024&ndash;65535 to the app server subnet CIDR.</p>
+        <p><strong>Why intermittent?</strong> Some ephemeral ports may fall in a range that coincidentally matches another NACL rule, causing inconsistent behavior depending on which port the OS selects.</p>
+        <p><strong>Lesson:</strong> When adding a new subnet with a custom NACL, always configure both inbound and outbound rules including ephemeral port ranges for return traffic.</p>
+      </div>
+
+    </section>
+
+    <hr class="topic-divider">
+
+    <!-- SG SECTION 3: SVG Diagram -->
+    <section class="topic-section" id="sg-diagram">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain3)" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+        VPC Traffic Flow &mdash; Security Groups &amp; NACLs
+      </h2>
+      <p>The diagram below shows how traffic flows through a three-tier VPC. NACLs filter at the subnet boundary (stateless &mdash; both directions evaluated independently). Security groups filter at the resource's network interface (stateful &mdash; return traffic auto-allowed). Traffic must pass both controls at every boundary.</p>
+
+      <div class="diagram-container">
+        <svg viewBox="0 0 820 620" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagram showing VPC traffic flow through a three-tier architecture. Internet client sends HTTPS to a public subnet, which passes through a subnet NACL and then a security group to reach the web server. The web server communicates with an application server in a private subnet through another NACL and security group. The app server reaches a database in a private subnet through a third NACL and security group. NACLs are stateless and require explicit return-direction rules. Security groups are stateful and auto-allow return traffic. A NACL deny overrides a security group allow.">
+
+          <defs>
+            <marker id="arr-sg" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+              <polygon points="0 0, 10 3.5, 0 7" fill="var(--domain4)"/>
+            </marker>
+            <marker id="arr-sg-warn" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+              <polygon points="0 0, 10 3.5, 0 7" fill="#ef4444"/>
+            </marker>
+            <marker id="arr-sg-accent" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+              <polygon points="0 0, 10 3.5, 0 7" fill="var(--accent)"/>
+            </marker>
+            <pattern id="grid-sg" width="20" height="20" patternUnits="userSpaceOnUse">
+              <path d="M 20 0 L 0 0 0 20" fill="none" stroke="var(--border)" stroke-width="0.3" opacity="0.4"/>
+            </pattern>
+          </defs>
+
+          <rect width="820" height="620" fill="var(--bg-card)" rx="8"/>
+          <rect width="820" height="620" fill="url(#grid-sg)" rx="8"/>
+
+          <text x="410" y="24" text-anchor="middle" font-size="14" font-weight="700" fill="var(--text-primary)" font-family="Inter, sans-serif">VPC Three-Tier Traffic Flow</text>
+
+          <!-- Internet Client -->
+          <rect x="20" y="44" width="120" height="50" rx="8" fill="var(--bg-primary)" stroke="var(--text-muted)" stroke-width="1.5" stroke-dasharray="5 3"/>
+          <text x="80" y="65" text-anchor="middle" font-size="11" font-weight="600" fill="var(--text-primary)" font-family="Inter, sans-serif">Internet Client</text>
+          <text x="80" y="82" text-anchor="middle" font-size="9" fill="var(--text-muted)" font-family="Inter, sans-serif">HTTPS request</text>
+
+          <!-- Arrow: Client -> IGW -->
+          <line x1="140" y1="69" x2="188" y2="69" stroke="var(--domain4)" stroke-width="2" marker-end="url(#arr-sg)"/>
+
+          <!-- IGW -->
+          <rect x="190" y="50" width="80" height="38" rx="6" fill="var(--bg-primary)" stroke="var(--accent)" stroke-width="1.5"/>
+          <text x="230" y="74" text-anchor="middle" font-size="10" font-weight="600" fill="var(--accent)" font-family="Inter, sans-serif">IGW</text>
+
+          <!-- Arrow: IGW -> Public Subnet -->
+          <line x1="270" y1="69" x2="308" y2="69" stroke="var(--domain4)" stroke-width="2" marker-end="url(#arr-sg)"/>
+
+          <!-- ===== PUBLIC SUBNET ===== -->
+          <rect x="310" y="36" width="490" height="116" rx="10" fill="rgba(34,197,94,0.04)" stroke="var(--domain4)" stroke-width="2"/>
+          <text x="555" y="52" text-anchor="middle" font-size="11" font-weight="700" fill="var(--domain4)" font-family="Inter, sans-serif">Public Subnet</text>
+
+          <!-- NACL badge -->
+          <rect x="316" y="58" width="70" height="24" rx="5" fill="rgba(249,115,22,0.12)" stroke="var(--accent)" stroke-width="1"/>
+          <text x="351" y="75" text-anchor="middle" font-size="9" font-weight="600" fill="var(--accent)" font-family="Inter, sans-serif">NACL</text>
+
+          <!-- Arrow: NACL -> Web Server -->
+          <line x1="386" y1="70" x2="434" y2="70" stroke="var(--accent)" stroke-width="1.5" marker-end="url(#arr-sg-accent)" stroke-dasharray="4 2"/>
+          <text x="410" y="62" text-anchor="middle" font-size="8" fill="var(--text-muted)" font-family="Inter, sans-serif">pass</text>
+
+          <!-- Web Server + SG -->
+          <rect x="436" y="56" width="140" height="50" rx="8" fill="var(--bg-primary)" stroke="var(--domain1)" stroke-width="2"/>
+          <text x="506" y="76" text-anchor="middle" font-size="11" font-weight="600" fill="var(--text-primary)" font-family="Inter, sans-serif">Web Server</text>
+          <text x="506" y="94" text-anchor="middle" font-size="8" fill="var(--text-muted)" font-family="Inter, sans-serif">SG: Allow 443 from 0.0.0.0/0</text>
+          <!-- SG badge -->
+          <rect x="580" y="56" width="44" height="18" rx="4" fill="rgba(249,115,22,0.12)" stroke="var(--domain1)" stroke-width="1"/>
+          <text x="602" y="69" text-anchor="middle" font-size="8" font-weight="600" fill="var(--domain1)" font-family="Inter, sans-serif">SG</text>
+
+          <!-- Return traffic label -->
+          <text x="555" y="138" text-anchor="middle" font-size="9" font-style="italic" fill="var(--domain4)" font-family="Inter, sans-serif">SG: stateful &rarr; return auto-allowed</text>
+          <text x="351" y="138" text-anchor="middle" font-size="9" font-style="italic" fill="var(--accent)" font-family="Inter, sans-serif">NACL: needs outbound rule</text>
+
+          <!-- ===== PRIVATE SUBNET (App) ===== -->
+          <rect x="40" y="180" width="490" height="116" rx="10" fill="rgba(6,182,212,0.04)" stroke="var(--domain2)" stroke-width="2"/>
+          <text x="285" y="196" text-anchor="middle" font-size="11" font-weight="700" fill="var(--domain2)" font-family="Inter, sans-serif">Private Subnet &mdash; Application Tier</text>
+
+          <!-- Arrow: Web -> Private Subnet -->
+          <line x1="506" y1="106" x2="506" y2="150" stroke="var(--domain4)" stroke-width="2" marker-end="url(#arr-sg)"/>
+          <line x1="506" y1="150" x2="396" y2="150" stroke="var(--domain4)" stroke-width="2"/>
+          <line x1="396" y1="150" x2="396" y2="178" stroke="var(--domain4)" stroke-width="2" marker-end="url(#arr-sg)"/>
+
+          <!-- NACL badge -->
+          <rect x="46" y="202" width="70" height="24" rx="5" fill="rgba(249,115,22,0.12)" stroke="var(--accent)" stroke-width="1"/>
+          <text x="81" y="219" text-anchor="middle" font-size="9" font-weight="600" fill="var(--accent)" font-family="Inter, sans-serif">NACL</text>
+
+          <!-- Arrow: NACL -> App Server -->
+          <line x1="116" y1="214" x2="164" y2="214" stroke="var(--accent)" stroke-width="1.5" marker-end="url(#arr-sg-accent)" stroke-dasharray="4 2"/>
+
+          <!-- App Server + SG -->
+          <rect x="166" y="200" width="160" height="50" rx="8" fill="var(--bg-primary)" stroke="var(--domain2)" stroke-width="2"/>
+          <text x="246" y="220" text-anchor="middle" font-size="11" font-weight="600" fill="var(--text-primary)" font-family="Inter, sans-serif">App Server</text>
+          <text x="246" y="238" text-anchor="middle" font-size="8" fill="var(--text-muted)" font-family="Inter, sans-serif">SG: Allow 8080 from sg-web</text>
+          <rect x="330" y="200" width="44" height="18" rx="4" fill="rgba(6,182,212,0.12)" stroke="var(--domain2)" stroke-width="1"/>
+          <text x="352" y="213" text-anchor="middle" font-size="8" font-weight="600" fill="var(--domain2)" font-family="Inter, sans-serif">SG</text>
+
+          <text x="285" y="282" text-anchor="middle" font-size="9" font-style="italic" fill="var(--domain2)" font-family="Inter, sans-serif">SG: stateful &rarr; return auto-allowed</text>
+
+          <!-- ===== PRIVATE SUBNET (DB) ===== -->
+          <rect x="40" y="320" width="490" height="116" rx="10" fill="rgba(168,85,247,0.04)" stroke="var(--domain3)" stroke-width="2"/>
+          <text x="285" y="336" text-anchor="middle" font-size="11" font-weight="700" fill="var(--domain3)" font-family="Inter, sans-serif">Private Subnet &mdash; Database Tier</text>
+
+          <!-- Arrow: App -> DB Subnet -->
+          <line x1="246" y1="250" x2="246" y2="318" stroke="var(--domain4)" stroke-width="2" marker-end="url(#arr-sg)"/>
+
+          <!-- NACL badge -->
+          <rect x="46" y="342" width="70" height="24" rx="5" fill="rgba(249,115,22,0.12)" stroke="var(--accent)" stroke-width="1"/>
+          <text x="81" y="359" text-anchor="middle" font-size="9" font-weight="600" fill="var(--accent)" font-family="Inter, sans-serif">NACL</text>
+
+          <line x1="116" y1="354" x2="164" y2="354" stroke="var(--accent)" stroke-width="1.5" marker-end="url(#arr-sg-accent)" stroke-dasharray="4 2"/>
+
+          <!-- Database + SG -->
+          <rect x="166" y="340" width="160" height="50" rx="8" fill="var(--bg-primary)" stroke="var(--domain3)" stroke-width="2"/>
+          <text x="246" y="360" text-anchor="middle" font-size="11" font-weight="600" fill="var(--text-primary)" font-family="Inter, sans-serif">RDS Database</text>
+          <text x="246" y="378" text-anchor="middle" font-size="8" fill="var(--text-muted)" font-family="Inter, sans-serif">SG: Allow 3306 from sg-app</text>
+          <rect x="330" y="340" width="44" height="18" rx="4" fill="rgba(168,85,247,0.12)" stroke="var(--domain3)" stroke-width="1"/>
+          <text x="352" y="353" text-anchor="middle" font-size="8" font-weight="600" fill="var(--domain3)" font-family="Inter, sans-serif">SG</text>
+
+          <!-- ===== NACL DENY EXAMPLE (right side) ===== -->
+          <rect x="560" y="180" width="240" height="256" rx="10" fill="rgba(239,68,68,0.04)" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="5 3"/>
+          <text x="680" y="200" text-anchor="middle" font-size="11" font-weight="700" fill="#ef4444" font-family="Inter, sans-serif">NACL Rule Priority</text>
+
+          <text x="580" y="222" font-size="9" fill="var(--text-secondary)" font-family="Inter, sans-serif">Rule 50: DENY 198.51.100.0/24</text>
+          <rect x="560" y="226" width="230" height="2" rx="1" fill="#ef4444" opacity="0.3"/>
+          <text x="580" y="244" font-size="9" fill="var(--text-secondary)" font-family="Inter, sans-serif">Rule 100: ALLOW 443 from 0.0.0.0/0</text>
+          <rect x="560" y="248" width="230" height="2" rx="1" fill="var(--domain4)" opacity="0.3"/>
+          <text x="580" y="266" font-size="9" fill="var(--text-secondary)" font-family="Inter, sans-serif">Rule *: DENY ALL</text>
+
+          <text x="680" y="296" text-anchor="middle" font-size="9" font-weight="600" fill="#ef4444" font-family="Inter, sans-serif">First match wins!</text>
+          <text x="680" y="312" text-anchor="middle" font-size="9" fill="var(--text-muted)" font-family="Inter, sans-serif">198.51.100.50 on port 443</text>
+          <text x="680" y="328" text-anchor="middle" font-size="9" fill="var(--text-muted)" font-family="Inter, sans-serif">&#8594; Hits Rule 50 first &#8594; DENIED</text>
+          <text x="680" y="346" text-anchor="middle" font-size="9" fill="var(--text-muted)" font-family="Inter, sans-serif">(Rule 100 never evaluated)</text>
+
+          <rect x="574" y="370" width="212" height="50" rx="6" fill="rgba(239,68,68,0.08)" stroke="#ef4444" stroke-width="1"/>
+          <text x="680" y="390" text-anchor="middle" font-size="9" font-weight="600" fill="#ef4444" font-family="Inter, sans-serif">Security group ALLOW &#8800;</text>
+          <text x="680" y="406" text-anchor="middle" font-size="9" font-weight="600" fill="#ef4444" font-family="Inter, sans-serif">override NACL DENY</text>
+
+          <!-- ===== Legend / Annotation ===== -->
+          <rect x="40" y="460" width="740" height="60" rx="6" fill="rgba(255,153,0,0.06)" stroke="var(--accent)" stroke-width="1" stroke-dasharray="4 2"/>
+          <text x="410" y="480" text-anchor="middle" font-size="11" fill="var(--text-secondary)" font-family="Inter, sans-serif">
+            <tspan font-weight="600" fill="var(--domain1)">Security Groups</tspan> = stateful, at network interface, allow rules only.
+            <tspan font-weight="600" fill="var(--accent)">NACLs</tspan> = stateless, at subnet boundary, allow + deny rules.
+          </text>
+          <text x="410" y="498" text-anchor="middle" font-size="11" fill="var(--text-secondary)" font-family="Inter, sans-serif">
+            Traffic must pass <tspan font-weight="600">both</tspan> controls. A NACL deny <tspan font-weight="600" fill="#ef4444">always blocks</tspan> regardless of SG configuration.
+          </text>
+
+          <!-- Stateful vs Stateless key -->
+          <rect x="40" y="530" width="360" height="46" rx="6" fill="rgba(34,197,94,0.06)" stroke="var(--domain4)" stroke-width="1"/>
+          <text x="220" y="549" text-anchor="middle" font-size="10" font-weight="600" fill="var(--domain4)" font-family="Inter, sans-serif">&#10003; Stateful (SG): Response auto-allowed</text>
+          <text x="220" y="567" text-anchor="middle" font-size="9" fill="var(--text-muted)" font-family="Inter, sans-serif">No outbound rule needed for tracked connection responses</text>
+
+          <rect x="420" y="530" width="360" height="46" rx="6" fill="rgba(239,68,68,0.06)" stroke="#ef4444" stroke-width="1"/>
+          <text x="600" y="549" text-anchor="middle" font-size="10" font-weight="600" fill="#ef4444" font-family="Inter, sans-serif">&#9888; Stateless (NACL): Response needs explicit rule</text>
+          <text x="600" y="567" text-anchor="middle" font-size="9" fill="var(--text-muted)" font-family="Inter, sans-serif">Outbound rule for ephemeral ports (1024-65535) required</text>
+
+          <!-- Subtle hand-drawn wobble on key lines -->
+          <path d="M 310 152 Q 312 148 316 152" fill="none" stroke="var(--domain4)" stroke-width="1" opacity="0.4"/>
+          <path d="M 40 436 Q 42 432 46 436" fill="none" stroke="var(--domain3)" stroke-width="1" opacity="0.4"/>
+
+        </svg>
+      </div>
+      <p class="diagram-label">Figure: VPC three-tier traffic flow showing NACLs at subnet boundaries (stateless, first-match rule evaluation) and security groups at each resource's network interface (stateful, return traffic auto-allowed). The right panel illustrates how a low-numbered NACL DENY rule takes precedence over a later ALLOW rule, and how a security group allow cannot override a NACL deny.</p>
+
+    </section>
+
+    <hr class="topic-divider">
+
+    <!-- SG SECTION 4: Exam Gotchas -->
+    <section class="topic-section" id="sg-gotchas">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        SAA-C03 Exam Gotchas &mdash; Security Groups vs NACLs
+      </h2>
+
+      <div class="gotcha">
+        <h4>1. Confusing Stateful (SG) with Stateless (NACL)</h4>
+        <p><strong>Wrong:</strong> "I allowed inbound HTTPS in the NACL, so the response is automatically permitted." <strong>Correct:</strong> NACLs are stateless &mdash; return traffic must be explicitly allowed by an outbound rule (including ephemeral ports). Only security groups are stateful and auto-allow responses.</p>
+        <p><strong>Exam clue:</strong> "Traffic reaches the server but responses never arrive" = missing NACL outbound rule for ephemeral ports.</p>
+        <p><strong>Memory rule:</strong> SG = stateful (tracks connections). NACL = stateless (every packet evaluated independently).</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>2. Assuming Security Groups Support Deny Rules</h4>
+        <p><strong>Wrong:</strong> "I'll add a deny rule to the SG to block that malicious IP." <strong>Correct:</strong> Security groups support <strong>allow rules only</strong>. To explicitly deny a specific IP, use a NACL deny rule. In a security group, anything not explicitly allowed is implicitly denied.</p>
+        <p><strong>Exam clue:</strong> "Block a specific IP range" = NACL. "Allow only specific sources" = SG.</p>
+        <p><strong>Memory rule:</strong> SG = allow list only. NACL = allow + deny.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>3. Assuming NACLs Evaluate All Matching Rules</h4>
+        <p><strong>Wrong:</strong> "Rule 100 allows HTTPS from everywhere, and rule 200 denies a specific IP, so both apply." <strong>Correct:</strong> NACLs use <strong>first-match evaluation</strong> by ascending rule number. If traffic matches rule 100 (ALLOW), rule 200 (DENY) is <em>never evaluated</em>. To deny that IP, the DENY rule must have a <em>lower</em> number than the ALLOW.</p>
+        <p><strong>Exam clue:</strong> "NACL deny rule exists but traffic still passes" = the deny has a higher rule number than a matching allow.</p>
+        <p><strong>Memory rule:</strong> NACL = first match wins. Lower number = higher priority.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>4. Forgetting the Final <code>*</code> Rule</h4>
+        <p><strong>Wrong:</strong> "I only added ALLOW rules to my custom NACL, so everything else passes." <strong>Correct:</strong> Every NACL has an immutable <code>*</code> rule at the bottom that <strong>denies all traffic not matched by earlier rules</strong>. If your custom NACL has no ALLOW rules, all traffic is denied.</p>
+        <p><strong>Exam clue:</strong> "Created a custom NACL and associated it with a subnet, now nothing works" = only the * deny rule exists.</p>
+        <p><strong>Memory rule:</strong> Default NACL = allow all. Custom NACL = deny all (until you add rules).</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>5. Assuming a Security Group Allow Overrides a NACL Deny</h4>
+        <p><strong>Wrong:</strong> "The SG allows port 443, so the NACL deny doesn't matter." <strong>Correct:</strong> Traffic must pass <strong>both</strong> the NACL and the security group. A NACL deny blocks traffic at the subnet boundary <em>before</em> it ever reaches the security group. The two are independent filters &mdash; neither overrides the other.</p>
+        <p><strong>Exam clue:</strong> "SG allows the traffic but connection still fails" = check the NACL.</p>
+        <p><strong>Memory rule:</strong> NACL + SG are independent. DENY at either layer = blocked.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>6. Forgetting NACL Return Traffic Rules</h4>
+        <p><strong>Wrong:</strong> "I allowed inbound on port 80 in the NACL, so the web server can respond." <strong>Correct:</strong> The server's response uses an <strong>ephemeral port</strong> (1024&ndash;65535). The NACL needs an <em>outbound</em> rule allowing traffic on those ports. Without it, responses are silently dropped.</p>
+        <p><strong>Exam clue:</strong> "Server receives requests but cannot send responses" + NACL mentioned = missing outbound ephemeral port rule.</p>
+        <p><strong>Memory rule:</strong> NACL stateless = request AND response both need rules. Don't forget ephemeral ports.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>7. Forgetting Ephemeral Port Requirements</h4>
+        <p><strong>Wrong:</strong> "I only need to allow port 443 inbound and outbound in the NACL." <strong>Correct:</strong> The client sends to port 443, but the server responds to the client's ephemeral port (1024&ndash;65535). The NACL outbound rule must allow <strong>this full range</strong>, not just port 443. Similarly, the client-side NACL must allow inbound on ephemeral ports.</p>
+        <p><strong>Exam clue:</strong> "NACL allows the destination port but responses time out" = ephemeral ports not covered.</p>
+        <p><strong>Memory rule:</strong> Request = known port. Response = ephemeral port (1024&ndash;65535). NACLs need both.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>8. Confusing SG Scope with NACL Scope</h4>
+        <p><strong>Wrong:</strong> "The security group protects the entire subnet." <strong>Correct:</strong> A security group is associated with <strong>network interfaces</strong> (individual resources). A NACL is associated with a <strong>subnet</strong> (all traffic in/out of that subnet). Different resources in the same subnet can have different security groups.</p>
+        <p><strong>Exam clue:</strong> "Subnet-level filtering" = NACL. "Instance-level filtering" = SG.</p>
+        <p><strong>Memory rule:</strong> SG = per-resource. NACL = per-subnet.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>9. Opening a Database SG to the Whole VPC or Internet</h4>
+        <p><strong>Wrong:</strong> "Allow MySQL 3306 from 10.0.0.0/16 so all app servers can connect." <strong>Correct:</strong> Use a <strong>security group reference</strong> (allow from sg-app-server) instead of the entire VPC CIDR. The VPC CIDR includes web servers, bastion hosts, and any other resource &mdash; far broader than necessary. A SG reference limits access to exactly the tagged resources.</p>
+        <p><strong>Exam clue:</strong> "Least privilege for database access" = SG reference to the specific application tier SG.</p>
+        <p><strong>Memory rule:</strong> Database SG source = app server SG ID, not a broad CIDR.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>10. Confusing Default SG and Default NACL Behavior</h4>
+        <p><strong>Wrong:</strong> "The default SG and default NACL both allow all traffic." <strong>Correct:</strong> The <strong>default NACL</strong> allows all inbound and outbound traffic. The <strong>default security group</strong> allows all inbound only from itself (other resources with the same SG) and allows all outbound. They have different default rules.</p>
+        <p><strong>Exam clue:</strong> "New instance can reach the internet but other instances can't reach it" = default SG only allows inbound from same SG.</p>
+        <p><strong>Memory rule:</strong> Default NACL = open. Default SG = self-referencing inbound only.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>11. Assuming a Permissive SG Overrides a Restrictive SG</h4>
+        <p><strong>Wrong:</strong> "I attached a restrictive SG, so I'll add an 'allow all' SG to override it." <strong>Correct:</strong> When multiple SGs are attached to a resource, all rules are <strong>aggregated as a union</strong>. The permissive SG <em>expands</em> what is allowed &mdash; it does not override the restrictive one. You now have all rules from both SGs active.</p>
+        <p><strong>Exam clue:</strong> "More permissive SG was added but specific traffic is still allowed" = SGs aggregate, they don't override.</p>
+        <p><strong>Memory rule:</strong> Multiple SGs = union of all rules. More SGs = more permissive (never more restrictive).</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>12. Ignoring IPv6 Rules</h4>
+        <p><strong>Wrong:</strong> "I allowed 0.0.0.0/0, so all traffic is permitted." <strong>Correct:</strong> <code>0.0.0.0/0</code> covers IPv4 only. If your VPC uses dual-stack (IPv4 + IPv6), you also need <code>::/0</code> rules. Forgetting IPv6 rules causes mysterious failures for IPv6-enabled clients.</p>
+        <p><strong>Exam clue:</strong> "Some clients can connect but others cannot" + dual-stack VPC = missing IPv6 rules.</p>
+        <p><strong>Memory rule:</strong> 0.0.0.0/0 = IPv4. ::/0 = IPv6. Dual-stack needs both.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>13. Assuming a Timeout Proves SG/NACL Is Blocking</h4>
+        <p><strong>Wrong:</strong> "The connection times out, so the security group must be blocking it." <strong>Correct:</strong> Timeouts can also be caused by missing route table entries, IGW/NAT misconfiguration, DNS resolution failures, the target service being stopped, or VPC peering/endpoint issues. Check the entire path.</p>
+        <p><strong>Exam clue:</strong> "Timeout" in a question = investigate SGs, NACLs, routes, and resource health.</p>
+        <p><strong>Memory rule:</strong> Timeout &#8800; SG problem. Check: SG &rarr; NACL &rarr; routes &rarr; service health.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>14. Assuming a Higher NACL Rule Number Overrides a Lower One</h4>
+        <p><strong>Wrong:</strong> "I added rule 500 to deny traffic, which overrides rule 100 that allows it." <strong>Correct:</strong> NACL rules are evaluated in <strong>ascending</strong> order. Rule 100 (ALLOW) is evaluated <em>before</em> rule 500 (DENY). The allow takes effect and the deny is never reached. To override, the deny must have a <em>lower</em> number.</p>
+        <p><strong>Exam clue:</strong> "DENY rule has a higher number than the matching ALLOW" = the deny is ineffective.</p>
+        <p><strong>Memory rule:</strong> Lower rule number = evaluated first = wins for that traffic.</p>
+      </div>
+
+    </section>
+
+    <hr class="topic-divider">
+
+    <!-- SG SECTION 5: Practice Questions -->
+    <section class="topic-section" id="sg-practice">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Scenario-Based Practice Questions
+      </h2>
+
+      <div class="practice-questions">
+        <h4>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          Practice Questions &mdash; Security Groups vs NACLs
+        </h4>
+
+        <!-- Q1: Stateful vs Stateless -->
+        <div class="practice-q">
+          <p class="q-text">Q1. A company hosts a web application on EC2 instances in a public subnet. The security group allows inbound HTTPS (port 443) from 0.0.0.0/0 and allows all outbound traffic. Users can access the site successfully. The network team then associates a custom NACL with the subnet. The custom NACL has one inbound rule allowing TCP 443 from 0.0.0.0/0 and one outbound rule allowing TCP 443 to 0.0.0.0/0. After this change, users report that the website no longer loads. What is the MOST likely cause?</p>
+          <ul class="q-options">
+            <li><span class="q-letter">A.</span> The security group needs an explicit outbound rule for port 443 to match the NACL outbound rule.</li>
+            <li><span class="q-letter">B.</span> The custom NACL is missing an outbound rule allowing traffic on ephemeral ports (1024&ndash;65535). The NACL is stateless and does not automatically allow response traffic.</li>
+            <li><span class="q-letter">C.</span> The custom NACL needs an inbound rule allowing traffic on ephemeral ports (1024&ndash;65535) for the client's responses.</li>
+            <li><span class="q-letter">D.</span> The security group's stateful tracking was disabled when the custom NACL was associated. The security group now needs an explicit outbound allow rule for ephemeral ports.</li>
+          </ul>
+          <button class="reveal-btn">Show Answer</button>
+          <div class="answer-reveal">
+            <p><strong>Correct Answer: B</strong></p>
+            <p>NACLs are <strong>stateless</strong> &mdash; they do not track connections. The server's response goes back to the client on an ephemeral port (1024&ndash;65535), not on port 443. The NACL outbound rule only allows port 443, so the response is dropped at the subnet boundary. The fix is to add an outbound NACL rule allowing TCP on ports 1024&ndash;65535 to 0.0.0.0/0.</p>
+            <p><strong>Why not the others?</strong></p>
+            <ul>
+              <li><strong>A</strong> is wrong because security groups are stateful. The SG automatically allows the response to an inbound connection &mdash; no explicit outbound rule is needed for tracked responses.</li>
+              <li><strong>C</strong> has the direction wrong. The inbound NACL rule needs to allow the client's <em>request</em> on port 443 (which it does). The <em>outbound</em> rule needs to allow the <em>response</em> on ephemeral ports.</li>
+              <li><strong>D</strong> is wrong because associating a NACL does not disable security group connection tracking. SGs and NACLs are independent layers.</li>
+            </ul>
+            <p><strong>Key exam clue:</strong> "Custom NACL associated" + "site stops working" + "NACL only allows the service port" = missing ephemeral port outbound rule.</p>
+            <p><strong>Takeaway:</strong> NACLs are stateless. Always include ephemeral port rules (1024&ndash;65535) in the return direction.</p>
+          </div>
+        </div>
+
+        <!-- Q2: Explicit Deny -->
+        <div class="practice-q">
+          <p class="q-text">Q2. A security team has detected malicious traffic from the IP range 203.0.113.0/24 targeting a public-facing web application. The web server's security group allows inbound HTTPS from 0.0.0.0/0. The team needs to immediately block all traffic from this IP range while continuing to serve all other users. What is the MOST effective approach?</p>
+          <ul class="q-options">
+            <li><span class="q-letter">A.</span> Remove the 0.0.0.0/0 inbound HTTPS rule from the security group and add individual allow rules for every legitimate IP range except 203.0.113.0/24.</li>
+            <li><span class="q-letter">B.</span> Add an explicit deny rule in the security group for inbound traffic from 203.0.113.0/24.</li>
+            <li><span class="q-letter">C.</span> Add a NACL inbound DENY rule for 203.0.113.0/24 with a rule number lower than any existing ALLOW rule that matches the same traffic.</li>
+            <li><span class="q-letter">D.</span> Add a NACL inbound DENY rule for 203.0.113.0/24 with rule number 999 to ensure it is evaluated after all other rules.</li>
+          </ul>
+          <button class="reveal-btn">Show Answer</button>
+          <div class="answer-reveal">
+            <p><strong>Correct Answer: C</strong></p>
+            <p>Security groups do not support deny rules, so the NACL is the correct tool. The NACL DENY rule must have a <strong>lower rule number</strong> than any ALLOW rule that would match the same traffic (e.g., an ALLOW for 0.0.0.0/0 on port 443). This ensures the DENY is evaluated first and blocks the malicious range before the ALLOW is reached.</p>
+            <p><strong>Why not the others?</strong></p>
+            <ul>
+              <li><strong>A</strong> is impractical. Listing every legitimate IP range individually is unmanageable for a public-facing web application with thousands of users from diverse locations.</li>
+              <li><strong>B</strong> is wrong because security groups do not support explicit deny rules. They only support allow rules.</li>
+              <li><strong>D</strong> is wrong because NACL rules are evaluated in ascending order. Rule 999 would be evaluated <em>after</em> a lower-numbered ALLOW rule (e.g., rule 100 ALLOW 443 from 0.0.0.0/0), so the DENY would never be reached for HTTPS traffic.</li>
+            </ul>
+            <p><strong>Key exam clue:</strong> "Block a specific IP" + "still allow all other traffic" = NACL DENY rule with a low rule number.</p>
+            <p><strong>Takeaway:</strong> Use NACLs for explicit deny rules. Always ensure the DENY rule number is lower than any ALLOW that would match the same traffic.</p>
+          </div>
+        </div>
+
+        <!-- Q3: Three-Tier Architecture -->
+        <div class="practice-q">
+          <p class="q-text">Q3. A solutions architect is designing a three-tier application with a web tier in a public subnet, an application tier in a private subnet, and an RDS MySQL database in a separate private subnet. The architect needs to ensure that only the application tier can connect to the database on port 3306, and the web tier can communicate with the application tier on port 8443. Which security group configuration follows the principle of least privilege?</p>
+          <ul class="q-options">
+            <li><span class="q-letter">A.</span> Database SG: allow inbound 3306 from the VPC CIDR (10.0.0.0/16). App SG: allow inbound 8443 from the VPC CIDR. Web SG: allow inbound 443 from 0.0.0.0/0.</li>
+            <li><span class="q-letter">B.</span> Database SG: allow inbound 3306 from the app subnet CIDR (10.0.2.0/24). App SG: allow inbound 8443 from the web subnet CIDR (10.0.1.0/24). Web SG: allow inbound 443 from 0.0.0.0/0.</li>
+            <li><span class="q-letter">C.</span> Database SG: allow inbound 3306 from the app server security group ID. App SG: allow inbound 8443 from the web server security group ID. Web SG: allow inbound 443 from 0.0.0.0/0.</li>
+            <li><span class="q-letter">D.</span> All three tiers share a single security group that allows inbound on ports 443, 8443, and 3306 from 0.0.0.0/0.</li>
+          </ul>
+          <button class="reveal-btn">Show Answer</button>
+          <div class="answer-reveal">
+            <p><strong>Correct Answer: C</strong></p>
+            <p>Security group references are the <strong>most precise</strong> way to restrict tier-to-tier communication. The database SG allows port 3306 only from resources tagged with the app server SG &mdash; not the entire VPC CIDR, not the entire subnet, and certainly not the internet. This scales automatically: new app servers with the correct SG get access immediately, and no other resources in the VPC can reach the database.</p>
+            <p><strong>Why not the others?</strong></p>
+            <ul>
+              <li><strong>A</strong> uses the entire VPC CIDR (10.0.0.0/16) as the source, which means <em>every resource in the VPC</em> &mdash; including web servers, bastion hosts, and test instances &mdash; can connect to the database. This violates least privilege.</li>
+              <li><strong>B</strong> is better than A (subnet CIDR is narrower than VPC CIDR) but still allows any resource in the app subnet to connect to the database, not just the application servers. If a monitoring tool or a developer's test instance is in the same subnet, it also gets database access.</li>
+              <li><strong>D</strong> shares a single security group across all tiers and opens all ports to the internet, completely defeating the purpose of a multi-tier architecture. This is a critical security vulnerability.</li>
+            </ul>
+            <p><strong>Key exam clue:</strong> "Least privilege" + "tier-to-tier communication" = security group references (SG IDs), not CIDR blocks.</p>
+            <p><strong>Takeaway:</strong> Reference security group IDs instead of CIDR blocks for tier-to-tier rules. This provides the tightest access control and scales with Auto Scaling groups.</p>
           </div>
         </div>
       </div>

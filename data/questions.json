@@ -514,5 +514,47 @@
     ],
     "correctAnswer": 2,
     "explanation": "Multi-region KMS keys share key material across regions. Data encrypted in us-east-1 can be decrypted in eu-west-1 using the local replica key with no cross-region API calls. Option B fails if us-east-1 is down during a disaster. SSE-S3 works but lacks key-level audit trails. Client-side encryption adds significant operational overhead compared to multi-region KMS keys."
+  },
+  {
+    "id": "d1-sg-03",
+    "domain": "domain1",
+    "topic": "security-groups-nacls",
+    "question": "A web application in a public subnet uses a custom NACL with an inbound rule allowing TCP 443 from 0.0.0.0/0 and an outbound rule allowing only TCP 443 to 0.0.0.0/0. The security group allows inbound HTTPS and all outbound traffic. Users report the site no longer loads. What is the MOST likely cause?",
+    "options": [
+      "The security group needs an explicit outbound rule for port 443 to match the NACL",
+      "The NACL is missing an outbound rule for ephemeral ports (1024-65535) — NACLs are stateless and do not auto-allow response traffic",
+      "The NACL needs an inbound rule for ephemeral ports for client responses",
+      "The security group stateful tracking was disabled when the custom NACL was associated"
+    ],
+    "correctAnswer": 1,
+    "explanation": "NACLs are stateless — they do not track connections. Server responses use ephemeral ports (1024-65535), not port 443. The NACL outbound rule only allows port 443, so responses are dropped at the subnet boundary. Security groups are stateful and auto-allow responses, so they are not the issue. Associating a NACL does not affect SG behavior."
+  },
+  {
+    "id": "d1-sg-04",
+    "domain": "domain1",
+    "topic": "security-groups-nacls",
+    "question": "A security team needs to block all traffic from 203.0.113.0/24 to a public web application while allowing all other HTTPS traffic. The web server's security group allows inbound HTTPS from 0.0.0.0/0. What is the MOST effective approach?",
+    "options": [
+      "Remove the 0.0.0.0/0 rule and add individual allow rules for every legitimate IP range",
+      "Add an explicit deny rule in the security group for 203.0.113.0/24",
+      "Add a NACL inbound DENY rule for 203.0.113.0/24 with a rule number lower than any matching ALLOW rule",
+      "Add a NACL inbound DENY rule for 203.0.113.0/24 with rule number 999"
+    ],
+    "correctAnswer": 2,
+    "explanation": "Security groups do not support deny rules, so a NACL is needed. The NACL DENY rule must have a lower rule number than any ALLOW that matches the same traffic (e.g., ALLOW 443 from 0.0.0.0/0). NACL rules are evaluated in ascending order — first match wins. Rule 999 would be evaluated after a lower-numbered ALLOW and never take effect."
+  },
+  {
+    "id": "d1-sg-05",
+    "domain": "domain1",
+    "topic": "security-groups-nacls",
+    "question": "A three-tier application has web, application, and database tiers in separate subnets. The architect needs to ensure only the application tier connects to the RDS database on port 3306. Which security group configuration follows the principle of least privilege?",
+    "options": [
+      "Database SG: allow inbound 3306 from the VPC CIDR (10.0.0.0/16)",
+      "Database SG: allow inbound 3306 from the app subnet CIDR (10.0.2.0/24)",
+      "Database SG: allow inbound 3306 from the application server security group ID",
+      "All three tiers share a single security group allowing inbound 443, 8443, and 3306 from 0.0.0.0/0"
+    ],
+    "correctAnswer": 2,
+    "explanation": "Security group references provide the tightest access control. Only resources tagged with the app server SG can reach the database — not the entire VPC or subnet. This scales automatically with Auto Scaling. VPC CIDR allows every resource in the VPC. Subnet CIDR allows any resource in that subnet. A shared SG with internet access is a critical vulnerability."
   }
 ]
