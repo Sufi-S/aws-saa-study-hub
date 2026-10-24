@@ -430,5 +430,47 @@
     ],
     "correctAnswer": 1,
     "explanation": "Amazon Cognito identity pools provide web identity federation. Users sign in with Google, and Cognito exchanges the identity token for temporary AWS credentials via STS. The IAM role attached to the identity pool defines permissions. No IAM users are needed. IAM Identity Center is for workforce access, not customer-facing apps. Embedding keys in app code is a critical security vulnerability."
+  },
+  {
+    "id": "d1-scp-03",
+    "domain": "domain1",
+    "topic": "organizations-scps",
+    "question": "A company uses AWS Organizations and wants to prevent any member account from disabling AWS CloudTrail logging. Several member-account administrators have the AdministratorAccess IAM policy attached. Which approach ensures CloudTrail cannot be disabled in any member account, even by administrators?",
+    "options": [
+      "Remove AdministratorAccess from all administrators and replace it with a custom policy excluding CloudTrail actions",
+      "Attach an IAM permissions boundary to each administrator that denies cloudtrail:StopLogging and cloudtrail:DeleteTrail",
+      "Attach an SCP to the organization root with an explicit Deny for cloudtrail:StopLogging and cloudtrail:DeleteTrail",
+      "Configure CloudTrail as an organization trail and enable consolidated billing to protect it"
+    ],
+    "correctAnswer": 2,
+    "explanation": "An SCP with an explicit Deny at the organization root prevents all IAM principals in all member accounts from disabling CloudTrail, including users with AdministratorAccess and the member account root user. Per-account IAM changes (options A and B) can be circumvented by local administrators. Consolidated billing is a cost feature, not a security control."
+  },
+  {
+    "id": "d1-scp-04",
+    "domain": "domain1",
+    "topic": "organizations-scps",
+    "question": "A company has an AWS Organization with Production and Development OUs. Production accounts must be restricted to eu-west-1 and eu-central-1 only, while development accounts can use any Region. The root has a FullAWSAccess SCP. How should this be configured?",
+    "options": [
+      "Attach a Region-restricting SCP to the organization root and create an exception SCP on the Development OU to override the deny",
+      "Attach a Region-restricting SCP with an explicit Deny for non-EU Regions only to the Production OU, leaving the Development OU unrestricted",
+      "Remove FullAWSAccess from the root and create separate allow-list SCPs for each OU",
+      "Configure IAM policies in each production account to deny non-EU Region actions"
+    ],
+    "correctAnswer": 1,
+    "explanation": "Attaching the Region-restricting SCP only to the Production OU limits production to EU Regions while development remains unrestricted. An SCP explicit Deny cannot be overridden by an Allow in a child SCP (eliminates option A). Removing FullAWSAccess requires complex allow-lists. Per-account IAM policies can be modified by local admins."
+  },
+  {
+    "id": "d1-scp-05",
+    "domain": "domain1",
+    "topic": "organizations-scps",
+    "question": "A company is setting up AWS Organizations for the first time. They need consolidated billing for cost tracking, centralized security guardrails across 12 member accounts, and employee single sign-on to multiple accounts. Which combination of services meets ALL three requirements?",
+    "options": [
+      "AWS Organizations with consolidated billing, IAM policies in each account for guardrails, and cross-account IAM roles for SSO",
+      "AWS Organizations with consolidated billing and SCPs for centralized guardrails, plus AWS IAM Identity Center for single sign-on",
+      "AWS Organizations with consolidated billing for both cost tracking and security enforcement, plus Amazon Cognito for employee SSO",
+      "AWS Control Tower for account provisioning, AWS Config for security guardrails, and SAML 2.0 federation for SSO"
+    ],
+    "correctAnswer": 1,
+    "explanation": "Organizations provides consolidated billing (cost) and SCPs (centralized guardrails no member account can override). IAM Identity Center provides workforce SSO across accounts. Option A uses per-account IAM policies that local admins can change. Option C confuses billing with security enforcement and Cognito with workforce SSO. Option D uses Config for compliance monitoring, not prevention."
   }
 ]

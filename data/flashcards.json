@@ -223,5 +223,40 @@
     "term": "Amazon Cognito (Identity Pools)",
     "definition": "Provides temporary AWS credentials to mobile/web app users who sign in via social providers (Google, Facebook, Apple), SAML, or OpenID Connect. Uses web identity federation to exchange tokens for STS credentials scoped by an IAM role.",
     "gotcha": "Cognito is for CUSTOMER-FACING app users. IAM Identity Center is for WORKFORCE (employee) users. If the exam mentions mobile apps + social login, Cognito is the answer."
+  },
+  {
+    "term": "AWS Organizations",
+    "definition": "A free service that lets you group multiple AWS accounts under a single management structure. Provides consolidated billing, organizational units (OUs), and policy-based governance via SCPs. One management account controls the organization.",
+    "gotcha": "Organizations is required for SCPs. Without enabling 'all features' mode, only consolidated billing is available — SCPs are not. You can invite existing accounts or create new ones from the management account."
+  },
+  {
+    "term": "Management Account (Organizations)",
+    "definition": "The single account that created the AWS Organization. It pays the consolidated bill, can create/invite member accounts, and manages SCPs. It is exempt from SCP restrictions.",
+    "gotcha": "SCPs NEVER restrict the management account — not even SCPs attached to the root OU. Best practice: use it only for billing and org management, never for workloads, because it operates without SCP guardrails."
+  },
+  {
+    "term": "Member Account (Organizations)",
+    "definition": "Any AWS account in an organization that is not the management account. Member accounts are subject to SCPs. They can be created by the organization or invited into it.",
+    "gotcha": "SCPs apply to ALL principals in member accounts, including the root user. This is unlike normal IAM where the root user cannot be restricted by IAM policies. The member account root user IS restricted by SCPs."
+  },
+  {
+    "term": "Organizational Unit (OU)",
+    "definition": "A container within AWS Organizations that groups accounts. OUs can be nested. SCPs attached to an OU are inherited by all accounts and child OUs beneath it. Common OUs: Production, Development, Security, Shared Services.",
+    "gotcha": "Moving an account between OUs instantly changes which SCPs apply to it. If users in an account suddenly lose access, check whether the account was recently moved to an OU with more restrictive SCPs."
+  },
+  {
+    "term": "SCP Inheritance",
+    "definition": "SCPs flow down the organization hierarchy: root → OU → child OU → account. The effective SCP for any account is the intersection of all SCPs from the root to that account. A child can never have more permissions than its parent allows.",
+    "gotcha": "An explicit Deny at any level cannot be overridden by an Allow at a lower level. A more permissive SCP on a child OU does NOT expand beyond the parent's ceiling. Permissions only narrow as you descend."
+  },
+  {
+    "term": "SCP Allow-List vs Deny-List",
+    "definition": "Deny-list (default): keep FullAWSAccess SCP and add explicit Deny for blocked actions. Allow-list: remove FullAWSAccess and explicitly Allow only permitted services — everything else is implicitly denied.",
+    "gotcha": "If you remove FullAWSAccess without a replacement Allow SCP, ALL actions are denied for member accounts. A deny-list SCP alone (without FullAWSAccess) does not allow anything — the broad Allow comes from FullAWSAccess, not from the absence of Deny."
+  },
+  {
+    "term": "Consolidated Billing (Organizations)",
+    "definition": "All member accounts' charges roll into one bill paid by the management account. Enables volume pricing discounts (S3, data transfer) and Reserved Instance sharing across the organization.",
+    "gotcha": "Consolidated billing is a COST feature, not a SECURITY feature. It does not enforce permissions, restrict actions, or provide guardrails. If the exam asks about 'centralized security enforcement,' the answer is SCPs, not consolidated billing."
   }
 ]

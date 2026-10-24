@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>IAM &amp; STS — Domain 1: Secure Architectures — SAA-C03 Study Hub</title>
+  <title>Domain 1: Design Secure Architectures — SAA-C03 Study Hub</title>
   <link rel="stylesheet" href="../assets/css/style.css">
   <script src="../assets/js/theme.js"></script>
 </head>
@@ -44,24 +44,29 @@
 
     <div class="page-header">
       <div class="breadcrumb">
-        <a href="../index.html">Home</a> <span>/</span> <a href="domain1.html">Domain 1</a> <span>/</span> <span>IAM &amp; STS</span>
+        <a href="../index.html">Home</a> <span>/</span> <a href="domain1.html">Domain 1</a> <span>/</span> <span>Secure Architectures</span>
       </div>
       <h1 style="display:flex;align-items:center;gap:0.6rem;">
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--domain1)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-        IAM &amp; STS
+        Design Secure Architectures
       </h1>
-      <p>Identity and Access Management and Security Token Service &mdash; the foundation of every secure AWS architecture.</p>
+      <p>30% of exam &mdash; IAM, STS, AWS Organizations, SCPs, encryption, VPC security, and secure access patterns.</p>
     </div>
 
     <!-- Table of Contents -->
     <nav class="toc" aria-label="Table of contents">
       <h3>On This Page</h3>
       <ol>
-        <li><a href="#learn">Learn from Zero &mdash; Plain-English Explanation</a></li>
-        <li><a href="#real-world">When Real Architects Actually Use This</a></li>
-        <li><a href="#diagram">How Role Assumption Works &mdash; Visual Walkthrough</a></li>
-        <li><a href="#gotchas">SAA-C03 Exam Gotchas</a></li>
-        <li><a href="#practice">Scenario-Based Practice Questions</a></li>
+        <li><a href="#learn"><strong>IAM &amp; STS</strong> &mdash; Learn from Zero</a></li>
+        <li><a href="#real-world">IAM &amp; STS &mdash; Real-World Scenarios</a></li>
+        <li><a href="#diagram">IAM &amp; STS &mdash; Role Assumption Diagram</a></li>
+        <li><a href="#gotchas">IAM &amp; STS &mdash; Exam Gotchas</a></li>
+        <li><a href="#practice">IAM &amp; STS &mdash; Practice Questions</a></li>
+        <li><a href="#orgs-learn"><strong>Organizations &amp; SCPs</strong> &mdash; Learn from Zero</a></li>
+        <li><a href="#orgs-real-world">Organizations &amp; SCPs &mdash; Real-World Scenarios</a></li>
+        <li><a href="#orgs-diagram">Organizations &amp; SCPs &mdash; Hierarchy Diagram</a></li>
+        <li><a href="#orgs-gotchas">Organizations &amp; SCPs &mdash; Exam Gotchas</a></li>
+        <li><a href="#orgs-practice">Organizations &amp; SCPs &mdash; Practice Questions</a></li>
       </ol>
     </nav>
 
@@ -533,6 +538,554 @@
               <li><strong>D</strong> is designed for <em>workforce</em> (employee) access, not customer-facing mobile app users. It does not support social provider federation the way Cognito does.</li>
             </ul>
             <p><strong>Key exam clue:</strong> "Mobile/web app users" + "social sign-in" + "avoid IAM users" = Amazon Cognito identity pools with an IAM role.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================= -->
+    <!-- TOPIC 2: AWS Organizations & SCPs             -->
+    <!-- ============================================= -->
+
+    <hr class="topic-divider" style="margin-top:4rem;">
+
+    <div class="page-header" style="border-bottom:none;padding-bottom:0;margin-bottom:1.5rem;">
+      <h1 style="display:flex;align-items:center;gap:0.6rem;font-size:1.75rem;">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="var(--domain1)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+        AWS Organizations &amp; SCPs
+      </h1>
+      <p>Multi-account governance, organizational structure, and service control policies.</p>
+    </div>
+
+    <!-- ============================================= -->
+    <!-- ORGS SECTION 1: Learn from Zero               -->
+    <!-- ============================================= -->
+    <section class="topic-section" id="orgs-learn">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain1)" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        Learn from Zero
+      </h2>
+
+      <h3>What Is AWS Organizations and Why Use Multiple Accounts?</h3>
+      <p><strong>AWS Organizations</strong> is a free service that lets you group multiple AWS accounts under a single umbrella and manage them centrally. Instead of treating each account as an isolated island, Organizations gives you a hierarchy with shared billing, account-wide security guardrails, and centralized governance.</p>
+      <p>Why not put everything in one account? A single account means every team shares the same IAM namespace, the same service quotas, and the same blast radius. If a developer accidentally deletes a production database, there is no account boundary to contain the damage. Using <strong>separate accounts</strong> for production, development, testing, security, and shared services provides natural isolation:</p>
+      <ul>
+        <li><strong>Blast-radius containment</strong> &mdash; a mistake in a dev account cannot reach production resources.</li>
+        <li><strong>Separate billing</strong> &mdash; you can track costs per team or environment.</li>
+        <li><strong>Independent service quotas</strong> &mdash; one team's heavy usage does not exhaust another team's limits.</li>
+        <li><strong>Clear security boundaries</strong> &mdash; each account has its own IAM principals, so cross-account access is explicit, auditable, and revocable.</li>
+      </ul>
+
+      <div class="key-concept">
+        <strong>Core exam concept:</strong> An AWS <em>account</em> is a billing and security boundary. An <em>organization</em> is a management layer above accounts that provides consolidated billing, policy-based governance, and centralized account creation.
+      </div>
+
+      <h3>Management Account vs Member Accounts</h3>
+      <p>Every organization has exactly one <strong>management account</strong> (formerly called the "master account"). This is the account that created the organization. It pays the consolidated bill and has special privileges &mdash; including being exempt from SCP restrictions.</p>
+      <p>All other accounts are <strong>member accounts</strong>. They can be created inside the organization or invited from outside. Member accounts are subject to the SCPs that the management account attaches.</p>
+
+      <div class="key-concept">
+        <strong>Best practice:</strong> Use the management account <em>only</em> for billing and organization management. Do not run workloads in it. Because SCPs cannot restrict the management account, any principal there operates without organizational guardrails.
+      </div>
+
+      <h3>Organizational Units (OUs) and Hierarchy</h3>
+      <p>An <strong>organizational unit (OU)</strong> is a container for accounts within an organization. You can nest OUs inside other OUs to create a tree structure. A typical layout:</p>
+      <ul>
+        <li><strong>Root</strong> &mdash; the top-level container. Every account and OU lives under the root.</li>
+        <li><strong>Production OU</strong> &mdash; contains production workload accounts.</li>
+        <li><strong>Development OU</strong> &mdash; contains dev and test accounts.</li>
+        <li><strong>Security OU</strong> &mdash; contains the security tooling account (GuardDuty, Security Hub, CloudTrail aggregation).</li>
+        <li><strong>Shared Services OU</strong> &mdash; contains accounts for networking, DNS, CI/CD pipelines.</li>
+      </ul>
+
+      <div class="real-world">
+        <h4>Example: TechCorp's Organization</h4>
+        <p>TechCorp has one organization with the root at the top. Under the root are three OUs: <strong>Production</strong> (containing <code>prod-web</code> and <code>prod-data</code> accounts), <strong>Development</strong> (containing <code>dev-team-a</code> and <code>dev-team-b</code>), and <strong>Security</strong> (containing <code>security-tooling</code>). The management account sits at the root level and handles billing. SCPs attached at the root apply to all OUs and member accounts beneath it. An SCP attached to the Production OU applies only to production accounts.</p>
+      </div>
+
+      <h3>Consolidated Billing</h3>
+      <p>With Organizations, all member accounts roll their charges into a single bill paid by the management account. The main benefits:</p>
+      <ul>
+        <li><strong>Volume discounts</strong> &mdash; aggregated usage across accounts can trigger tiered pricing (for example, S3 or data transfer).</li>
+        <li><strong>Reserved Instance sharing</strong> &mdash; RI pricing benefits apply across the entire organization unless you disable sharing.</li>
+        <li><strong>Single payment</strong> &mdash; one invoice to the finance team instead of dozens.</li>
+      </ul>
+      <p>Consolidated billing is a billing feature, <strong>not a security feature</strong>. It does not enforce any permissions or restrict actions. SCPs are what enforce guardrails.</p>
+
+      <h3>What Is a Service Control Policy (SCP)?</h3>
+      <p>An <strong>SCP</strong> is a type of organization policy that defines the <em>maximum available permissions</em> for IAM users and roles in affected member accounts. Think of it as a fence around a yard &mdash; you can move anywhere inside the fence, but you cannot cross it no matter what permissions your IAM policy grants.</p>
+
+      <div class="key-concept">
+        <strong>Critical distinction:</strong> An SCP <strong>does not grant permissions</strong>. Even if an SCP contains an <code>Allow</code> statement, that Allow does not give anyone the ability to perform the action. The principal must <em>also</em> have an IAM policy (identity-based or resource-based) that grants the permission. The SCP only determines whether the IAM policy is <em>allowed to take effect</em>.
+      </div>
+
+      <h3>How SCPs Differ from IAM Policies</h3>
+      <div class="table-wrap">
+        <table class="comparison-table">
+          <thead>
+            <tr><th>Feature</th><th>SCP</th><th>IAM Identity Policy</th><th>IAM Trust Policy</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>What it does</td><td>Sets maximum permissions ceiling</td><td>Grants or denies specific actions</td><td>Controls who can assume a role</td></tr>
+            <tr><td>Grants permissions?</td><td class="cross">&#10007; Never</td><td class="check">&#10003; Yes</td><td class="check">&#10003; For role assumption</td></tr>
+            <tr><td>Scope</td><td>Entire account or OU</td><td>Single user, group, or role</td><td>Single role</td></tr>
+            <tr><td>Affects management account?</td><td class="cross">&#10007; No</td><td class="check">&#10003; Yes</td><td class="check">&#10003; Yes</td></tr>
+            <tr><td>Affects member root user?</td><td class="check">&#10003; Yes</td><td class="check">&#10003; Yes</td><td>N/A</td></tr>
+            <tr><td>Managed at</td><td>Organization level</td><td>Account level</td><td>Account level</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>SCP Inheritance Through the Hierarchy</h3>
+      <p>SCPs are attached at the root, OU, or individual account level. The effective SCP for any account is the <strong>intersection</strong> of all SCPs applied from the root down to that account. If the root SCP allows services A, B, C, and an OU SCP allows only A and B, then accounts in that OU can use only A and B &mdash; even if the account itself has a more permissive SCP.</p>
+      <p>This means a child can never have <em>more</em> permissions than its parent allows. Permissions can only be narrowed as you descend the hierarchy, never broadened.</p>
+
+      <h3>Allow-List vs Deny-List Strategies</h3>
+      <p>There are two main approaches to structuring SCPs:</p>
+      <ul>
+        <li><strong>Deny-list (default, recommended)</strong> &mdash; Keep the default <code>FullAWSAccess</code> SCP (which allows everything) and then attach additional SCPs with explicit <code>Deny</code> statements for the specific actions you want to block. This is simpler: everything is allowed unless you explicitly block it.</li>
+        <li><strong>Allow-list</strong> &mdash; Remove the <code>FullAWSAccess</code> SCP and replace it with SCPs that explicitly <code>Allow</code> only the services you want to permit. Everything not listed is implicitly denied. This is more restrictive but requires careful maintenance &mdash; you must add new services to the allow-list before anyone can use them.</li>
+      </ul>
+
+      <div class="gotcha">
+        <h4>Common Mistake</h4>
+        <p>A deny-list SCP <strong>does not automatically allow</strong> everything that it does not deny. The default <code>FullAWSAccess</code> SCP provides the broad Allow. If you remove <code>FullAWSAccess</code> without attaching a replacement Allow policy, <em>all</em> actions are implicitly denied for member accounts.</p>
+      </div>
+
+      <h3>SCP JSON Example &mdash; Deny-List Strategy</h3>
+      <p>This SCP prevents member accounts from leaving the organization or disabling CloudTrail:</p>
+      <pre style="background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius-sm);padding:1rem;overflow-x:auto;font-size:0.82rem;line-height:1.5;color:var(--text-secondary);"><code>{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DenyLeaveOrg",
+      "Effect": "Deny",
+      "Action": "organizations:LeaveOrganization",
+      "Resource": "*"
+    },
+    {
+      "Sid": "DenyDisableCloudTrail",
+      "Effect": "Deny",
+      "Action": [
+        "cloudtrail:StopLogging",
+        "cloudtrail:DeleteTrail"
+      ],
+      "Resource": "*"
+    }
+  ]
+}</code></pre>
+      <p>Because this SCP uses only <code>Deny</code> statements and the default <code>FullAWSAccess</code> SCP provides the broad Allow, every action <em>except</em> these three is available (subject to IAM policies within the account).</p>
+
+      <h3>Important Rules and Limitations</h3>
+      <ul>
+        <li><strong>SCPs do not grant permissions.</strong> Even an Allow statement in an SCP only opens the ceiling &mdash; a principal must still have a matching IAM policy grant.</li>
+        <li><strong>Effective permissions</strong> require the action to be permitted by the applicable SCPs <em>and</em> by the identity-based or resource-based policy. Both layers must align.</li>
+        <li><strong>SCPs affect member account root users.</strong> Unlike IAM policies that cannot restrict the root user within an account, SCPs can restrict what the root user of a member account can do.</li>
+        <li><strong>SCPs do not restrict the management account.</strong> No SCP, including those attached to the root OU, limits principals in the management account.</li>
+        <li><strong>SCPs do not restrict service-linked roles.</strong> Service-linked roles are created by AWS services for internal integrations (e.g., the <code>AWSServiceRoleForElasticLoadBalancing</code> role). SCPs cannot block the actions they perform because those actions are controlled by the service, not by the account's principals.</li>
+        <li><strong>OU placement matters for troubleshooting.</strong> Moving an account from one OU to another instantly changes the SCPs that apply to it. If users suddenly lose access, check whether the account was moved.</li>
+        <li><strong>Changing an SCP affects many accounts at once.</strong> Modifying an SCP attached to the root OU can impact every member account in the organization. Always test in a sandbox OU first.</li>
+      </ul>
+
+      <h3>SCPs vs Permissions Boundaries</h3>
+      <p>Both limit permissions without granting them, but at different levels:</p>
+      <ul>
+        <li><strong>SCPs</strong> apply to an entire account or OU. They are managed by the organization administrator in the management account. Individual account administrators cannot remove or modify them.</li>
+        <li><strong>Permissions boundaries</strong> apply to a single IAM user or role. They are managed by the account administrator. They are commonly used for <em>delegated administration</em> &mdash; allowing developers to create roles without exceeding their own privilege level.</li>
+      </ul>
+      <p>If both an SCP and a permissions boundary are present, the action must be permitted by <em>both</em>. They work as independent ceilings that stack.</p>
+
+      <h3>SCPs vs IAM Identity Center Permission Sets</h3>
+      <p><strong>IAM Identity Center permission sets</strong> are collections of policies that define what a federated user can do when they access an account through the Identity Center portal. Permission sets are the <em>grant</em> mechanism &mdash; they give users permissions. SCPs are the <em>guardrail</em> mechanism &mdash; they cap what those grants can achieve. A permission set that allows <code>ec2:*</code> is useless if the account's SCP denies EC2 actions.</p>
+
+      <h3>Worked Example: AdministratorAccess vs SCP</h3>
+      <div class="real-world">
+        <h4>Why AdministratorAccess Cannot Beat an SCP</h4>
+        <p>A user in a member account has the <code>AdministratorAccess</code> managed policy attached (<code>"Effect": "Allow", "Action": "*", "Resource": "*"</code>). The user tries to call <code>organizations:LeaveOrganization</code>. An SCP on the account's OU contains an explicit <code>Deny</code> for that action.</p>
+        <p><strong>Result:</strong> Access denied. The SCP's explicit Deny overrides the IAM Allow. The user's AdministratorAccess policy can only grant permissions <em>within</em> the ceiling set by the SCP. The SCP is enforced by the organization at a level above the account, so no in-account policy can override it.</p>
+        <p>If there were <em>no</em> SCP deny but the SCP used an allow-list that did not include <code>organizations:LeaveOrganization</code>, the result would be the same &mdash; the action would be implicitly denied because it falls outside the SCP's allowed ceiling.</p>
+      </div>
+    </section>
+
+    <hr class="topic-divider">
+
+    <!-- ============================================= -->
+    <!-- ORGS SECTION 2: Real-World Scenarios           -->
+    <!-- ============================================= -->
+    <section class="topic-section" id="orgs-real-world">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain2)" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        When Real Architects Actually Use This
+      </h2>
+
+      <!-- Scenario A -->
+      <div class="real-world">
+        <h4>Scenario A: Preventing Public S3 Access</h4>
+        <p><strong>Requirement:</strong> A company needs to ensure that no member account can make S3 buckets publicly accessible.</p>
+        <p><strong>Solution:</strong> Attach an SCP to the root OU that denies <code>s3:PutBucketPolicy</code> and <code>s3:PutBucketAcl</code> when the request would enable public access. Use condition keys like <code>s3:x-amz-acl</code> to target only public grants.</p>
+        <p><strong>Important nuance:</strong> The SCP provides an organization-wide guardrail, but it is not the only defense. You should also enable <strong>S3 Block Public Access</strong> at the account level (or organization level via the Organizations S3 settings) and use individual bucket policies as a defense-in-depth strategy. The SCP prevents <em>IAM principals</em> from changing the settings, but it does not directly inspect or validate existing bucket configurations.</p>
+        <p><strong>Limitation:</strong> SCPs apply to IAM principals within the organization. If a bucket policy explicitly grants access to an external principal (account or user outside the organization), the SCP on the resource-owning account does not directly block that external principal's access. You must use the bucket policy or Block Public Access settings to control external access at the resource level.</p>
+      </div>
+
+      <!-- Scenario B -->
+      <div class="real-world">
+        <h4>Scenario B: Restricting AWS Regions</h4>
+        <p><strong>Requirement:</strong> A European company wants workloads to run only in <code>eu-west-1</code> and <code>eu-central-1</code> for data residency compliance.</p>
+        <p><strong>Solution:</strong> Attach an SCP that denies all actions when the <code>aws:RequestedRegion</code> condition key is <em>not</em> one of the allowed Regions. Example:</p>
+        <pre style="background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius-sm);padding:1rem;overflow-x:auto;font-size:0.82rem;line-height:1.5;color:var(--text-secondary);"><code>{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DenyNonEURegions",
+      "Effect": "Deny",
+      "Action": "*",
+      "Resource": "*",
+      "Condition": {
+        "StringNotEquals": {
+          "aws:RequestedRegion": [
+            "eu-west-1",
+            "eu-central-1"
+          ]
+        }
+      }
+    }
+  ]
+}</code></pre>
+        <p><strong>Why this needs care:</strong> Some AWS services are global (IAM, Organizations, Route 53, CloudFront, STS global endpoint). Blocking all non-EU Regions would break these services. You must add exceptions for global services using <code>NotAction</code> or condition-key exclusions. Failing to do this is a common implementation mistake and a frequent exam trap.</p>
+      </div>
+
+      <!-- Scenario C -->
+      <div class="real-world">
+        <h4>Scenario C: Protecting Production Accounts</h4>
+        <p><strong>Requirement:</strong> A company separates production and development into different OUs. Production accounts need stricter controls: no one should be able to terminate EC2 instances without MFA, and no one should delete RDS snapshots.</p>
+        <p><strong>Solution:</strong> At the <strong>root OU</strong>, attach an SCP that denies <code>organizations:LeaveOrganization</code> (a baseline guardrail for all accounts). At the <strong>Production OU</strong>, attach an additional SCP that denies <code>ec2:TerminateInstances</code> unless MFA is present (using the <code>aws:MultiFactorAuthPresent</code> condition key) and unconditionally denies <code>rds:DeleteDBSnapshot</code>. The Development OU does not receive these extra restrictions, allowing developers to iterate freely.</p>
+        <p><strong>How inheritance works here:</strong> Production accounts inherit the root-level SCP (deny leave org) <em>and</em> the Production OU SCP (deny terminate without MFA, deny snapshot deletion). Development accounts only inherit the root-level SCP. This layered approach lets you apply progressively stricter controls as you descend the hierarchy.</p>
+      </div>
+
+      <!-- Scenario D -->
+      <div class="real-world">
+        <h4>Scenario D: Preventing Dangerous Actions</h4>
+        <p><strong>Requirement:</strong> A security team wants to prevent anyone in any member account from disabling AWS Config, stopping CloudTrail logging, or deleting GuardDuty detectors.</p>
+        <p><strong>Solution:</strong> Attach an SCP at the root OU with explicit Deny statements for <code>config:StopConfigurationRecorder</code>, <code>config:DeleteConfigurationRecorder</code>, <code>cloudtrail:StopLogging</code>, <code>cloudtrail:DeleteTrail</code>, <code>guardduty:DeleteDetector</code>, and <code>guardduty:DisassociateFromMasterAccount</code>.</p>
+        <p><strong>Why this is appropriate:</strong> Because the SCP's explicit Deny cannot be overridden by any IAM policy in member accounts &mdash; not even by the root user &mdash; these security services remain enabled regardless of what an account administrator does. The management account is exempt, so the organization administrator can still manage these services if needed.</p>
+        <p><strong>Implementation risk:</strong> The exact API action names must be verified against current AWS documentation. AWS occasionally adds or renames actions, so the SCP should be reviewed periodically. Also, the SCP prevents IAM principals from performing these actions, but service-linked roles used by these services internally are not restricted.</p>
+      </div>
+
+      <!-- Scenario E -->
+      <div class="real-world">
+        <h4>Scenario E: Centralized Governance for Many Accounts</h4>
+        <p><strong>Requirement:</strong> A growing company has 40 AWS accounts across five departments. They need consistent security baselines, separate billing visibility, and the ability to onboard new teams quickly.</p>
+        <p><strong>Solution:</strong> Structure the organization with OUs per department (Engineering, Finance, Marketing, etc.) plus cross-cutting OUs for Security and Shared Services. Apply baseline SCPs at the root (deny dangerous actions, restrict Regions). Apply department-specific SCPs at each department OU as needed. Use <strong>consolidated billing</strong> for volume discounts and cost tracking via Cost Allocation Tags. Use <strong>AWS Control Tower</strong> to automate account provisioning with pre-configured guardrails.</p>
+        <p><strong>Why separate accounts per team?</strong> Each department gets its own IAM namespace, service quotas, and blast radius. A developer in Marketing cannot accidentally affect Engineering's production database. Consolidated billing still provides a single invoice. SCPs ensure organization-wide compliance without requiring each department to configure their own restrictions.</p>
+        <p><strong>Limitation:</strong> Organizations and SCPs provide governance structure, but they do not replace account-level security configuration. Each account still needs properly configured IAM policies, VPC security, encryption settings, and logging. SCPs are guardrails, not a complete security solution.</p>
+      </div>
+    </section>
+
+    <hr class="topic-divider">
+
+    <!-- ============================================= -->
+    <!-- ORGS SECTION 3: SVG Diagram                   -->
+    <!-- ============================================= -->
+    <section class="topic-section" id="orgs-diagram">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain3)" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+        Organizations Hierarchy &amp; SCP Authorization
+      </h2>
+      <p>The diagram below shows a typical AWS Organizations hierarchy with SCPs attached at different levels, and how effective permissions are determined for a principal in a member account.</p>
+
+      <div class="diagram-container">
+        <svg viewBox="0 0 820 520" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagram showing AWS Organizations hierarchy with management account, organizational units, member accounts, and SCP inheritance. Also shows how effective permissions require both SCP and IAM policy to allow an action.">
+
+          <defs>
+            <marker id="arr-org" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+              <polygon points="0 0, 10 3.5, 0 7" fill="var(--text-muted)"/>
+            </marker>
+            <marker id="arr-ok" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+              <polygon points="0 0, 10 3.5, 0 7" fill="var(--domain4)"/>
+            </marker>
+            <marker id="arr-deny" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+              <polygon points="0 0, 10 3.5, 0 7" fill="#ef4444"/>
+            </marker>
+          </defs>
+
+          <rect width="820" height="520" fill="var(--bg-card)" rx="8"/>
+
+          <!-- Title -->
+          <text x="410" y="26" text-anchor="middle" font-size="14" font-weight="700" fill="var(--text-primary)" font-family="Inter, sans-serif">AWS Organizations Hierarchy &amp; SCP Effect</text>
+
+          <!-- === Organization Root === -->
+          <rect x="310" y="40" width="200" height="44" rx="8" fill="var(--bg-primary)" stroke="var(--accent)" stroke-width="2"/>
+          <text x="410" y="58" text-anchor="middle" font-size="11" font-weight="700" fill="var(--accent)" font-family="Inter, sans-serif">Organization Root</text>
+          <text x="410" y="74" text-anchor="middle" font-size="9" fill="var(--text-muted)" font-family="Inter, sans-serif">SCP: FullAWSAccess + DenyLeaveOrg</text>
+
+          <!-- Management Account (off to the side) -->
+          <rect x="580" y="40" width="180" height="44" rx="8" fill="rgba(249,115,22,0.08)" stroke="var(--domain1)" stroke-width="1.5" stroke-dasharray="5 3"/>
+          <text x="670" y="58" text-anchor="middle" font-size="10" font-weight="600" fill="var(--domain1)" font-family="Inter, sans-serif">Management Account</text>
+          <text x="670" y="74" text-anchor="middle" font-size="9" fill="var(--text-muted)" font-family="Inter, sans-serif">SCPs do NOT apply here</text>
+          <line x1="510" y1="62" x2="578" y2="62" stroke="var(--text-muted)" stroke-width="1" stroke-dasharray="4 3"/>
+
+          <!-- Lines from Root to OUs -->
+          <line x1="340" y1="84" x2="180" y2="118" stroke="var(--text-muted)" stroke-width="1.5" marker-end="url(#arr-org)"/>
+          <line x1="480" y1="84" x2="580" y2="118" stroke="var(--text-muted)" stroke-width="1.5" marker-end="url(#arr-org)"/>
+
+          <!-- === Production OU === -->
+          <rect x="80" y="120" width="200" height="44" rx="8" fill="var(--bg-primary)" stroke="var(--domain1)" stroke-width="2"/>
+          <text x="180" y="138" text-anchor="middle" font-size="11" font-weight="600" fill="var(--domain1)" font-family="Inter, sans-serif">Production OU</text>
+          <text x="180" y="154" text-anchor="middle" font-size="9" fill="var(--text-muted)" font-family="Inter, sans-serif">SCP: DenyDeleteSnapshots</text>
+
+          <!-- === Development OU === -->
+          <rect x="480" y="120" width="200" height="44" rx="8" fill="var(--bg-primary)" stroke="var(--domain2)" stroke-width="2"/>
+          <text x="580" y="138" text-anchor="middle" font-size="11" font-weight="600" fill="var(--domain2)" font-family="Inter, sans-serif">Development OU</text>
+          <text x="580" y="154" text-anchor="middle" font-size="9" fill="var(--text-muted)" font-family="Inter, sans-serif">No additional SCP</text>
+
+          <!-- Lines from OUs to Accounts -->
+          <line x1="130" y1="164" x2="100" y2="198" stroke="var(--text-muted)" stroke-width="1.5" marker-end="url(#arr-org)"/>
+          <line x1="230" y1="164" x2="260" y2="198" stroke="var(--text-muted)" stroke-width="1.5" marker-end="url(#arr-org)"/>
+          <line x1="530" y1="164" x2="500" y2="198" stroke="var(--text-muted)" stroke-width="1.5" marker-end="url(#arr-org)"/>
+          <line x1="630" y1="164" x2="660" y2="198" stroke="var(--text-muted)" stroke-width="1.5" marker-end="url(#arr-org)"/>
+
+          <!-- === Member Accounts === -->
+          <rect x="30" y="200" width="140" height="36" rx="6" fill="var(--bg-primary)" stroke="var(--border)" stroke-width="1.5"/>
+          <text x="100" y="223" text-anchor="middle" font-size="10" font-weight="500" fill="var(--text-primary)" font-family="Inter, sans-serif">prod-web</text>
+
+          <rect x="200" y="200" width="140" height="36" rx="6" fill="var(--bg-primary)" stroke="var(--border)" stroke-width="1.5"/>
+          <text x="270" y="223" text-anchor="middle" font-size="10" font-weight="500" fill="var(--text-primary)" font-family="Inter, sans-serif">prod-data</text>
+
+          <rect x="430" y="200" width="140" height="36" rx="6" fill="var(--bg-primary)" stroke="var(--border)" stroke-width="1.5"/>
+          <text x="500" y="223" text-anchor="middle" font-size="10" font-weight="500" fill="var(--text-primary)" font-family="Inter, sans-serif">dev-team-a</text>
+
+          <rect x="600" y="200" width="140" height="36" rx="6" fill="var(--bg-primary)" stroke="var(--border)" stroke-width="1.5"/>
+          <text x="670" y="223" text-anchor="middle" font-size="10" font-weight="500" fill="var(--text-primary)" font-family="Inter, sans-serif">dev-team-b</text>
+
+          <!-- IAM user/role inside prod-web -->
+          <rect x="48" y="248" width="104" height="24" rx="4" fill="rgba(249,115,22,0.08)" stroke="var(--domain1)" stroke-width="1"/>
+          <text x="100" y="264" text-anchor="middle" font-size="9" fill="var(--text-secondary)" font-family="Inter, sans-serif">IAM User / Role</text>
+
+          <!-- Inheritance annotation -->
+          <rect x="20" y="285" width="330" height="36" rx="6" fill="rgba(249,115,22,0.06)" stroke="var(--domain1)" stroke-width="1" stroke-dasharray="4 2"/>
+          <text x="185" y="301" text-anchor="middle" font-size="9" fill="var(--text-secondary)" font-family="Inter, sans-serif">
+            <tspan font-weight="600" fill="var(--domain1)">Inherited SCPs:</tspan> FullAWSAccess + DenyLeaveOrg + DenyDeleteSnapshots
+          </text>
+          <text x="185" y="314" text-anchor="middle" font-size="9" fill="var(--text-muted)" font-family="Inter, sans-serif">Effective ceiling = intersection of all inherited SCPs</text>
+
+          <!-- ======== Authorization Example (bottom half) ======== -->
+          <line x1="40" y1="340" x2="780" y2="340" stroke="var(--border)" stroke-width="1" stroke-dasharray="3 2"/>
+          <text x="410" y="362" text-anchor="middle" font-size="12" font-weight="700" fill="var(--text-primary)" font-family="Inter, sans-serif">How Effective Permissions Are Determined</text>
+
+          <!-- Example 1: Allowed -->
+          <rect x="40" y="380" width="350" height="120" rx="8" fill="rgba(34,197,94,0.05)" stroke="var(--domain4)" stroke-width="1.5"/>
+          <text x="215" y="400" text-anchor="middle" font-size="11" font-weight="600" fill="var(--domain4)" font-family="Inter, sans-serif">Action: s3:GetObject</text>
+
+          <rect x="60" y="414" width="140" height="28" rx="5" fill="var(--bg-primary)" stroke="var(--domain4)" stroke-width="1"/>
+          <text x="130" y="432" text-anchor="middle" font-size="9" font-weight="600" fill="var(--domain4)" font-family="Inter, sans-serif">IAM Policy: Allow s3:*</text>
+
+          <text x="220" y="432" text-anchor="middle" font-size="14" font-weight="700" fill="var(--text-muted)" font-family="Inter, sans-serif">+</text>
+
+          <rect x="240" y="414" width="130" height="28" rx="5" fill="var(--bg-primary)" stroke="var(--domain4)" stroke-width="1"/>
+          <text x="305" y="432" text-anchor="middle" font-size="9" font-weight="600" fill="var(--domain4)" font-family="Inter, sans-serif">SCP: Permits S3</text>
+
+          <text x="215" y="462" text-anchor="middle" font-size="10" font-weight="500" fill="var(--text-secondary)" font-family="Inter, sans-serif">=</text>
+
+          <rect x="110" y="470" width="210" height="24" rx="5" fill="rgba(34,197,94,0.15)" stroke="var(--domain4)" stroke-width="1.5"/>
+          <text x="215" y="487" text-anchor="middle" font-size="10" font-weight="700" fill="var(--domain4)" font-family="Inter, sans-serif">&#10003; Action may be allowed</text>
+
+          <!-- Example 2: Denied -->
+          <rect x="430" y="380" width="350" height="120" rx="8" fill="rgba(239,68,68,0.05)" stroke="#ef4444" stroke-width="1.5"/>
+          <text x="605" y="400" text-anchor="middle" font-size="11" font-weight="600" fill="#ef4444" font-family="Inter, sans-serif">Action: rds:DeleteDBSnapshot</text>
+
+          <rect x="450" y="414" width="140" height="28" rx="5" fill="var(--bg-primary)" stroke="var(--domain4)" stroke-width="1"/>
+          <text x="520" y="432" text-anchor="middle" font-size="9" font-weight="600" fill="var(--domain4)" font-family="Inter, sans-serif">IAM Policy: Allow *</text>
+
+          <text x="610" y="432" text-anchor="middle" font-size="14" font-weight="700" fill="var(--text-muted)" font-family="Inter, sans-serif">+</text>
+
+          <rect x="630" y="414" width="130" height="28" rx="5" fill="var(--bg-primary)" stroke="#ef4444" stroke-width="1"/>
+          <text x="695" y="432" text-anchor="middle" font-size="9" font-weight="600" fill="#ef4444" font-family="Inter, sans-serif">SCP: Deny RDS delete</text>
+
+          <text x="605" y="462" text-anchor="middle" font-size="10" font-weight="500" fill="var(--text-secondary)" font-family="Inter, sans-serif">=</text>
+
+          <rect x="500" y="470" width="210" height="24" rx="5" fill="rgba(239,68,68,0.15)" stroke="#ef4444" stroke-width="1.5"/>
+          <text x="605" y="487" text-anchor="middle" font-size="10" font-weight="700" fill="#ef4444" font-family="Inter, sans-serif">&#10007; Action is BLOCKED</text>
+
+        </svg>
+      </div>
+      <p class="diagram-label">Figure: AWS Organizations hierarchy showing SCP inheritance from root to OUs to member accounts. The management account is exempt from SCPs. Effective permissions require both the SCP and the IAM policy to permit an action; an SCP Deny always blocks regardless of IAM grants. SCPs do not independently grant permissions.</p>
+    </section>
+
+    <hr class="topic-divider">
+
+    <!-- ============================================= -->
+    <!-- ORGS SECTION 4: Exam Gotchas                  -->
+    <!-- ============================================= -->
+    <section class="topic-section" id="orgs-gotchas">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        SAA-C03 Exam Gotchas &mdash; Organizations &amp; SCPs
+      </h2>
+
+      <div class="gotcha">
+        <h4>Assuming an SCP Grants Permissions Because It Contains Allow</h4>
+        <p><strong>Wrong:</strong> "The SCP allows S3, so users can use S3." <strong>Correct:</strong> The SCP <em>permits</em> S3 actions to take effect, but each principal still needs an IAM policy that grants S3 access. An SCP Allow only opens the ceiling &mdash; it does not hand out keys.</p>
+        <p><strong>Exam clue:</strong> If a question says "only an SCP is configured" and asks what a user can do, the answer is <em>nothing</em> &mdash; the user also needs an IAM policy.</p>
+        <p><strong>Memory rule:</strong> SCP = ceiling, IAM policy = permission. You need both.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>Assuming AdministratorAccess Can Bypass an SCP</h4>
+        <p><strong>Wrong:</strong> "The user has AdministratorAccess, so the SCP doesn't matter." <strong>Correct:</strong> In a member account, effective permissions are the <em>intersection</em> of the SCP and the IAM policy. AdministratorAccess allows everything at the IAM level, but the SCP caps what "everything" can be.</p>
+        <p><strong>Exam clue:</strong> "User has AdministratorAccess but cannot perform X" = the SCP is blocking X.</p>
+        <p><strong>Memory rule:</strong> AdminAccess &#8745; SCP = whatever the SCP allows.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>Assuming SCPs Restrict the Management Account</h4>
+        <p><strong>Wrong:</strong> "We attached a deny SCP to the root OU, so no one in any account can do this." <strong>Correct:</strong> The management account is always exempt from SCPs. If the exam asks what happens when the management account tries a denied action, the answer is: it succeeds.</p>
+        <p><strong>Exam clue:</strong> Look for "management account" or "payer account" in the question. If the action originates there, SCPs do not apply.</p>
+        <p><strong>Memory rule:</strong> Management account = above the law (for SCPs).</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>Forgetting That SCPs Affect the Member Account Root User</h4>
+        <p><strong>Wrong:</strong> "The root user can do anything, so SCPs don't apply." <strong>Correct:</strong> Within a <em>member</em> account, SCPs restrict the root user just like any other principal. The root user of the management account is not restricted, but the root user of a member account is.</p>
+        <p><strong>Exam clue:</strong> "Root user of a member account" + "cannot perform action" = SCP is blocking it.</p>
+        <p><strong>Memory rule:</strong> Member root user &#8800; management root user.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>Confusing an SCP with a Permissions Boundary</h4>
+        <p><strong>Wrong:</strong> "We applied a permissions boundary to the account." <strong>Correct:</strong> SCPs apply to accounts/OUs and are managed by the organization administrator. Permissions boundaries apply to individual IAM users/roles and are managed by the account administrator. They are different tools at different levels.</p>
+        <p><strong>Exam clue:</strong> If the question says "organization-wide restriction," the answer is SCP. If it says "limit what a specific developer can grant," the answer is permissions boundary.</p>
+        <p><strong>Memory rule:</strong> SCP = org-level fence. Permissions boundary = individual-level fence.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>Confusing a Trust Policy with an SCP</h4>
+        <p><strong>Wrong:</strong> "We used an SCP to control who can assume the role." <strong>Correct:</strong> A <em>trust policy</em> on a role controls who can assume it. An SCP controls the <em>maximum permissions</em> available to principals. An SCP can prevent a principal from calling <code>sts:AssumeRole</code>, but the trust policy is the primary mechanism for controlling role assumption.</p>
+        <p><strong>Exam clue:</strong> "Who can assume?" = trust policy. "What actions are permitted across the account?" = SCP.</p>
+        <p><strong>Memory rule:</strong> Trust policy = door to the role. SCP = fence around the account.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>Assuming a Deny-List Automatically Allows Everything Not Denied</h4>
+        <p><strong>Wrong:</strong> "Our SCP only has Deny statements, so everything else is allowed." <strong>Correct:</strong> The Deny statements block specific actions, but the broad Allow comes from the default <code>FullAWSAccess</code> SCP. If someone removes <code>FullAWSAccess</code> and only leaves Deny statements, <em>everything</em> is denied (no Allow + explicit Deny = total lockout).</p>
+        <p><strong>Exam clue:</strong> If a question says the FullAWSAccess SCP was removed, the answer involves total access loss for member accounts.</p>
+        <p><strong>Memory rule:</strong> Deny-list strategy = FullAWSAccess + explicit Deny. Remove FullAWSAccess and the deny-list becomes a deny-everything.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>Assuming an OU-Level Restriction Disappears with a More Permissive Account Policy</h4>
+        <p><strong>Wrong:</strong> "The account has a FullAWSAccess SCP attached directly, so the OU restriction doesn't matter." <strong>Correct:</strong> Effective permissions are the intersection of SCPs at <em>every level</em> from root to account. An account-level SCP cannot expand beyond what its parent OU allows. The most restrictive applicable SCP always wins.</p>
+        <p><strong>Exam clue:</strong> Questions about OU hierarchy where one level is restrictive = the restriction holds.</p>
+        <p><strong>Memory rule:</strong> Child can never exceed parent's ceiling.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>Assuming SCPs Alone Prevent All Public Resource Exposure</h4>
+        <p><strong>Wrong:</strong> "We have an SCP that blocks public access, so our buckets are safe." <strong>Correct:</strong> SCPs restrict <em>IAM principals within the organization</em>. They do not directly control access from external principals granted through resource-based policies, nor do they replace S3 Block Public Access settings. Defense in depth requires SCPs plus account-level controls.</p>
+        <p><strong>Exam clue:</strong> If the question asks about preventing "all public access," SCPs are part of the answer but not the entire answer.</p>
+        <p><strong>Memory rule:</strong> SCP = guards inside the fence. Bucket policy + Block Public Access = guards at the gate.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>Assuming SCPs Restrict Service-Linked Roles</h4>
+        <p><strong>Wrong:</strong> "Our SCP denies elasticloadbalancing actions, so the ELB service-linked role can't function." <strong>Correct:</strong> Service-linked roles are not restricted by SCPs. These roles are created and managed by AWS services for their internal operations. An SCP that denies <code>elasticloadbalancing:*</code> prevents IAM users and roles from managing ELB, but it does not prevent the ELB service itself from performing its internal operations via its service-linked role.</p>
+        <p><strong>Exam clue:</strong> Questions involving AWS-managed service operations continuing despite restrictive SCPs = service-linked role exception.</p>
+        <p><strong>Memory rule:</strong> SCPs bind people and roles you create, not AWS's own service plumbing.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>Confusing Consolidated Billing with Permission Enforcement</h4>
+        <p><strong>Wrong:</strong> "We enabled consolidated billing, so all accounts follow the same security rules." <strong>Correct:</strong> Consolidated billing is a <em>cost management</em> feature. It combines invoices and enables volume discounts. It has no effect on permissions, security controls, or access policies. Permission enforcement requires SCPs.</p>
+        <p><strong>Exam clue:</strong> If a question mentions "consistent security policies across accounts," the answer involves SCPs or AWS Control Tower, not consolidated billing.</p>
+        <p><strong>Memory rule:</strong> Billing = money. SCPs = permissions. Different problems, different tools.</p>
+      </div>
+    </section>
+
+    <hr class="topic-divider">
+
+    <!-- ============================================= -->
+    <!-- ORGS SECTION 5: Practice Questions             -->
+    <!-- ============================================= -->
+    <section class="topic-section" id="orgs-practice">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Scenario-Based Practice Questions
+      </h2>
+
+      <div class="practice-questions">
+        <h4>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          Practice Questions &mdash; Organizations &amp; SCPs
+        </h4>
+
+        <!-- Q1 -->
+        <div class="practice-q">
+          <p class="q-text">Q1. A company uses AWS Organizations and wants to prevent any member account from disabling AWS CloudTrail logging. Several member-account administrators have the <code>AdministratorAccess</code> IAM policy attached to their IAM users. Which approach ensures that CloudTrail cannot be disabled in any member account, even by administrators?</p>
+          <ul class="q-options">
+            <li><span class="q-letter">A.</span> Remove the <code>AdministratorAccess</code> policy from all member-account administrators and replace it with a custom policy that excludes CloudTrail actions.</li>
+            <li><span class="q-letter">B.</span> Attach an IAM permissions boundary to each administrator that denies <code>cloudtrail:StopLogging</code> and <code>cloudtrail:DeleteTrail</code>.</li>
+            <li><span class="q-letter">C.</span> Attach an SCP to the organization root with an explicit Deny for <code>cloudtrail:StopLogging</code> and <code>cloudtrail:DeleteTrail</code>.</li>
+            <li><span class="q-letter">D.</span> Configure CloudTrail as an organization trail and enable consolidated billing to protect it.</li>
+          </ul>
+          <button class="reveal-btn">Show Answer</button>
+          <div class="answer-reveal">
+            <p><strong>Correct Answer: C</strong></p>
+            <p>An SCP with an explicit Deny attached at the organization root prevents <em>all</em> IAM principals in <em>all</em> member accounts from disabling CloudTrail. This includes users with AdministratorAccess and even the member account root user. The SCP cannot be overridden by any in-account policy.</p>
+            <p><strong>Why not the others?</strong></p>
+            <ul>
+              <li><strong>A</strong> is operationally complex, must be maintained per account, and a determined administrator could re-attach AdministratorAccess or create a new user with full permissions.</li>
+              <li><strong>B</strong> requires attaching a permissions boundary to every individual administrator across every account. New administrators could be created without the boundary. This is not centrally enforceable.</li>
+              <li><strong>D</strong> is wrong because consolidated billing is a cost feature, not a security control. An organization trail helps with centralized logging but does not prevent member-account administrators from stopping their account's logging.</li>
+            </ul>
+            <p><strong>Key exam clue:</strong> "Prevent action across all member accounts" + "even administrators" = SCP with explicit Deny.</p>
+            <p><strong>Takeaway:</strong> SCPs are the only mechanism that centrally enforces restrictions that no in-account policy can override.</p>
+          </div>
+        </div>
+
+        <!-- Q2 -->
+        <div class="practice-q">
+          <p class="q-text">Q2. A company has an AWS Organization with two OUs: Production and Development. The security team wants production accounts to be restricted to only <code>eu-west-1</code> and <code>eu-central-1</code> Regions, while development accounts should be allowed to use any Region. An SCP attached to the organization root provides <code>FullAWSAccess</code>. How should the architect configure this?</p>
+          <ul class="q-options">
+            <li><span class="q-letter">A.</span> Attach a Region-restricting SCP to the organization root so it applies to all accounts, then create an exception SCP on the Development OU that overrides the deny.</li>
+            <li><span class="q-letter">B.</span> Attach a Region-restricting SCP with an explicit Deny for non-EU Regions only to the Production OU, leaving the Development OU with no additional SCP.</li>
+            <li><span class="q-letter">C.</span> Remove <code>FullAWSAccess</code> from the organization root and create separate allow-list SCPs for each OU.</li>
+            <li><span class="q-letter">D.</span> Configure IAM policies in each production account to deny non-EU Region actions instead of using SCPs.</li>
+          </ul>
+          <button class="reveal-btn">Show Answer</button>
+          <div class="answer-reveal">
+            <p><strong>Correct Answer: B</strong></p>
+            <p>By attaching the Region-restricting SCP only to the Production OU, production accounts are limited to EU Regions while development accounts inherit only the root-level <code>FullAWSAccess</code> SCP and remain unrestricted. This is the simplest and most targeted approach.</p>
+            <p><strong>Why not the others?</strong></p>
+            <ul>
+              <li><strong>A</strong> is wrong because an explicit Deny in an SCP <em>cannot</em> be overridden by an Allow in a child SCP. Once the root SCP denies non-EU Regions, no child SCP can re-allow them. You cannot "override" an SCP deny.</li>
+              <li><strong>C</strong> works in theory but is far more complex. Removing <code>FullAWSAccess</code> means you must explicitly list every allowed service in allow-list SCPs for both OUs. This is error-prone and hard to maintain.</li>
+              <li><strong>D</strong> uses per-account IAM policies, which a local administrator could modify or remove. SCPs provide centrally enforced, tamper-proof restrictions.</li>
+            </ul>
+            <p><strong>Key exam clue:</strong> "Different restrictions for different OUs" = attach the restrictive SCP to only the OU that needs it.</p>
+            <p><strong>Takeaway:</strong> SCP explicit Deny cannot be overridden by any Allow. Target SCPs at the specific OU level, not the root, when restrictions differ between OUs.</p>
+          </div>
+        </div>
+
+        <!-- Q3 -->
+        <div class="practice-q">
+          <p class="q-text">Q3. A company is setting up AWS Organizations for the first time. They need consolidated billing for cost tracking, centralized security guardrails across 12 member accounts, and a way for employees to access multiple accounts through a single sign-on portal. Which combination of services meets ALL three requirements?</p>
+          <ul class="q-options">
+            <li><span class="q-letter">A.</span> AWS Organizations with consolidated billing, IAM policies in each account for security guardrails, and IAM users with cross-account roles for SSO.</li>
+            <li><span class="q-letter">B.</span> AWS Organizations with consolidated billing and SCPs for centralized guardrails, plus AWS IAM Identity Center for single sign-on.</li>
+            <li><span class="q-letter">C.</span> AWS Organizations with consolidated billing for both cost tracking and security enforcement, plus Amazon Cognito for employee SSO.</li>
+            <li><span class="q-letter">D.</span> AWS Control Tower for account provisioning, AWS Config for security guardrails, and SAML 2.0 federation with an on-premises IdP for SSO.</li>
+          </ul>
+          <button class="reveal-btn">Show Answer</button>
+          <div class="answer-reveal">
+            <p><strong>Correct Answer: B</strong></p>
+            <p>AWS Organizations provides <strong>consolidated billing</strong> (cost tracking) and <strong>SCPs</strong> (centralized security guardrails that no member account can override). <strong>IAM Identity Center</strong> provides workforce single sign-on across multiple accounts with a central portal. This combination directly addresses all three requirements with the simplest architecture.</p>
+            <p><strong>Why not the others?</strong></p>
+            <ul>
+              <li><strong>A</strong> uses per-account IAM policies for guardrails, which are manageable by local administrators and not centrally enforceable. Cross-account roles provide access but not a single sign-on portal experience.</li>
+              <li><strong>C</strong> incorrectly assumes consolidated billing provides security enforcement &mdash; it is purely a billing feature. Amazon Cognito is for customer-facing application users, not workforce SSO.</li>
+              <li><strong>D</strong> uses AWS Config for monitoring/compliance (it detects non-compliance but does not <em>prevent</em> actions the way SCPs do). SAML federation can provide SSO but is more complex than IAM Identity Center for multi-account workforce access.</li>
+            </ul>
+            <p><strong>Key exam clue:</strong> "Consolidated billing" + "centralized guardrails" + "single sign-on for employees" = Organizations + SCPs + IAM Identity Center.</p>
+            <p><strong>Takeaway:</strong> Consolidated billing &#8800; security. SCPs &#8800; permissions grants. Cognito &#8800; workforce SSO. Each service solves a specific problem.</p>
           </div>
         </div>
       </div>
