@@ -258,5 +258,55 @@
     "term": "Consolidated Billing (Organizations)",
     "definition": "All member accounts' charges roll into one bill paid by the management account. Enables volume pricing discounts (S3, data transfer) and Reserved Instance sharing across the organization.",
     "gotcha": "Consolidated billing is a COST feature, not a SECURITY feature. It does not enforce permissions, restrict actions, or provide guardrails. If the exam asks about 'centralized security enforcement,' the answer is SCPs, not consolidated billing."
+  },
+  {
+    "term": "AWS Managed KMS Key",
+    "definition": "A KMS key created and managed by AWS in your account for a specific service (alias: aws/<service>). You can view it and see CloudTrail logs, but you cannot change its policy, rotation, or share it cross-account.",
+    "gotcha": "AWS managed keys CANNOT be shared cross-account because you cannot modify the key policy. For cross-account encrypted resource sharing (snapshots, S3 objects), you MUST use a customer managed key."
+  },
+  {
+    "term": "AWS Owned KMS Key",
+    "definition": "A KMS key owned and managed entirely by AWS in a service account. Invisible to you — no CloudTrail logging, no key policy control. Used for default encryption in many services. Completely free.",
+    "gotcha": "You cannot view, manage, audit, or rotate AWS owned keys. If the exam asks about auditing key usage or controlling encryption key access, AWS owned keys are not the answer."
+  },
+  {
+    "term": "Encryption at Rest vs In Transit",
+    "definition": "At rest: protects data stored on disk/database (KMS, SSE). In transit: protects data moving over networks (TLS/HTTPS, VPN). They are independent — enabling one does NOT enable the other.",
+    "gotcha": "A common exam trap: 'data is encrypted with KMS' only means at rest. Data still travels in plaintext unless TLS/SSL is separately configured. The exam tests whether you know these are separate concerns."
+  },
+  {
+    "term": "SSE-S3 vs SSE-KMS vs SSE-C",
+    "definition": "SSE-S3: S3 manages keys, no visibility/control, free. SSE-KMS: KMS manages keys, CloudTrail audit, key policy access control, per-request cost. SSE-C: you provide the key with every request, AWS never stores it, HTTPS required.",
+    "gotcha": "SSE-S3 is the default since Jan 2023. SSE-KMS adds audit + access control but costs more and is subject to KMS request quotas. SSE-C requires you to manage and provide the key — lose the key, lose the data."
+  },
+  {
+    "term": "Symmetric vs Asymmetric KMS Key",
+    "definition": "Symmetric (default): single 256-bit AES-GCM key for encrypt and decrypt. Asymmetric: public/private key pair (RSA or ECC) for encryption outside AWS or digital signing. AWS service integrations require symmetric keys.",
+    "gotcha": "You CANNOT use an asymmetric KMS key with S3 SSE-KMS, EBS encryption, RDS encryption, etc. — they all require symmetric keys. Asymmetric keys are for external encryption or digital signing where the caller can't call KMS."
+  },
+  {
+    "term": "KMS Key Policy",
+    "definition": "A resource-based policy attached directly to a KMS key. It is the PRIMARY access control for the key. Without key policy permission, even the account root user cannot use the key (unlike most AWS resources).",
+    "gotcha": "By default, the key policy grants the root account full access and enables IAM policies to work. If someone removes this default statement, IAM policies alone cannot grant KMS access — the key becomes manageable only through the key policy."
+  },
+  {
+    "term": "KMS Key Rotation",
+    "definition": "Automatic rotation creates new cryptographic material while keeping the same key ID/ARN. Old material is preserved for decrypting old data. Customer managed keys: optional, configurable interval. AWS managed keys: automatic yearly.",
+    "gotcha": "Rotation does NOT re-encrypt existing data. Old data still uses old key material (preserved by KMS). If compliance requires current material on all data, you must re-encrypt existing data manually."
+  },
+  {
+    "term": "KMS Key Deletion",
+    "definition": "Permanently destroys a KMS key and all its cryptographic material. Irreversible. AWS enforces a 7-30 day waiting period before deletion. During the wait, you can cancel. After deletion, all data encrypted under the key is permanently unrecoverable.",
+    "gotcha": "There is NO way to recover a deleted KMS key or the data it protected. This is the most dangerous KMS operation. Disable the key first (reversible) before considering deletion."
+  },
+  {
+    "term": "KMS vs CloudHSM",
+    "definition": "KMS: fully managed, multi-tenant HSMs, deep AWS service integration, $1/key/month. CloudHSM: you manage HSM clusters, single-tenant, FIPS 140-2 Level 3, custom integration via PKCS#11/JCE/CNG, ~$1.50/hr per HSM.",
+    "gotcha": "CloudHSM is for regulatory requirements demanding single-tenant hardware and exclusive key control. If the exam says 'dedicated hardware' or 'PKCS#11', the answer is CloudHSM. For everything else, KMS."
+  },
+  {
+    "term": "Data Key (Envelope Encryption)",
+    "definition": "A symmetric key generated by KMS (via GenerateDataKey) used to encrypt actual data locally. KMS returns both a plaintext copy and a KMS-encrypted copy. You encrypt data with the plaintext key, then discard it and store only the encrypted copy.",
+    "gotcha": "The data key encrypts the data. The KMS key encrypts the data key. KMS never sees your data — only the small data key. This two-tier pattern is called envelope encryption and is how S3 SSE-KMS, EBS, and RDS encryption work internally."
   }
 ]

@@ -472,5 +472,47 @@
     ],
     "correctAnswer": 1,
     "explanation": "Organizations provides consolidated billing (cost) and SCPs (centralized guardrails no member account can override). IAM Identity Center provides workforce SSO across accounts. Option A uses per-account IAM policies that local admins can change. Option C confuses billing with security enforcement and Cognito with workforce SSO. Option D uses Config for compliance monitoring, not prevention."
+  },
+  {
+    "id": "d1-kms-04",
+    "domain": "domain1",
+    "topic": "kms-encryption",
+    "question": "A company stores confidential financial reports in an S3 bucket encrypted with SSE-KMS using a customer managed key. A new analytics team in a different AWS account has s3:GetObject permission via a bucket policy but receives Access Denied when downloading reports. What is the MOST likely cause and solution?",
+    "options": [
+      "The bucket policy is incorrect — add s3:Decrypt permission to the analytics role",
+      "The KMS key policy does not grant the analytics account kms:Decrypt — update the key policy and add an IAM policy in the analytics account allowing kms:Decrypt on the key ARN",
+      "SSE-KMS encrypted objects cannot be shared cross-account — re-encrypt with SSE-S3",
+      "The analytics team must use the same AWS managed key (aws/s3) — configure the same key alias in the destination account"
+    ],
+    "correctAnswer": 1,
+    "explanation": "Cross-account access to SSE-KMS encrypted objects requires both S3 read permission AND kms:Decrypt permission on the KMS key. The key policy must grant the external account access, and the external account needs an IAM policy allowing KMS actions on the key. s3:Decrypt is not a valid action. SSE-KMS objects can be shared cross-account with customer managed keys. AWS managed keys cannot be shared cross-account."
+  },
+  {
+    "id": "d1-kms-05",
+    "domain": "domain1",
+    "topic": "kms-encryption",
+    "question": "A healthcare company has an encrypted RDS PostgreSQL database (AWS managed KMS key). An audit reveals database connections transmit data in plaintext across the VPC. What should the architect do to protect data in transit with MINIMAL changes?",
+    "options": [
+      "Replace the AWS managed KMS key with a customer managed key — customer managed keys encrypt data in transit",
+      "Enable SSL/TLS on the RDS instance and configure the application connection to require SSL using the RDS CA certificate",
+      "Move the RDS instance into the same subnet as the application servers to prevent data from crossing a network boundary",
+      "Enable VPC Flow Logs on the database subnet to encrypt network traffic between the application and database"
+    ],
+    "correctAnswer": 1,
+    "explanation": "RDS encryption at rest (KMS) and encryption in transit (TLS) are separate mechanisms. Changing the KMS key type has no effect on network traffic. To protect data in transit, configure the application to connect via SSL/TLS using the RDS CA certificate. Moving to the same subnet does not encrypt traffic. VPC Flow Logs record traffic metadata, not encrypt it."
+  },
+  {
+    "id": "d1-kms-06",
+    "domain": "domain1",
+    "topic": "kms-encryption",
+    "question": "A global media company stores large encrypted video files in S3 in us-east-1 and uses CRR to replicate to eu-west-1 for DR. After failover, applications in eu-west-1 must decrypt videos without calling back to us-east-1. Which approach meets this requirement with MINIMAL overhead?",
+    "options": [
+      "Use SSE-S3 — CRR automatically re-encrypts in the destination using the destination region's S3-managed key",
+      "Create a customer managed KMS key in us-east-1 and grant the eu-west-1 role kms:Decrypt — the application calls KMS in us-east-1 after failover",
+      "Create a multi-region customer managed KMS key with primary in us-east-1 and replica in eu-west-1 — the DR application decrypts using the local replica key",
+      "Use client-side encryption with an AES key stored in Secrets Manager replicated to eu-west-1"
+    ],
+    "correctAnswer": 2,
+    "explanation": "Multi-region KMS keys share key material across regions. Data encrypted in us-east-1 can be decrypted in eu-west-1 using the local replica key with no cross-region API calls. Option B fails if us-east-1 is down during a disaster. SSE-S3 works but lacks key-level audit trails. Client-side encryption adds significant operational overhead compared to multi-region KMS keys."
   }
 ]

@@ -67,6 +67,11 @@
         <li><a href="#orgs-diagram">Organizations &amp; SCPs &mdash; Hierarchy Diagram</a></li>
         <li><a href="#orgs-gotchas">Organizations &amp; SCPs &mdash; Exam Gotchas</a></li>
         <li><a href="#orgs-practice">Organizations &amp; SCPs &mdash; Practice Questions</a></li>
+        <li><a href="#kms-learn"><strong>KMS &amp; Encryption</strong> &mdash; Learn from Zero</a></li>
+        <li><a href="#kms-real-world">KMS &amp; Encryption &mdash; Real-World Scenarios</a></li>
+        <li><a href="#kms-diagram">KMS &amp; Encryption &mdash; Envelope Encryption Diagram</a></li>
+        <li><a href="#kms-gotchas">KMS &amp; Encryption &mdash; Exam Gotchas</a></li>
+        <li><a href="#kms-practice">KMS &amp; Encryption &mdash; Practice Questions</a></li>
       </ol>
     </nav>
 
@@ -1086,6 +1091,650 @@
             </ul>
             <p><strong>Key exam clue:</strong> "Consolidated billing" + "centralized guardrails" + "single sign-on for employees" = Organizations + SCPs + IAM Identity Center.</p>
             <p><strong>Takeaway:</strong> Consolidated billing &#8800; security. SCPs &#8800; permissions grants. Cognito &#8800; workforce SSO. Each service solves a specific problem.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================= -->
+    <!-- TOPIC 3: AWS KMS & Encryption                 -->
+    <!-- ============================================= -->
+
+    <hr class="topic-divider" style="margin-top:4rem;">
+
+    <div class="page-header" style="border-bottom:none;padding-bottom:0;margin-bottom:1.5rem;">
+      <h1 style="display:flex;align-items:center;gap:0.6rem;font-size:1.75rem;">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="var(--domain1)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        AWS KMS &amp; Encryption
+      </h1>
+      <p>Encryption at rest and in transit, KMS key types, envelope encryption, and encryption across AWS services.</p>
+    </div>
+
+    <!-- KMS SECTION 1: Learn from Zero -->
+    <section class="topic-section" id="kms-learn">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain1)" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        Learn from Zero
+      </h2>
+
+      <h3>Encryption Fundamentals</h3>
+      <p><strong>Encryption</strong> is the process of converting readable data (<strong>plaintext</strong>) into an unreadable format (<strong>ciphertext</strong>) using a mathematical algorithm and a secret value called a <strong>key</strong>. <strong>Decryption</strong> reverses the process &mdash; it converts ciphertext back into plaintext using the appropriate key. Without the correct key, the ciphertext is useless.</p>
+
+      <h3>Symmetric vs Asymmetric Encryption</h3>
+      <ul>
+        <li><strong>Symmetric encryption</strong> uses the <em>same key</em> for both encryption and decryption. It is fast and efficient for large amounts of data. The challenge is key distribution &mdash; both parties must securely share the secret key. Example: AES-256.</li>
+        <li><strong>Asymmetric encryption</strong> uses a <em>key pair</em>: a public key (freely shared) and a private key (kept secret). Data encrypted with the public key can only be decrypted with the private key, and vice versa. It is slower than symmetric encryption but solves the key distribution problem. Examples: RSA, ECC.</li>
+      </ul>
+
+      <div class="key-concept">
+        <strong>Exam relevance:</strong> AWS KMS keys are <strong>symmetric by default</strong> (AES-256-GCM). KMS also supports asymmetric keys for use cases like digital signing or encryption outside AWS where you cannot call KMS directly. The exam most often tests symmetric KMS keys.
+      </div>
+
+      <h3>Encryption at Rest vs Encryption in Transit</h3>
+      <div class="table-wrap">
+        <table class="comparison-table">
+          <thead>
+            <tr><th>Aspect</th><th>Encryption at Rest</th><th>Encryption in Transit</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>What it protects</td><td>Data stored on disk, in databases, in S3 objects, on backup media</td><td>Data moving across a network between two endpoints</td></tr>
+            <tr><td>Protection against</td><td>Unauthorized access to physical storage or storage-level compromises</td><td>Eavesdropping, man-in-the-middle attacks, data tampering</td></tr>
+            <tr><td>Mechanism</td><td>Server-side or client-side encryption using a key</td><td>TLS/HTTPS, VPN tunnels, IPsec</td></tr>
+            <tr><td>AWS examples</td><td>S3 SSE, EBS encryption, RDS encryption</td><td>HTTPS endpoints, TLS for RDS connections, VPN</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>A complete security posture requires <strong>both</strong>. Encrypting data at rest does not protect it while it travels over the network, and encrypting data in transit does not protect it once it lands on disk.</p>
+
+      <h3>TLS/HTTPS and Certificates</h3>
+      <p><strong>TLS (Transport Layer Security)</strong> is the protocol that encrypts data in transit. When you see <code>https://</code> in a URL, the connection uses TLS. TLS relies on <strong>certificates</strong> issued by a Certificate Authority (CA) to verify the server's identity and establish an encrypted channel. AWS Certificate Manager (ACM) provides free public TLS certificates for use with AWS services like CloudFront, ALB, and API Gateway.</p>
+
+      <h3>Encryption vs Hashing</h3>
+      <ul>
+        <li><strong>Encryption</strong> is <em>reversible</em> &mdash; you can decrypt ciphertext back to plaintext with the key. It protects <em>confidentiality</em>.</li>
+        <li><strong>Hashing</strong> is a <em>one-way</em> function &mdash; you cannot recover the original data from a hash. It protects <em>integrity</em> (detecting changes). Used for checksums, password storage, and digital signatures. Examples: SHA-256, MD5.</li>
+      </ul>
+
+      <h3>What Encryption Protects &mdash; and What It Does Not</h3>
+      <p>Encryption protects <strong>confidentiality</strong>: even if an attacker obtains the encrypted data, they cannot read it without the key. However, encryption alone does <strong>not</strong>:</p>
+      <ul>
+        <li><strong>Authorize access</strong> &mdash; encrypting an S3 object does not replace the bucket policy or IAM permissions that control who can read or write it. A user with both the IAM permission to read the object <em>and</em> permission to use the encryption key can still access the data.</li>
+        <li><strong>Guarantee integrity</strong> without additional mechanisms (though many encryption algorithms like AES-GCM include integrity checking).</li>
+        <li><strong>Protect against an authorized insider</strong> who has legitimate access to both the data and the key.</li>
+      </ul>
+
+      <div class="key-concept">
+        <strong>Critical distinction:</strong> Encryption and authorization are <strong>separate layers</strong>. The exam will test whether you understand that encrypting data with KMS does not remove the need for proper IAM policies, bucket policies, or security group rules.
+      </div>
+
+      <h3>What Is AWS KMS?</h3>
+      <p><strong>AWS Key Management Service (KMS)</strong> is a managed service that lets you create, manage, and control cryptographic keys used to encrypt your data. KMS integrates with most AWS services that support encryption, so you can centrally manage the keys that protect your data across S3, EBS, RDS, DynamoDB, and many more.</p>
+      <p>A <strong>KMS key</strong> (formerly called a Customer Master Key or CMK) is the primary resource in KMS. It represents a logical key that contains the key material used for cryptographic operations. KMS keys never leave KMS unencrypted &mdash; all cryptographic operations happen inside the service.</p>
+
+      <h3>Types of KMS Keys</h3>
+      <div class="table-wrap">
+        <table class="comparison-table">
+          <thead>
+            <tr><th>Feature</th><th>Customer Managed Key</th><th>AWS Managed Key</th><th>AWS Owned Key</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Created by</td><td>You</td><td>AWS (in your account)</td><td>AWS (in a service account)</td></tr>
+            <tr><td>Alias format</td><td>Your choice</td><td><code>aws/&lt;service&gt;</code></td><td>Not visible</td></tr>
+            <tr><td>You control key policy</td><td class="check">&#10003;</td><td class="cross">&#10007;</td><td class="cross">&#10007;</td></tr>
+            <tr><td>CloudTrail logging</td><td class="check">&#10003;</td><td class="check">&#10003;</td><td class="cross">&#10007;</td></tr>
+            <tr><td>Configurable rotation</td><td class="check">&#10003;</td><td class="cross">&#10007; (auto yearly)</td><td class="cross">&#10007; (managed by AWS)</td></tr>
+            <tr><td>Cross-account sharing</td><td class="check">&#10003;</td><td class="cross">&#10007;</td><td class="cross">&#10007; (transparent)</td></tr>
+            <tr><td>Monthly cost</td><td>$1/month + usage</td><td>No monthly fee; usage fees</td><td>Free</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><strong>Customer managed keys</strong> give you maximum control &mdash; you set key policies, configure rotation, and can share across accounts. <strong>AWS managed keys</strong> (aliases like <code>aws/ebs</code>, <code>aws/s3</code>) are convenient but you cannot modify their policies or share them. <strong>AWS owned keys</strong> are fully managed by AWS and invisible to you.</p>
+
+      <div class="key-concept">
+        <strong>Exam tip:</strong> If a question asks about auditing key usage, controlling rotation, or sharing encryption keys across accounts, the answer is <strong>customer managed keys</strong>. AWS managed keys cannot be shared cross-account and their rotation schedule is fixed.
+      </div>
+
+      <h3>KMS Key Policies vs IAM Policies</h3>
+      <p>Every KMS key has a <strong>key policy</strong> &mdash; a resource-based policy attached directly to the key. Unlike most AWS resources, a KMS key's key policy is the <em>primary</em> access control mechanism. Without permission in the key policy (either directly or by enabling IAM policies), no one can use the key &mdash; not even the account root user.</p>
+      <ul>
+        <li><strong>Key policy</strong> &mdash; controls access to the KMS key itself. By default, the key policy grants the account root user full access and enables IAM policies to control access.</li>
+        <li><strong>IAM policies</strong> &mdash; can grant KMS permissions only if the key policy allows it (by including the <code>"kms:*"</code> grant to the root account).</li>
+      </ul>
+
+      <h3>Key Administrators vs Key Users</h3>
+      <ul>
+        <li><strong>Key administrators</strong> can manage the key (enable, disable, set policies, schedule deletion) but cannot use it for cryptographic operations.</li>
+        <li><strong>Key users</strong> can use the key to encrypt and decrypt data but cannot manage the key's lifecycle or policies.</li>
+      </ul>
+      <p>This separation enforces least privilege &mdash; the person who manages the key does not need to access the encrypted data, and the application that uses the key does not need to manage it.</p>
+
+      <h3>Important KMS Permissions</h3>
+      <ul>
+        <li><code>kms:Encrypt</code> &mdash; encrypt data directly under a KMS key (limited to 4 KB of data).</li>
+        <li><code>kms:Decrypt</code> &mdash; decrypt ciphertext that was encrypted under a KMS key.</li>
+        <li><code>kms:GenerateDataKey</code> &mdash; generate a plaintext data key and its encrypted copy for <strong>envelope encryption</strong>. This is the permission used when encrypting large data.</li>
+      </ul>
+
+      <h3>Key Rotation and Key Deletion</h3>
+      <p><strong>Key rotation</strong> creates new cryptographic material for a KMS key while keeping the same key ID and ARN. Old material is preserved so previously encrypted data can still be decrypted. Customer managed keys support optional automatic rotation (configurable interval); AWS managed keys rotate automatically every year.</p>
+      <p><strong>Key deletion</strong> is irreversible and dangerous. When a KMS key is deleted, <em>all data encrypted under that key becomes permanently unrecoverable</em>. AWS enforces a mandatory waiting period (7&ndash;30 days) before deletion to prevent accidental data loss. During the waiting period, you can cancel the deletion.</p>
+
+      <div class="gotcha">
+        <h4>Key Rotation vs Re-Encryption</h4>
+        <p>Rotating a KMS key does <strong>not</strong> re-encrypt existing data. Old data remains encrypted under the old key material (which KMS preserves). Only <em>new</em> encryption operations use the new material. If compliance requires that existing data uses only current key material, you must re-encrypt it yourself.</p>
+      </div>
+
+      <h3>Multi-Region KMS Keys</h3>
+      <p>A <strong>multi-Region KMS key</strong> is a set of KMS keys in different Regions that share the same key material and key ID (with an <code>mrk-</code> prefix). Data encrypted in one Region can be decrypted in another without cross-Region API calls or re-encryption. You create a primary key in one Region and replicate it to others.</p>
+      <p>Multi-Region keys are useful for disaster recovery, global applications, and cross-Region data sharing. However, they are <em>not global</em> &mdash; you must explicitly replicate them to each Region you need, and each replica is billed separately.</p>
+
+      <h3>Cross-Account KMS Access</h3>
+      <p>To grant another account access to your customer managed KMS key, you need <strong>both</strong>:</p>
+      <ol>
+        <li>The KMS key policy must grant the external account (or a specific principal in it) permission to use the key.</li>
+        <li>The external account must grant its own principal an IAM policy allowing KMS actions on your key ARN.</li>
+      </ol>
+      <p>This mirrors the cross-account pattern for IAM roles &mdash; both sides must agree. AWS managed keys cannot be shared cross-account because you cannot modify their key policies.</p>
+
+      <h3>KMS vs CloudHSM</h3>
+      <div class="table-wrap">
+        <table class="comparison-table">
+          <thead>
+            <tr><th>Aspect</th><th>AWS KMS</th><th>AWS CloudHSM</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Management</td><td>Fully managed by AWS</td><td>You manage HSM clusters</td></tr>
+            <tr><td>Key storage</td><td>Multi-tenant HSMs (FIPS 140-2 Level 3)</td><td>Single-tenant HSMs (FIPS 140-2 Level 3)</td></tr>
+            <tr><td>Key control</td><td>AWS and you (shared)</td><td>You alone</td></tr>
+            <tr><td>Integration</td><td>Deep integration with AWS services</td><td>Custom integration via PKCS#11, JCE, CNG</td></tr>
+            <tr><td>Cost</td><td>$1/key/month + API calls</td><td>~$1.50/hour per HSM</td></tr>
+            <tr><td>Best for</td><td>Most encryption needs</td><td>Regulatory requirements demanding exclusive key control</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="key-concept">
+        <strong>Exam tip:</strong> If a question mentions <em>dedicated hardware</em>, <em>single-tenant</em>, <em>PKCS#11</em>, or <em>exclusive control over keys</em>, the answer is <strong>CloudHSM</strong>. For most other encryption scenarios, KMS is the right choice.
+      </div>
+
+      <h3>Envelope Encryption</h3>
+      <p>KMS has a <strong>4 KB limit</strong> on data you can encrypt directly. For anything larger (which is almost everything in practice), you use <strong>envelope encryption</strong>:</p>
+      <ol>
+        <li>Call <code>kms:GenerateDataKey</code>. KMS returns a <strong>plaintext data key</strong> and an <strong>encrypted copy</strong> of that data key (encrypted under your KMS key).</li>
+        <li>Use the plaintext data key to encrypt your data locally (in your application, SDK, or AWS service).</li>
+        <li>Store the <strong>encrypted data</strong> and the <strong>encrypted data key</strong> together. Discard the plaintext data key from memory.</li>
+        <li>To decrypt later, send the encrypted data key to KMS (<code>kms:Decrypt</code>). KMS returns the plaintext data key.</li>
+        <li>Use the recovered plaintext data key to decrypt the data locally.</li>
+      </ol>
+
+      <div class="key-concept">
+        <strong>Why envelope encryption matters:</strong> Your actual data never leaves your environment &mdash; KMS only sees the small data key, not your large files. This reduces latency, avoids the 4 KB limit, and minimizes KMS API calls. This is how S3 SSE-KMS, EBS encryption, and most AWS encryption works internally.
+      </div>
+
+      <h3>Encryption Across AWS Services</h3>
+
+      <h4>S3: SSE-S3, SSE-KMS, and SSE-C</h4>
+      <div class="table-wrap">
+        <table class="comparison-table">
+          <thead>
+            <tr><th>Feature</th><th>SSE-S3</th><th>SSE-KMS</th><th>SSE-C</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Key managed by</td><td>S3 (AWS owned)</td><td>KMS (AWS managed or customer managed)</td><td>You (provide key with each request)</td></tr>
+            <tr><td>Key visibility</td><td>None</td><td>Visible in KMS console</td><td>None &mdash; AWS discards key after use</td></tr>
+            <tr><td>CloudTrail audit</td><td class="cross">&#10007;</td><td class="check">&#10003;</td><td class="cross">&#10007;</td></tr>
+            <tr><td>Access control via key policy</td><td class="cross">&#10007;</td><td class="check">&#10003; (with customer managed key)</td><td class="cross">&#10007;</td></tr>
+            <tr><td>HTTPS required</td><td>No</td><td>No</td><td class="check">&#10003; (always)</td></tr>
+            <tr><td>Cost</td><td>Free</td><td>KMS API call charges</td><td>Free (you manage keys)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><strong>SSE-S3</strong> is the default &mdash; S3 encrypts every new object automatically. <strong>SSE-KMS</strong> adds key visibility, audit trails, and access control through the key policy. <strong>SSE-C</strong> requires you to provide the encryption key with every request &mdash; AWS never stores it.</p>
+
+      <div class="key-concept">
+        <strong>Exam tip:</strong> If a question asks about <em>auditing which keys encrypt which S3 objects</em> or <em>controlling decryption through key permissions</em>, the answer is <strong>SSE-KMS with a customer managed key</strong>. SSE-S3 is simpler but gives you no key-level control.
+      </div>
+
+      <h4>EBS Volumes and Snapshots</h4>
+      <p>EBS encryption is enabled per-volume. When you create an encrypted volume, EBS uses envelope encryption with a KMS key. All data on the volume, snapshots created from it, and volumes restored from those snapshots are encrypted. Encryption is transparent to the EC2 instance &mdash; no application changes needed.</p>
+      <ul>
+        <li>You <strong>cannot remove encryption</strong> from an encrypted EBS volume or snapshot.</li>
+        <li>To encrypt an unencrypted volume, create a snapshot, copy the snapshot with encryption enabled, then create a new volume from the encrypted snapshot.</li>
+        <li>Snapshots of encrypted volumes are always encrypted with the same key (or you can re-encrypt with a different key during a snapshot copy).</li>
+      </ul>
+
+      <h4>RDS Encryption</h4>
+      <p>RDS encryption at rest protects the database storage, automated backups, read replicas, and snapshots. It uses KMS envelope encryption.</p>
+      <ul>
+        <li>Encryption must be enabled <strong>at creation time</strong>. You cannot encrypt an existing unencrypted RDS instance directly.</li>
+        <li>To encrypt an existing database: create a snapshot, copy the snapshot with encryption, then restore from the encrypted snapshot.</li>
+        <li>Read replicas of encrypted instances are always encrypted (same Region uses the same key; cross-Region requires a key in the destination Region).</li>
+      </ul>
+
+      <h4>EFS, SQS, DynamoDB, and CloudWatch Logs</h4>
+      <ul>
+        <li><strong>EFS</strong> supports encryption at rest (KMS) and encryption in transit (TLS mount option). Both are independent settings.</li>
+        <li><strong>SQS</strong> supports server-side encryption using KMS keys. Messages are encrypted at rest in the queue.</li>
+        <li><strong>DynamoDB</strong> encrypts all tables at rest by default using an AWS owned key. You can choose an AWS managed key or a customer managed key instead.</li>
+        <li><strong>CloudWatch Logs</strong> supports encryption using a customer managed KMS key at the log group level.</li>
+      </ul>
+
+      <h4>TLS for Data in Transit</h4>
+      <p>Most AWS service endpoints use HTTPS (TLS) by default. For services where TLS is optional (such as RDS database connections or EFS mounts), you can enforce TLS through configuration. The exam expects you to know that encryption at rest and encryption in transit are <strong>separate concerns</strong> that require separate configurations.</p>
+
+      <h3>Related Services Compared</h3>
+
+      <h4>KMS vs Secrets Manager</h4>
+      <ul>
+        <li><strong>KMS</strong> manages <em>encryption keys</em> &mdash; it encrypts and decrypts data. It does not store your secrets or application data.</li>
+        <li><strong>Secrets Manager</strong> stores and manages <em>secrets</em> (database credentials, API keys, tokens). It can encrypt those secrets using a KMS key and provides <strong>automatic rotation</strong>.</li>
+      </ul>
+      <p>They often work together: Secrets Manager uses KMS to encrypt the secrets it stores. But they solve different problems.</p>
+
+      <h4>KMS vs Certificate Manager (ACM)</h4>
+      <ul>
+        <li><strong>KMS</strong> handles encryption keys for data at rest.</li>
+        <li><strong>ACM</strong> manages <em>TLS/SSL certificates</em> for data in transit. ACM provides free public certificates for use with AWS services (CloudFront, ALB, API Gateway). ACM does not encrypt your stored data.</li>
+      </ul>
+
+      <h4>Encryption vs Authorization</h4>
+      <p>Encryption protects <em>confidentiality</em> &mdash; even if someone accesses the ciphertext, they cannot read it. Authorization controls <em>access</em> &mdash; who can reach the resource in the first place. A properly secured system uses both: IAM policies and bucket policies control who can access a resource, and encryption protects the data if those controls are bypassed at the storage level.</p>
+
+    </section>
+
+    <hr class="topic-divider">
+
+    <!-- KMS SECTION 2: Real-World Scenarios -->
+    <section class="topic-section" id="kms-real-world">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain2)" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        When Real Architects Actually Use This
+      </h2>
+
+      <div class="real-world">
+        <h4>Scenario 1: Sensitive S3 Objects With Controlled Decryption</h4>
+        <p><strong>Requirement:</strong> A healthcare company stores patient records in S3. Only authorized applications in a specific account should be able to decrypt the data. The security team needs a CloudTrail audit trail for every decryption.</p>
+        <p><strong>Solution:</strong> Encrypt objects using <strong>SSE-KMS with a customer managed key</strong>. Configure the KMS key policy to grant <code>kms:Decrypt</code> only to the authorized application role. The S3 bucket policy controls who can access the objects, and the KMS key policy controls who can decrypt them &mdash; two independent layers.</p>
+        <p><strong>Why this works:</strong> Even if someone gains S3 read access through a misconfigured bucket policy, they cannot read the data without <code>kms:Decrypt</code> permission on the key. Every decryption call is logged in CloudTrail.</p>
+        <p><strong>Limitation:</strong> KMS encryption adds a per-request cost and is subject to KMS request quotas (thousands of requests per second per Region). For extremely high-throughput reads, SSE-S3 with bucket-policy-only access control may be simpler, but you lose the key-level audit trail.</p>
+      </div>
+
+      <div class="real-world">
+        <h4>Scenario 2: Encrypted EBS Volumes for EC2 Applications</h4>
+        <p><strong>Requirement:</strong> A financial application on EC2 processes sensitive transaction data. All volumes must be encrypted, and the operations team needs to share encrypted snapshots with a disaster recovery account.</p>
+        <p><strong>Solution:</strong> Create encrypted EBS volumes using a <strong>customer managed KMS key</strong>. Snapshots inherit the encryption. To share with the DR account, copy the snapshot and re-encrypt it with a KMS key that the DR account can access (grant the DR account's role in the key policy).</p>
+        <p><strong>Why a customer managed key?</strong> AWS managed keys (<code>aws/ebs</code>) cannot be shared cross-account. A customer managed key lets you control the key policy and grant the DR account access.</p>
+        <p><strong>Trade-off:</strong> Customer managed keys cost $1/month plus API call charges, and you are responsible for key lifecycle management. For single-account use, the AWS managed EBS key is simpler.</p>
+      </div>
+
+      <div class="real-world">
+        <h4>Scenario 3: Encrypted RDS Database With Protected Backups</h4>
+        <p><strong>Requirement:</strong> A retail company runs an RDS PostgreSQL database storing customer payment information. Compliance requires encryption at rest for the database and all backups. The existing database is currently unencrypted.</p>
+        <p><strong>Solution:</strong> Since you cannot enable encryption on an existing RDS instance directly: (1) create a snapshot of the unencrypted database, (2) copy the snapshot with encryption enabled using a customer managed KMS key, (3) restore a new RDS instance from the encrypted snapshot, (4) update the application's connection string to point to the new instance. Automated backups and read replicas of the new instance will be encrypted automatically.</p>
+        <p><strong>Why this matters:</strong> The migration requires a brief downtime window and a DNS/connection cutover. Planning the cutover is a real-world consideration that the exam tests &mdash; "you cannot simply enable encryption on an existing RDS instance."</p>
+        <p><strong>Limitation:</strong> Cross-Region read replicas of encrypted databases require a KMS key in the destination Region. You cannot use the same key ARN across Regions (unless using multi-Region keys).</p>
+      </div>
+
+      <div class="real-world">
+        <h4>Scenario 4: Securing Web Application Data in Transit</h4>
+        <p><strong>Requirement:</strong> An e-commerce site transmits credit card information between the user's browser and the application. The security team requires all data in transit to be encrypted.</p>
+        <p><strong>Solution:</strong> Terminate TLS at the Application Load Balancer using a certificate from <strong>AWS Certificate Manager (ACM)</strong>. Configure the ALB listener to accept only HTTPS traffic on port 443. For end-to-end encryption, also enable TLS between the ALB and the backend EC2 instances.</p>
+        <p><strong>Why ACM and not KMS?</strong> ACM handles TLS certificates (data in transit). KMS handles encryption keys (data at rest). They solve different problems. A common exam trap is conflating the two.</p>
+        <p><strong>Trade-off:</strong> End-to-end TLS (ALB to backend) increases CPU overhead on the backend instances and requires managing certificates on those instances. Many architectures terminate TLS at the ALB and use the private VPC network for internal traffic.</p>
+      </div>
+
+      <div class="real-world">
+        <h4>Scenario 5: Centralized Key Governance</h4>
+        <p><strong>Requirement:</strong> A company with 20 AWS accounts wants all teams to use approved encryption keys and wants the security team to audit key usage across accounts.</p>
+        <p><strong>Solution:</strong> Create customer managed KMS keys in a central <strong>security account</strong>. Configure key policies to grant specific roles in each member account <code>kms:Encrypt</code>, <code>kms:Decrypt</code>, and <code>kms:GenerateDataKey</code> permissions. Member accounts reference the central key ARN when encrypting their data. All key usage appears in the security account's CloudTrail logs.</p>
+        <p><strong>Why centralized keys?</strong> It gives the security team a single place to audit, rotate, and revoke encryption access. If a member account is compromised, the security team can immediately revoke that account's key access from the central key policy.</p>
+        <p><strong>Limitation:</strong> Cross-account KMS calls add latency and are subject to KMS request quotas in the key's home Region. High-throughput workloads may need keys in their own accounts with separate audit aggregation.</p>
+      </div>
+
+      <div class="real-world">
+        <h4>Scenario 6: Multi-Region Disaster Recovery</h4>
+        <p><strong>Requirement:</strong> A global application stores encrypted data in us-east-1 and must fail over to eu-west-1. After failover, the application in the DR Region must decrypt data replicated from the primary Region without calling back to us-east-1.</p>
+        <p><strong>Solution:</strong> Create a <strong>multi-Region KMS key</strong> with the primary in us-east-1 and a replica in eu-west-1. Encrypt data in us-east-1 with this key. Replicate the encrypted data (via S3 CRR or database replication) to eu-west-1. The DR application in eu-west-1 decrypts using the local replica key &mdash; same key material, no cross-Region calls.</p>
+        <p><strong>Why not separate keys per Region?</strong> If you use different keys, replicated data is encrypted under the source Region's key. The DR application would need to call KMS in us-east-1 to decrypt &mdash; which defeats the purpose of DR if that Region is down. Multi-Region keys solve this.</p>
+        <p><strong>Trade-off:</strong> Multi-Region keys share key material, which means a compromise of the key in one Region affects all Regions. You must carefully manage key policies in every Region where the key is replicated.</p>
+      </div>
+
+    </section>
+
+    <hr class="topic-divider">
+
+    <!-- KMS SECTION 3: SVG Diagram -->
+    <section class="topic-section" id="kms-diagram">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain3)" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+        How Envelope Encryption Works
+      </h2>
+      <p>The diagram below shows the complete envelope encryption workflow. An authorized application requests a data key from KMS, encrypts data locally, and stores the encrypted data alongside the encrypted data key. To decrypt, the application asks KMS to decrypt the data key, then uses the recovered key locally. <strong>KMS never sees your data</strong> &mdash; it only manages the small data key.</p>
+
+      <div class="diagram-container">
+        <svg viewBox="0 0 820 580" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagram showing envelope encryption workflow: Application requests data key from KMS, KMS returns plaintext and encrypted data key, application encrypts data locally, stores encrypted data and encrypted data key, then later requests decryption of the data key from KMS and uses it to decrypt the data locally.">
+
+          <defs>
+            <marker id="arr-kms" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+              <polygon points="0 0, 10 3.5, 0 7" fill="var(--accent)"/>
+            </marker>
+            <marker id="arr-kms-green" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+              <polygon points="0 0, 10 3.5, 0 7" fill="var(--domain4)"/>
+            </marker>
+            <marker id="arr-kms-blue" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+              <polygon points="0 0, 10 3.5, 0 7" fill="var(--domain2)"/>
+            </marker>
+            <pattern id="grid-kms" width="20" height="20" patternUnits="userSpaceOnUse">
+              <path d="M 20 0 L 0 0 0 20" fill="none" stroke="var(--border)" stroke-width="0.3" opacity="0.4"/>
+            </pattern>
+          </defs>
+
+          <rect width="820" height="580" fill="var(--bg-card)" rx="8"/>
+          <rect width="820" height="580" fill="url(#grid-kms)" rx="8"/>
+
+          <text x="410" y="26" text-anchor="middle" font-size="14" font-weight="700" fill="var(--text-primary)" font-family="Inter, sans-serif">Envelope Encryption Workflow</text>
+
+          <!-- ===== ENCRYPT PHASE (top half) ===== -->
+          <text x="410" y="52" text-anchor="middle" font-size="11" font-weight="600" fill="var(--accent)" font-family="Inter, sans-serif">&#9472;&#9472; Encrypt Phase &#9472;&#9472;</text>
+
+          <!-- Box: Application -->
+          <rect x="20" y="70" width="150" height="70" rx="10" fill="var(--bg-primary)" stroke="var(--domain1)" stroke-width="2" stroke-dasharray="6 3"/>
+          <text x="95" y="100" text-anchor="middle" font-size="12" font-weight="600" fill="var(--text-primary)" font-family="Inter, sans-serif">Application</text>
+          <text x="95" y="118" text-anchor="middle" font-size="9" fill="var(--text-muted)" font-family="Inter, sans-serif">(EC2, Lambda, SDK)</text>
+
+          <!-- Arrow 1: App -> KMS -->
+          <line x1="170" y1="90" x2="298" y2="90" stroke="var(--accent)" stroke-width="2" marker-end="url(#arr-kms)" stroke-dasharray="5 3"/>
+          <rect x="192" y="66" width="80" height="18" rx="4" fill="var(--accent)" opacity="0.15"/>
+          <text x="232" y="79" text-anchor="middle" font-size="10" font-weight="600" fill="var(--accent)" font-family="Inter, sans-serif">Step 1</text>
+          <text x="232" y="60" text-anchor="middle" font-size="9" fill="var(--text-muted)" font-family="Inter, sans-serif">GenerateDataKey</text>
+
+          <!-- Box: KMS -->
+          <rect x="300" y="70" width="150" height="70" rx="10" fill="var(--bg-primary)" stroke="var(--accent)" stroke-width="2"/>
+          <text x="375" y="96" text-anchor="middle" font-size="13" font-weight="700" fill="var(--accent)" font-family="Inter, sans-serif">AWS KMS</text>
+          <text x="375" y="114" text-anchor="middle" font-size="9" fill="var(--text-muted)" font-family="Inter, sans-serif">Returns 2 copies of key</text>
+
+          <!-- Arrow 2: KMS returns keys -->
+          <line x1="450" y1="90" x2="518" y2="90" stroke="var(--domain4)" stroke-width="2" marker-end="url(#arr-kms-green)"/>
+          <rect x="456" y="66" width="80" height="18" rx="4" fill="var(--domain4)" opacity="0.15"/>
+          <text x="496" y="79" text-anchor="middle" font-size="10" font-weight="600" fill="var(--domain4)" font-family="Inter, sans-serif">Step 2</text>
+
+          <!-- Box: Two keys returned -->
+          <rect x="520" y="64" width="280" height="82" rx="10" fill="var(--bg-primary)" stroke="var(--domain4)" stroke-width="1.5"/>
+          <rect x="530" y="74" width="120" height="28" rx="6" fill="rgba(34,197,94,0.12)" stroke="var(--domain4)" stroke-width="1"/>
+          <text x="590" y="93" text-anchor="middle" font-size="10" font-weight="600" fill="var(--domain4)" font-family="Inter, sans-serif">Plaintext Data Key</text>
+          <rect x="660" y="74" width="130" height="28" rx="6" fill="rgba(249,115,22,0.10)" stroke="var(--accent)" stroke-width="1"/>
+          <text x="725" y="93" text-anchor="middle" font-size="10" font-weight="600" fill="var(--accent)" font-family="Inter, sans-serif">Encrypted Data Key</text>
+          <text x="660" y="130" text-anchor="middle" font-size="9" fill="var(--text-muted)" font-family="Inter, sans-serif">Encrypted copy is protected by KMS key</text>
+
+          <!-- Arrow 3: App encrypts data locally -->
+          <line x1="95" y1="140" x2="95" y2="188" stroke="var(--domain4)" stroke-width="2" marker-end="url(#arr-kms-green)"/>
+          <rect x="110" y="150" width="80" height="18" rx="4" fill="var(--domain4)" opacity="0.15"/>
+          <text x="150" y="163" text-anchor="middle" font-size="10" font-weight="600" fill="var(--domain4)" font-family="Inter, sans-serif">Step 3</text>
+          <text x="150" y="180" text-anchor="middle" font-size="9" fill="var(--text-muted)" font-family="Inter, sans-serif">Encrypt locally</text>
+
+          <!-- Box: Local encryption -->
+          <rect x="20" y="190" width="260" height="60" rx="10" fill="var(--bg-primary)" stroke="var(--domain4)" stroke-width="2"/>
+          <text x="150" y="214" text-anchor="middle" font-size="11" font-weight="600" fill="var(--domain4)" font-family="Inter, sans-serif">Encrypt Data Locally</text>
+          <text x="150" y="234" text-anchor="middle" font-size="9" fill="var(--text-muted)" font-family="Inter, sans-serif">Using plaintext data key (AES-256)</text>
+
+          <!-- Arrow 4: Store encrypted data + encrypted key -->
+          <line x1="280" y1="220" x2="418" y2="220" stroke="var(--accent)" stroke-width="2" marker-end="url(#arr-kms)" stroke-dasharray="5 3"/>
+          <rect x="310" y="196" width="80" height="18" rx="4" fill="var(--accent)" opacity="0.15"/>
+          <text x="350" y="209" text-anchor="middle" font-size="10" font-weight="600" fill="var(--accent)" font-family="Inter, sans-serif">Step 4</text>
+
+          <!-- Box: Storage -->
+          <rect x="420" y="190" width="380" height="60" rx="10" fill="var(--bg-primary)" stroke="var(--domain1)" stroke-width="2"/>
+          <rect x="436" y="204" width="150" height="32" rx="6" fill="rgba(249,115,22,0.08)" stroke="var(--accent)" stroke-width="1"/>
+          <text x="511" y="225" text-anchor="middle" font-size="10" font-weight="600" fill="var(--accent)" font-family="Inter, sans-serif">Encrypted Data</text>
+          <text x="611" y="222" text-anchor="middle" font-size="14" fill="var(--text-muted)" font-family="Inter, sans-serif">+</text>
+          <rect x="634" y="204" width="150" height="32" rx="6" fill="rgba(249,115,22,0.08)" stroke="var(--accent)" stroke-width="1"/>
+          <text x="709" y="225" text-anchor="middle" font-size="10" font-weight="600" fill="var(--accent)" font-family="Inter, sans-serif">Encrypted Data Key</text>
+          <text x="610" y="178" text-anchor="middle" font-size="9" fill="var(--text-muted)" font-family="Inter, sans-serif">Store together (S3, EBS, database)</text>
+
+          <!-- Discard note -->
+          <rect x="20" y="262" width="260" height="24" rx="5" fill="rgba(239,68,68,0.08)" stroke="#ef4444" stroke-width="1"/>
+          <text x="150" y="279" text-anchor="middle" font-size="9" font-weight="600" fill="#ef4444" font-family="Inter, sans-serif">Discard plaintext data key from memory</text>
+
+          <!-- ===== DECRYPT PHASE (bottom half) ===== -->
+          <line x1="40" y1="306" x2="780" y2="306" stroke="var(--border)" stroke-width="1" stroke-dasharray="3 2"/>
+          <text x="410" y="328" text-anchor="middle" font-size="11" font-weight="600" fill="var(--domain2)" font-family="Inter, sans-serif">&#9472;&#9472; Decrypt Phase &#9472;&#9472;</text>
+
+          <!-- Box: Application (decrypt) -->
+          <rect x="20" y="345" width="150" height="70" rx="10" fill="var(--bg-primary)" stroke="var(--domain1)" stroke-width="2" stroke-dasharray="6 3"/>
+          <text x="95" y="375" text-anchor="middle" font-size="12" font-weight="600" fill="var(--text-primary)" font-family="Inter, sans-serif">Application</text>
+          <text x="95" y="393" text-anchor="middle" font-size="9" fill="var(--text-muted)" font-family="Inter, sans-serif">Needs to decrypt data</text>
+
+          <!-- Arrow 5: Send encrypted data key to KMS -->
+          <line x1="170" y1="365" x2="298" y2="365" stroke="var(--domain2)" stroke-width="2" marker-end="url(#arr-kms-blue)" stroke-dasharray="5 3"/>
+          <rect x="192" y="341" width="80" height="18" rx="4" fill="var(--domain2)" opacity="0.15"/>
+          <text x="232" y="354" text-anchor="middle" font-size="10" font-weight="600" fill="var(--domain2)" font-family="Inter, sans-serif">Step 5</text>
+          <text x="232" y="336" text-anchor="middle" font-size="9" fill="var(--text-muted)" font-family="Inter, sans-serif">Send encrypted data key</text>
+
+          <!-- Box: KMS (decrypt) -->
+          <rect x="300" y="345" width="150" height="70" rx="10" fill="var(--bg-primary)" stroke="var(--domain2)" stroke-width="2"/>
+          <text x="375" y="371" text-anchor="middle" font-size="13" font-weight="700" fill="var(--domain2)" font-family="Inter, sans-serif">AWS KMS</text>
+          <text x="375" y="389" text-anchor="middle" font-size="9" fill="var(--text-muted)" font-family="Inter, sans-serif">kms:Decrypt</text>
+          <text x="375" y="404" text-anchor="middle" font-size="9" fill="var(--text-muted)" font-family="Inter, sans-serif">Returns plaintext data key</text>
+
+          <!-- Arrow 6: KMS returns plaintext data key -->
+          <line x1="450" y1="380" x2="518" y2="380" stroke="var(--domain4)" stroke-width="2" marker-end="url(#arr-kms-green)"/>
+          <rect x="456" y="356" width="80" height="18" rx="4" fill="var(--domain4)" opacity="0.15"/>
+          <text x="496" y="369" text-anchor="middle" font-size="10" font-weight="600" fill="var(--domain4)" font-family="Inter, sans-serif">Step 6</text>
+
+          <!-- Box: Recovered key -->
+          <rect x="520" y="355" width="160" height="50" rx="10" fill="var(--bg-primary)" stroke="var(--domain4)" stroke-width="1.5"/>
+          <rect x="535" y="366" width="130" height="28" rx="6" fill="rgba(34,197,94,0.12)" stroke="var(--domain4)" stroke-width="1"/>
+          <text x="600" y="385" text-anchor="middle" font-size="10" font-weight="600" fill="var(--domain4)" font-family="Inter, sans-serif">Plaintext Data Key</text>
+
+          <!-- Arrow 7: Decrypt data locally -->
+          <line x1="95" y1="415" x2="95" y2="453" stroke="var(--domain4)" stroke-width="2" marker-end="url(#arr-kms-green)"/>
+
+          <!-- Box: Local decryption -->
+          <rect x="20" y="455" width="260" height="50" rx="10" fill="var(--bg-primary)" stroke="var(--domain4)" stroke-width="2"/>
+          <text x="150" y="476" text-anchor="middle" font-size="11" font-weight="600" fill="var(--domain4)" font-family="Inter, sans-serif">Decrypt Data Locally</text>
+          <text x="150" y="494" text-anchor="middle" font-size="9" fill="var(--text-muted)" font-family="Inter, sans-serif">Using recovered plaintext data key</text>
+
+          <!-- Final annotation -->
+          <rect x="60" y="525" width="700" height="44" rx="6" fill="rgba(255,153,0,0.06)" stroke="var(--accent)" stroke-width="1" stroke-dasharray="4 2"/>
+          <text x="410" y="543" text-anchor="middle" font-size="11" fill="var(--text-secondary)" font-family="Inter, sans-serif">
+            <tspan font-weight="600" fill="var(--accent)">Key point:</tspan> KMS never sees your plaintext data &mdash; only the small data key.
+          </text>
+          <text x="410" y="559" text-anchor="middle" font-size="11" fill="var(--text-secondary)" font-family="Inter, sans-serif">
+            Both <tspan font-weight="600" fill="var(--domain4)">GenerateDataKey</tspan> and <tspan font-weight="600" fill="var(--domain2)">Decrypt</tspan> require proper <tspan font-weight="600" fill="var(--domain1)">IAM + key policy</tspan> authorization.
+          </text>
+
+        </svg>
+      </div>
+      <p class="diagram-label">Figure: Envelope encryption workflow &mdash; the application encrypts data locally using a data key generated by KMS, stores the encrypted data alongside the KMS-encrypted data key, and later asks KMS to decrypt only the small data key to recover the data. Both GenerateDataKey and Decrypt operations require proper authorization through IAM policies and the KMS key policy.</p>
+
+    </section>
+
+    <hr class="topic-divider">
+
+    <!-- KMS SECTION 4: Exam Gotchas -->
+    <section class="topic-section" id="kms-gotchas">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        SAA-C03 Exam Gotchas &mdash; KMS &amp; Encryption
+      </h2>
+
+      <div class="gotcha">
+        <h4>Confusing Encryption at Rest with Encryption in Transit</h4>
+        <p><strong>Misconception:</strong> "We enabled S3 SSE-KMS, so our data is encrypted everywhere." <strong>Correct:</strong> SSE-KMS encrypts data <em>at rest</em> in S3. Data traveling between the client and S3 is protected by <em>HTTPS (TLS)</em>, which is a separate mechanism. You need both for complete protection.</p>
+        <p><strong>Exam clue:</strong> If a question asks about protecting data "in transit," look for TLS/HTTPS/VPN answers, not KMS. If it asks about "at rest," look for KMS/SSE answers.</p>
+        <p><strong>Memory rule:</strong> At rest = KMS/SSE. In transit = TLS/HTTPS. Different problems, different solutions.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>Assuming SSE-S3 and SSE-KMS Are Interchangeable</h4>
+        <p><strong>Misconception:</strong> "Both encrypt the data, so it doesn't matter which one I choose." <strong>Correct:</strong> SSE-S3 uses AWS-managed keys with no visibility or control. SSE-KMS gives you CloudTrail logging of every key usage, access control through the KMS key policy, and the option to use a customer managed key.</p>
+        <p><strong>Exam clue:</strong> "Audit key usage" or "control who can decrypt" = SSE-KMS with a customer managed key. "Simple default encryption" = SSE-S3.</p>
+        <p><strong>Memory rule:</strong> Need audit or key control? SSE-KMS. Otherwise SSE-S3 is fine.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>Assuming Resource Access Permission Includes Decrypt Permission</h4>
+        <p><strong>Misconception:</strong> "The user has <code>s3:GetObject</code> permission, so they can read encrypted S3 objects." <strong>Correct:</strong> If the object is encrypted with SSE-KMS, the user also needs <code>kms:Decrypt</code> permission on the KMS key. Without it, the GetObject call returns an Access Denied error &mdash; even though the S3 permission is correct.</p>
+        <p><strong>Exam clue:</strong> "Has S3 read access but gets Access Denied on encrypted objects" = missing KMS Decrypt permission.</p>
+        <p><strong>Memory rule:</strong> S3 permission gets the object. KMS permission decrypts it. You need both.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>Confusing KMS Key Policies with IAM Policies</h4>
+        <p><strong>Misconception:</strong> "I'll just grant <code>kms:Decrypt</code> in an IAM policy and that's enough." <strong>Correct:</strong> KMS key policies are the <em>primary</em> access control. An IAM policy can grant KMS permissions only if the key policy delegates access to IAM (which it does by default for customer managed keys). If the key policy does not include the root account grant, IAM policies alone are insufficient.</p>
+        <p><strong>Exam clue:</strong> If cross-account KMS access fails, check the key policy first.</p>
+        <p><strong>Memory rule:</strong> Key policy is the gatekeeper. IAM policy is a secondary grant.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>Confusing AWS Managed Keys with Customer Managed Keys</h4>
+        <p><strong>Misconception:</strong> "AWS managed keys can be shared across accounts." <strong>Correct:</strong> AWS managed keys (aliases like <code>aws/ebs</code>, <code>aws/s3</code>) can only be used within the account where they exist. You cannot modify their key policies or grant cross-account access. For cross-account encryption, you must use a <strong>customer managed key</strong>.</p>
+        <p><strong>Exam clue:</strong> "Share encrypted snapshots cross-account" or "grant another account decrypt access" = customer managed key.</p>
+        <p><strong>Memory rule:</strong> Cross-account = customer managed key. Always.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>Confusing KMS Keys with Data Keys</h4>
+        <p><strong>Misconception:</strong> "The KMS key encrypts my data directly." <strong>Correct:</strong> KMS keys can directly encrypt only up to 4 KB of data. For anything larger, KMS generates a <em>data key</em> that encrypts the data locally. The KMS key protects the data key, not the data itself. This is envelope encryption.</p>
+        <p><strong>Exam clue:</strong> "Encrypt large files with KMS" = envelope encryption via <code>GenerateDataKey</code>.</p>
+        <p><strong>Memory rule:</strong> KMS key protects the data key. Data key protects the data.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>Assuming Key Rotation Re-Encrypts Existing Data</h4>
+        <p><strong>Misconception:</strong> "We rotated the KMS key, so all our data now uses the new key material." <strong>Correct:</strong> Key rotation adds new cryptographic material for future encryption operations. Old material is <em>preserved</em> to decrypt data encrypted under previous versions. Existing encrypted data is <strong>not re-encrypted</strong>.</p>
+        <p><strong>Exam clue:</strong> "Compliance requires all data encrypted with current key material" = you must re-encrypt existing data yourself.</p>
+        <p><strong>Memory rule:</strong> Rotation creates new material. Old data keeps old material. Re-encryption is manual.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>Deleting a KMS Key and Losing Access to Encrypted Data</h4>
+        <p><strong>Misconception:</strong> "I can always recover a deleted key." <strong>Correct:</strong> KMS key deletion is <strong>irreversible</strong>. All data encrypted under that key (and under its data keys) becomes <em>permanently unrecoverable</em>. AWS enforces a 7&ndash;30 day waiting period to help prevent accidental deletion, but once the waiting period expires, the key and all its material are gone.</p>
+        <p><strong>Exam clue:</strong> "Data becomes inaccessible after a key is deleted" = this is the expected (and irreversible) outcome.</p>
+        <p><strong>Memory rule:</strong> Delete the key, lose the data. No recovery. Ever.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>Assuming Symmetric and Asymmetric KMS Keys Are Used Interchangeably</h4>
+        <p><strong>Misconception:</strong> "I'll use an asymmetric KMS key for S3 SSE-KMS." <strong>Correct:</strong> AWS services that integrate with KMS (S3, EBS, RDS, etc.) use <strong>symmetric</strong> KMS keys only. Asymmetric KMS keys are for use cases like digital signing or encrypting data outside AWS where the caller cannot call KMS directly (e.g., a client-side application using the public key).</p>
+        <p><strong>Exam clue:</strong> If the question involves AWS-service-level encryption, the answer is a symmetric key. Asymmetric keys appear in digital signing or external encryption scenarios.</p>
+        <p><strong>Memory rule:</strong> AWS services = symmetric KMS key. External signing/encryption = asymmetric.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>Confusing KMS with Secrets Manager and Certificate Manager</h4>
+        <p><strong>Misconception:</strong> "KMS can store my database password" or "KMS provides TLS certificates." <strong>Correct:</strong> KMS manages <em>encryption keys</em>. Secrets Manager stores and rotates <em>secrets</em> (passwords, API keys). Certificate Manager manages <em>TLS certificates</em>. They solve different problems and often work together.</p>
+        <p><strong>Exam clue:</strong> "Store and rotate credentials" = Secrets Manager. "TLS for an ALB" = ACM. "Encrypt data at rest" = KMS.</p>
+        <p><strong>Memory rule:</strong> KMS = keys. Secrets Manager = secrets. ACM = certificates.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>Assuming Multi-Region Keys Are Global</h4>
+        <p><strong>Misconception:</strong> "A multi-Region KMS key is automatically available everywhere." <strong>Correct:</strong> Multi-Region keys must be <em>explicitly replicated</em> to each Region you need. Each replica has its own ARN and is billed separately. They share the same key material and key ID prefix (<code>mrk-</code>), but you must set them up per Region.</p>
+        <p><strong>Exam clue:</strong> "Same key across Regions without cross-Region API calls" = multi-Region key (but you must replicate it first).</p>
+        <p><strong>Memory rule:</strong> Multi-Region &#8800; global. Replicate explicitly.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>Confusing Encryption with Authorization</h4>
+        <p><strong>Misconception:</strong> "Our S3 data is encrypted, so unauthorized users cannot access it." <strong>Correct:</strong> Encryption protects <em>confidentiality at the storage level</em>. If an unauthorized user has <code>s3:GetObject</code> permission <em>and</em> <code>kms:Decrypt</code> permission, encryption does not stop them. Access control (IAM policies, bucket policies, VPC endpoints) must be the first line of defense. Encryption is a <em>second layer</em>.</p>
+        <p><strong>Exam clue:</strong> "Prevent unauthorized access" = fix IAM/bucket policies first. Encryption is defense-in-depth, not a replacement for authorization.</p>
+        <p><strong>Memory rule:</strong> Authorization controls who gets in. Encryption protects what they find.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>RDS Encryption Limitations</h4>
+        <p><strong>Misconception:</strong> "I can enable encryption on my existing RDS instance." <strong>Correct:</strong> RDS encryption must be enabled <strong>at creation time</strong>. To encrypt an existing database, you must: snapshot &rarr; copy snapshot with encryption &rarr; restore from encrypted snapshot &rarr; update your application to point to the new instance. This requires a migration with downtime.</p>
+        <p><strong>Exam clue:</strong> "Encrypt an existing unencrypted RDS database" = snapshot, copy with encryption, restore.</p>
+        <p><strong>Memory rule:</strong> RDS encryption is birth-only. Migrate to encrypt after the fact.</p>
+      </div>
+
+    </section>
+
+    <hr class="topic-divider">
+
+    <!-- KMS SECTION 5: Practice Questions -->
+    <section class="topic-section" id="kms-practice">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Scenario-Based Practice Questions
+      </h2>
+
+      <div class="practice-questions">
+        <h4>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          Practice Questions &mdash; KMS &amp; Encryption
+        </h4>
+
+        <!-- Q1: S3 Encryption and KMS Key Permissions -->
+        <div class="practice-q">
+          <p class="q-text">Q1. A company stores confidential financial reports in an S3 bucket encrypted with SSE-KMS using a customer managed key. A new analytics team in a different AWS account needs to read these reports. The analytics team's IAM role has been granted <code>s3:GetObject</code> on the bucket via a bucket policy. However, when the team tries to download a report, they receive an Access Denied error. What is the MOST likely cause and solution?</p>
+          <ul class="q-options">
+            <li><span class="q-letter">A.</span> The bucket policy is incorrect. Add <code>s3:Decrypt</code> permission to the analytics team's role in the bucket policy.</li>
+            <li><span class="q-letter">B.</span> The KMS key policy does not grant the analytics team's account <code>kms:Decrypt</code> permission. Update the key policy to grant <code>kms:Decrypt</code> to the analytics role, and add an IAM policy in the analytics account allowing <code>kms:Decrypt</code> on the key ARN.</li>
+            <li><span class="q-letter">C.</span> SSE-KMS encrypted objects cannot be shared cross-account. Re-encrypt all objects with SSE-S3 and share the bucket.</li>
+            <li><span class="q-letter">D.</span> The analytics team needs to use the same AWS managed key (<code>aws/s3</code>) as the source account. Configure the destination account to use the same key alias.</li>
+          </ul>
+          <button class="reveal-btn">Show Answer</button>
+          <div class="answer-reveal">
+            <p><strong>Correct Answer: B</strong></p>
+            <p>With SSE-KMS, downloading an object requires both S3 read permission <strong>and</strong> <code>kms:Decrypt</code> permission on the KMS key. For cross-account access, the KMS key policy must grant the external account access, and the external account must also have an IAM policy allowing KMS actions on the key. Both sides must agree &mdash; this is the same cross-account pattern as IAM roles.</p>
+            <p><strong>Why not the others?</strong></p>
+            <ul>
+              <li><strong>A</strong> is wrong because <code>s3:Decrypt</code> is not a valid S3 action. Decryption is handled by KMS, not S3.</li>
+              <li><strong>C</strong> is wrong because SSE-KMS objects <em>can</em> be shared cross-account when using a customer managed key with the correct key policy. You do not need to re-encrypt.</li>
+              <li><strong>D</strong> is wrong because AWS managed keys (<code>aws/s3</code>) cannot be shared cross-account &mdash; they only work within the account that owns them. Each account has its own separate <code>aws/s3</code> key.</li>
+            </ul>
+            <p><strong>Key exam clue:</strong> "Cross-account access to KMS-encrypted data" + "Access Denied" = missing <code>kms:Decrypt</code> in the key policy and/or the caller's IAM policy.</p>
+            <p><strong>Takeaway:</strong> Accessing KMS-encrypted resources cross-account requires both the resource permission (S3) and the key permission (KMS) from both accounts.</p>
+          </div>
+        </div>
+
+        <!-- Q2: Encryption at Rest vs In Transit -->
+        <div class="practice-q">
+          <p class="q-text">Q2. A healthcare company stores patient records in an encrypted RDS PostgreSQL database (SSE enabled with an AWS managed KMS key). An auditor reports that database connections from the application servers are transmitting data in plaintext across the VPC. The security team needs to ensure data is protected both at rest and in transit with MINIMAL application changes. What should the solutions architect do?</p>
+          <ul class="q-options">
+            <li><span class="q-letter">A.</span> Replace the AWS managed KMS key with a customer managed key. Customer managed keys encrypt data both at rest and in transit.</li>
+            <li><span class="q-letter">B.</span> Enable SSL/TLS on the RDS instance by downloading the RDS CA certificate and configuring the application's database connection to require SSL.</li>
+            <li><span class="q-letter">C.</span> Move the RDS instance into the same subnet as the application servers so the data never crosses a network boundary.</li>
+            <li><span class="q-letter">D.</span> Enable VPC Flow Logs on the database subnet to encrypt the network traffic between the application and the database.</li>
+          </ul>
+          <button class="reveal-btn">Show Answer</button>
+          <div class="answer-reveal">
+            <p><strong>Correct Answer: B</strong></p>
+            <p>RDS encryption at rest (KMS) and encryption in transit (TLS) are <strong>separate mechanisms</strong>. The database is already encrypted at rest. To protect data in transit, you configure the application to connect using SSL/TLS. RDS supports SSL natively &mdash; you download the RDS CA certificate bundle and configure the connection string to require SSL verification.</p>
+            <p><strong>Why not the others?</strong></p>
+            <ul>
+              <li><strong>A</strong> is wrong because changing the KMS key type has no effect on network traffic. KMS keys handle encryption at rest, not in transit. No KMS key type encrypts data on the wire.</li>
+              <li><strong>C</strong> is wrong because data still travels over the network within a subnet. Moving to the same subnet does not encrypt the connection &mdash; it only reduces the network path. It also violates good architecture practice of separating tiers.</li>
+              <li><strong>D</strong> is wrong because VPC Flow Logs <em>record</em> metadata about network traffic for monitoring. They do not encrypt traffic.</li>
+            </ul>
+            <p><strong>Key exam clue:</strong> "Data encrypted at rest but not in transit" = you need TLS/SSL for the connection, not more KMS configuration.</p>
+            <p><strong>Takeaway:</strong> Encryption at rest (KMS) and encryption in transit (TLS) solve different problems and are configured independently.</p>
+          </div>
+        </div>
+
+        <!-- Q3: Envelope Encryption / Multi-Region KMS -->
+        <div class="practice-q">
+          <p class="q-text">Q3. A global media company stores large video files (up to 5 GB each) encrypted in S3 in us-east-1. They are building a disaster recovery site in eu-west-1 and will use S3 Cross-Region Replication (CRR) to copy the encrypted videos. After failover, applications in eu-west-1 must be able to decrypt and play the videos without making API calls back to us-east-1. The company wants to minimize operational overhead. Which encryption approach meets these requirements?</p>
+          <ul class="q-options">
+            <li><span class="q-letter">A.</span> Use SSE-S3 for encryption. S3 CRR automatically re-encrypts objects in the destination Region using the destination Region's S3-managed key.</li>
+            <li><span class="q-letter">B.</span> Create a customer managed KMS key in us-east-1, encrypt all videos with it, and grant the eu-west-1 application role <code>kms:Decrypt</code> permission. After failover, the eu-west-1 application calls KMS in us-east-1 to decrypt.</li>
+            <li><span class="q-letter">C.</span> Create a multi-Region customer managed KMS key with the primary in us-east-1 and a replica in eu-west-1. Encrypt videos using this key. After CRR replicates the objects, the eu-west-1 application decrypts using the local replica key.</li>
+            <li><span class="q-letter">D.</span> Use client-side encryption with a locally generated AES key stored in Secrets Manager. Replicate the secret to eu-west-1 using Secrets Manager cross-Region replication.</li>
+          </ul>
+          <button class="reveal-btn">Show Answer</button>
+          <div class="answer-reveal">
+            <p><strong>Correct Answer: C</strong></p>
+            <p>Multi-Region KMS keys share the same key material across Regions. Data encrypted in us-east-1 can be decrypted in eu-west-1 using the local replica key &mdash; no cross-Region API calls needed. This is the ideal pattern for DR with encrypted data. S3 CRR preserves the KMS encryption, and the multi-Region key ensures the destination Region can decrypt independently.</p>
+            <p><strong>Why not the others?</strong></p>
+            <ul>
+              <li><strong>A</strong> works for simple cases, but SSE-S3 does not provide key-level audit trails or access control through key policies. If the company needs to audit decryption (common for media rights management), SSE-S3 is insufficient.</li>
+              <li><strong>B</strong> violates the requirement &mdash; if us-east-1 is down during a disaster, the eu-west-1 application cannot call KMS in us-east-1, making the encrypted data inaccessible.</li>
+              <li><strong>D</strong> works technically but introduces significant operational overhead: you must manage client-side encryption logic, key distribution, and ensure the Secrets Manager replication is synchronized. This is far more complex than a multi-Region KMS key.</li>
+            </ul>
+            <p><strong>Key exam clue:</strong> "Cross-Region DR" + "decrypt without calling back to the primary Region" = multi-Region KMS key.</p>
+            <p><strong>Takeaway:</strong> Multi-Region KMS keys solve the cross-Region decryption problem for DR without requiring cross-Region API calls or re-encryption.</p>
           </div>
         </div>
       </div>
