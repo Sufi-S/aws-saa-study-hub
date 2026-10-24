@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AWS SAA-C03 Study Hub</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+  <script src="assets/js/theme.js"></script>
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar">
+  <a href="index.html" class="nav-brand">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+    SAA-C03 Hub
+  </a>
+  <ul class="nav-links">
+    <li><a href="index.html" class="active">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      Home</a></li>
+    <li><a href="domains/domain1.html">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      Domains</a></li>
+    <li><a href="flashcards.html">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+      Flashcards</a></li>
+    <li><a href="quiz.html">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      Quiz Mode</a></li>
+    <li><a href="interview/index.html">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Interview Prep</a></li>
+  </ul>
+  <div class="nav-right">
+    <button class="theme-toggle" aria-label="Toggle theme"></button>
+    <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+  </div>
+</nav>
+
+<div class="page-wrapper">
+  <div class="container page-content">
+
+    <!-- Disclaimer -->
+    <div class="disclaimer-banner">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      Unofficial personal study material. Not affiliated with or endorsed by Amazon Web Services.
+    </div>
+
+    <!-- Hero -->
+    <section class="hero">
+      <div class="hero-illustration">
+        <svg viewBox="0 0 280 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Cloud shape -->
+          <ellipse cx="140" cy="95" rx="120" ry="65" fill="var(--accent-subtle)" stroke="var(--accent)" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.5"/>
+          <!-- Server rack -->
+          <rect x="60" y="60" width="40" height="70" rx="4" fill="var(--bg-card)" stroke="var(--border)" stroke-width="1.5"/>
+          <rect x="66" y="68" width="28" height="6" rx="1.5" fill="var(--accent)" opacity="0.7"/>
+          <rect x="66" y="80" width="28" height="6" rx="1.5" fill="var(--domain2)" opacity="0.7"/>
+          <rect x="66" y="92" width="28" height="6" rx="1.5" fill="var(--domain3)" opacity="0.7"/>
+          <circle cx="90" cy="118" r="2.5" fill="var(--accent)" opacity="0.8"/>
+          <circle cx="84" cy="118" r="2.5" fill="var(--domain4)" opacity="0.8"/>
+          <!-- Shield -->
+          <path d="M140 48 L158 56 L158 76 C158 92 140 100 140 100 C140 100 122 92 122 76 L122 56 Z" fill="var(--bg-card)" stroke="var(--domain1)" stroke-width="1.5"/>
+          <path d="M134 72 L139 77 L148 66" stroke="var(--domain1)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          <!-- Database -->
+          <ellipse cx="200" cy="68" rx="22" ry="8" fill="var(--bg-card)" stroke="var(--domain2)" stroke-width="1.5"/>
+          <path d="M178 68 L178 90 C178 95 188 100 200 100 C212 100 222 95 222 90 L222 68" fill="var(--bg-card)" stroke="var(--domain2)" stroke-width="1.5"/>
+          <ellipse cx="200" cy="90" rx="22" ry="8" fill="none" stroke="var(--domain2)" stroke-width="1" opacity="0.4"/>
+          <ellipse cx="200" cy="79" rx="22" ry="8" fill="none" stroke="var(--domain2)" stroke-width="1" opacity="0.4"/>
+          <!-- Connection lines -->
+          <line x1="100" y1="90" x2="122" y2="74" stroke="var(--border)" stroke-width="1" stroke-dasharray="3 2"/>
+          <line x1="158" y1="74" x2="178" y2="82" stroke="var(--border)" stroke-width="1" stroke-dasharray="3 2"/>
+          <!-- Dollar sign -->
+          <circle cx="200" cy="130" r="16" fill="var(--bg-card)" stroke="var(--domain4)" stroke-width="1.5"/>
+          <text x="200" y="136" text-anchor="middle" font-size="16" font-weight="700" fill="var(--domain4)">$</text>
+          <!-- Bolt (performance) -->
+          <polygon points="80,140 90,140 86,150 95,150 78,165 82,155 74,155" fill="var(--domain3)" opacity="0.8"/>
+        </svg>
+      </div>
+
+      <h1>AWS Solutions Architect<br><span class="highlight">Study Hub</span></h1>
+      <p>Your personal dashboard for mastering the SAA-C03 exam. Track progress across all four domains, quiz yourself, and prepare for interviews.</p>
+
+      <div class="hero-stats">
+        <div class="hero-stat">
+          <div class="stat-value">4</div>
+          <div class="stat-label">Exam Domains</div>
+        </div>
+        <div class="hero-stat">
+          <div class="stat-value">65</div>
+          <div class="stat-label">Questions</div>
+        </div>
+        <div class="hero-stat">
+          <div class="stat-value">130 min</div>
+          <div class="stat-label">Exam Duration</div>
+        </div>
+        <div class="hero-stat">
+          <div class="stat-value" data-overall-progress>0%</div>
+          <div class="stat-label">Your Progress</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Domain Cards -->
+    <section>
+      <div class="section-header">
+        <h2>Exam Domains</h2>
+        <span class="badge">4 domains</span>
+      </div>
+
+      <div class="domains-grid">
+
+        <!-- Domain 1 -->
+        <a href="domains/domain1.html" class="domain-card" style="--card-accent: var(--domain1)">
+          <div class="domain-card-header">
+            <div class="domain-icon" style="background: rgba(249,115,22,0.12);">
+              <svg viewBox="0 0 24 24" fill="none" stroke="var(--domain1)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            </div>
+            <div>
+              <div class="domain-number">Domain 1</div>
+              <h3>Design Secure Architectures</h3>
+            </div>
+          </div>
+          <div class="domain-weight">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            30% of exam
+          </div>
+          <p class="domain-topics">IAM, VPC security, encryption, data protection, secure access patterns, AWS security services</p>
+          <div data-domain-progress="domain1">
+            <div class="progress-bar"><div class="progress-fill" style="width:0%"></div></div>
+            <div class="progress-label"><span>Progress</span><span class="progress-pct">0%</span></div>
+          </div>
+        </a>
+
+        <!-- Domain 2 -->
+        <a href="domains/domain2.html" class="domain-card" style="--card-accent: var(--domain2)">
+          <div class="domain-card-header">
+            <div class="domain-icon" style="background: rgba(6,182,212,0.12);">
+              <svg viewBox="0 0 24 24" fill="none" stroke="var(--domain2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+            </div>
+            <div>
+              <div class="domain-number">Domain 2</div>
+              <h3>Design Resilient Architectures</h3>
+            </div>
+          </div>
+          <div class="domain-weight">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            26% of exam
+          </div>
+          <p class="domain-topics">Scalable architectures, decoupling, multi-tier, ELB, Auto Scaling, SQS, containers, serverless</p>
+          <div data-domain-progress="domain2">
+            <div class="progress-bar"><div class="progress-fill" style="width:0%"></div></div>
+            <div class="progress-label"><span>Progress</span><span class="progress-pct">0%</span></div>
+          </div>
+        </a>
+
+        <!-- Domain 3 -->
+        <a href="domains/domain3.html" class="domain-card" style="--card-accent: var(--domain3)">
+          <div class="domain-card-header">
+            <div class="domain-icon" style="background: rgba(139,92,246,0.12);">
+              <svg viewBox="0 0 24 24" fill="none" stroke="var(--domain3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            </div>
+            <div>
+              <div class="domain-number">Domain 3</div>
+              <h3>Design High-Performing Architectures</h3>
+            </div>
+          </div>
+          <div class="domain-weight">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            24% of exam
+          </div>
+          <p class="domain-topics">Storage solutions, caching, databases, compute optimization, networking, CloudFront, Global Accelerator</p>
+          <div data-domain-progress="domain3">
+            <div class="progress-bar"><div class="progress-fill" style="width:0%"></div></div>
+            <div class="progress-label"><span>Progress</span><span class="progress-pct">0%</span></div>
+          </div>
+        </a>
+
+        <!-- Domain 4 -->
+        <a href="domains/domain4.html" class="domain-card" style="--card-accent: var(--domain4)">
+          <div class="domain-card-header">
+            <div class="domain-icon" style="background: rgba(34,197,94,0.12);">
+              <svg viewBox="0 0 24 24" fill="none" stroke="var(--domain4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            </div>
+            <div>
+              <div class="domain-number">Domain 4</div>
+              <h3>Design Cost-Optimized Architectures</h3>
+            </div>
+          </div>
+          <div class="domain-weight">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            20% of exam
+          </div>
+          <p class="domain-topics">Cost-effective storage, compute, databases, Reserved/Spot Instances, rightsizing, S3 tiers</p>
+          <div data-domain-progress="domain4">
+            <div class="progress-bar"><div class="progress-fill" style="width:0%"></div></div>
+            <div class="progress-label"><span>Progress</span><span class="progress-pct">0%</span></div>
+          </div>
+        </a>
+
+      </div>
+    </section>
+
+    <!-- Quick Links -->
+    <section>
+      <div class="section-header">
+        <h2>Quick Access</h2>
+      </div>
+
+      <div class="quicklinks-grid">
+
+        <a href="flashcards.html" class="quicklink-card">
+          <div class="quicklink-icon" style="background: rgba(249,115,22,0.12);">
+            <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+          </div>
+          <div>
+            <h4>Flashcards</h4>
+            <p>Key terms &amp; gotchas</p>
+          </div>
+        </a>
+
+        <a href="quiz.html" class="quicklink-card">
+          <div class="quicklink-icon" style="background: rgba(139,92,246,0.12);">
+            <svg viewBox="0 0 24 24" fill="none" stroke="var(--domain3)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          </div>
+          <div>
+            <h4>Quiz Mode</h4>
+            <p>Scenario-based practice</p>
+          </div>
+        </a>
+
+        <a href="interview/index.html" class="quicklink-card">
+          <div class="quicklink-icon" style="background: rgba(6,182,212,0.12);">
+            <svg viewBox="0 0 24 24" fill="none" stroke="var(--domain2)" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </div>
+          <div>
+            <h4>Interview Prep</h4>
+            <p>Common SA questions</p>
+          </div>
+        </a>
+
+        <a href="cheatsheet.html" class="quicklink-card">
+          <div class="quicklink-icon" style="background: rgba(34,197,94,0.12);">
+            <svg viewBox="0 0 24 24" fill="none" stroke="var(--domain4)" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          </div>
+          <div>
+            <h4>Cheat Sheet</h4>
+            <p>Quick reference guide</p>
+          </div>
+        </a>
+
+      </div>
+    </section>
+
+  </div>
+
+  <footer class="site-footer">
+    <p>AWS SAA-C03 Study Hub &mdash; Personal study material, not affiliated with AWS. Built with vanilla HTML/CSS/JS.</p>
+  </footer>
+</div>
+
+<script src="assets/js/nav.js"></script>
+<script src="assets/js/progress.js"></script>
+</body>
+</html>
