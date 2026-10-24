@@ -1,1 +1,434 @@
-[]
+[
+  {
+    "id": "d1-iam-01",
+    "domain": "domain1",
+    "question": "A company has an application running on EC2 instances that needs to access objects in an S3 bucket. The security team requires that no long-term credentials are stored on the instances. What is the MOST secure way to grant access?",
+    "options": [
+      "Create an IAM user and embed the access keys in the application code",
+      "Create an IAM role with an S3 access policy and attach it to the EC2 instances via an instance profile",
+      "Store IAM user credentials in AWS Secrets Manager and have the application retrieve them at startup",
+      "Create an S3 bucket policy that allows access from the VPC CIDR range"
+    ],
+    "correctAnswer": 1,
+    "explanation": "IAM roles attached to EC2 instances via instance profiles provide temporary credentials that are automatically rotated. No long-term credentials are stored on the instance. The application uses the instance metadata service to retrieve temporary credentials."
+  },
+  {
+    "id": "d1-iam-02",
+    "domain": "domain1",
+    "question": "A developer assumes Role A, which then assumes Role B (role chaining). Role B has a maximum session duration of 12 hours. How long can the developer's session with Role B last?",
+    "options": [
+      "12 hours, matching Role B's maximum session duration",
+      "1 hour, because role chaining has a hard cap of 1 hour",
+      "15 minutes, the minimum STS session duration",
+      "4 hours, half of the maximum session duration"
+    ],
+    "correctAnswer": 1,
+    "explanation": "Role chaining has a hard cap of 1 hour regardless of the role's maximum session duration setting. Even though Role B allows 12-hour sessions, when credentials come from assuming one role to assume another, the maximum is always 1 hour."
+  },
+  {
+    "id": "d1-iam-03",
+    "domain": "domain1",
+    "question": "A solutions architect needs to grant an on-premises application access to AWS services without using IAM user access keys. The application server has an X.509 certificate from a trusted Certificate Authority. Which approach should the architect use?",
+    "options": [
+      "AWS IAM Identity Center with SAML 2.0 federation",
+      "IAM Roles Anywhere using the X.509 certificate as a trust anchor",
+      "AWS STS AssumeRoleWithWebIdentity with the certificate",
+      "Store the certificate in AWS Certificate Manager and reference it in an IAM policy"
+    ],
+    "correctAnswer": 1,
+    "explanation": "IAM Roles Anywhere allows workloads outside of AWS to use X.509 certificates to obtain temporary AWS credentials. You configure a trust anchor with your CA certificate, then your on-premises application exchanges its certificate for temporary role credentials."
+  },
+  {
+    "id": "d1-scp-01",
+    "domain": "domain1",
+    "question": "An organization uses AWS Organizations with SCPs. The management account administrator attaches an SCP that denies all EC2 actions to the root OU. The management account's admin then tries to launch an EC2 instance from the management account. What happens?",
+    "options": [
+      "The action is denied because the SCP applies to all accounts in the organization",
+      "The action succeeds because SCPs never affect the management account",
+      "The action is denied because it applies to the root user of any account",
+      "The action succeeds only if the admin has AdministratorAccess policy attached"
+    ],
+    "correctAnswer": 1,
+    "explanation": "SCPs never restrict actions in the management account. This is a critical exam concept — the management account is always exempt from SCP restrictions, even if the SCP is attached to the root OU. This is why best practices recommend using the management account only for billing and organization management."
+  },
+  {
+    "id": "d1-scp-02",
+    "domain": "domain1",
+    "question": "A member account in AWS Organizations has the IAM policy AdministratorAccess (Allow *) attached to a user. An SCP attached to the account's OU allows only S3 and EC2 actions. What can this user do?",
+    "options": [
+      "Everything — AdministratorAccess overrides SCPs",
+      "Only S3 and EC2 actions — SCPs set the maximum permissions boundary",
+      "Nothing — the SCP and IAM policy conflict, so all access is denied",
+      "Only actions explicitly allowed in both the SCP and a resource-based policy"
+    ],
+    "correctAnswer": 1,
+    "explanation": "SCPs set the maximum permissions boundary for member accounts. Effective permissions are the intersection of SCPs and IAM policies. Even with AdministratorAccess, the user can only perform actions that the SCP allows. The SCP doesn't grant permissions — it limits what IAM policies can grant."
+  },
+  {
+    "id": "d1-kms-01",
+    "domain": "domain1",
+    "question": "A company must encrypt data at rest and needs to audit when encryption keys are used. They want to control key rotation schedules. Which type of KMS key should they use?",
+    "options": [
+      "AWS owned keys for zero management overhead",
+      "AWS managed keys for automatic rotation and CloudTrail logging",
+      "Customer managed keys for CloudTrail logging and configurable rotation",
+      "Imported key material with no rotation for maximum control"
+    ],
+    "correctAnswer": 2,
+    "explanation": "Customer managed keys provide both CloudTrail logging of key usage AND configurable rotation schedules. AWS managed keys also log to CloudTrail but rotation is automatic (every 365 days) and cannot be customized. AWS owned keys do not appear in CloudTrail at all."
+  },
+  {
+    "id": "d1-kms-02",
+    "domain": "domain1",
+    "question": "An application encrypts large files (50 MB+) before storing them in S3. The architect wants to minimize KMS API calls. What encryption approach should be used?",
+    "options": [
+      "Call KMS Encrypt for each file directly, sending the full file content",
+      "Use envelope encryption: call GenerateDataKey once, encrypt the file locally with the data key",
+      "Use server-side encryption with S3 managed keys (SSE-S3) and let S3 handle everything",
+      "Create a KMS grant that allows the application to decrypt without API calls"
+    ],
+    "correctAnswer": 1,
+    "explanation": "Envelope encryption is the correct pattern for large data. You call GenerateDataKey to get a plaintext data key and an encrypted copy. You encrypt the file locally using the plaintext data key, store the encrypted key alongside the encrypted file, then discard the plaintext key. This requires only one KMS API call per file, and KMS never sees your data."
+  },
+  {
+    "id": "d1-kms-03",
+    "domain": "domain1",
+    "question": "A company needs to encrypt data in multiple AWS Regions using the same encryption key to simplify cross-region disaster recovery. Which KMS feature should they use?",
+    "options": [
+      "Import the same key material into KMS keys in each region",
+      "Use AWS managed keys, which are automatically available in all regions",
+      "Create a multi-region KMS key and replicate it to the needed regions",
+      "Use S3 cross-region replication, which re-encrypts with the destination region's key"
+    ],
+    "correctAnswer": 2,
+    "explanation": "Multi-region KMS keys (with mrk- prefix) share the same key material across regions. Data encrypted in one region can be decrypted in another without cross-region API calls. AWS managed keys are region-specific and cannot be shared."
+  },
+  {
+    "id": "d1-sg-01",
+    "domain": "domain1",
+    "question": "A web application on EC2 receives traffic from an ALB. The security team wants to ensure only the ALB can send traffic to the EC2 instances on port 443. How should this be configured?",
+    "options": [
+      "Configure the EC2 security group to allow port 443 from 0.0.0.0/0",
+      "Configure the EC2 security group to allow port 443 from the ALB's security group ID",
+      "Configure a NACL on the EC2 subnet to deny all traffic except from the ALB's IP addresses",
+      "Configure the EC2 security group to allow port 443 from the ALB's private IP address"
+    ],
+    "correctAnswer": 1,
+    "explanation": "Security groups can reference other security groups as sources. By specifying the ALB's security group ID as the allowed source for port 443, only traffic originating from the ALB (or any resource in that security group) is permitted. This is more maintainable than using IP addresses, which can change."
+  },
+  {
+    "id": "d1-sg-02",
+    "domain": "domain1",
+    "question": "An architect configures a NACL to allow inbound HTTP (port 80) traffic. Users can connect to the web server, but the server's responses never reach the users. What is the MOST likely cause?",
+    "options": [
+      "The security group is blocking outbound traffic on port 80",
+      "The NACL does not have an outbound rule allowing traffic on ephemeral ports (1024-65535)",
+      "The IGW is not properly configured for the subnet",
+      "The NACL rules are evaluated in the wrong order"
+    ],
+    "correctAnswer": 1,
+    "explanation": "NACLs are stateless — return traffic must be explicitly allowed. When a client connects to port 80, the server responds on a random ephemeral port (1024-65535). Without an outbound NACL rule allowing these ephemeral ports, response traffic is blocked. Security groups are stateful and don't have this issue."
+  },
+  {
+    "id": "d1-secrets-01",
+    "domain": "domain1",
+    "question": "A company needs to store database credentials that automatically rotate every 30 days. The credentials are used by Lambda functions across multiple regions. Which service should they use?",
+    "options": [
+      "AWS Systems Manager Parameter Store with a CloudWatch Events rule to trigger rotation",
+      "AWS Secrets Manager with automatic rotation and cross-region replication",
+      "AWS KMS to encrypt credentials stored in environment variables",
+      "AWS Systems Manager Parameter Store Advanced tier with parameter policies"
+    ],
+    "correctAnswer": 1,
+    "explanation": "Secrets Manager provides native automatic rotation for database credentials (RDS, Redshift, DocumentDB) with no custom Lambda needed. It also supports cross-region replication for multi-region applications. Parameter Store has no built-in rotation mechanism."
+  },
+  {
+    "id": "d1-secrets-02",
+    "domain": "domain1",
+    "question": "A development team needs to store application configuration values like feature flags and endpoint URLs. The values are not sensitive and the team wants to minimize costs. Which solution is MOST appropriate?",
+    "options": [
+      "AWS Secrets Manager for centralized configuration management",
+      "AWS Systems Manager Parameter Store Standard tier with String type parameters",
+      "DynamoDB table with configuration key-value pairs",
+      "Environment variables in the application's deployment configuration"
+    ],
+    "correctAnswer": 1,
+    "explanation": "Parameter Store Standard tier is free for up to 10,000 parameters and supports hierarchical naming (/app/prod/feature-flags). For non-sensitive configuration data, String type (not SecureString) is sufficient. Secrets Manager costs $0.40/secret/month and is designed for credentials, making it overpriced for simple config."
+  },
+  {
+    "id": "d1-vpc-01",
+    "domain": "domain1",
+    "question": "A company runs a database in a private subnet that needs to call the AWS KMS API for envelope encryption. The security team requires that traffic never traverse the public internet. Which solution meets this requirement with MINIMAL cost?",
+    "options": [
+      "Deploy a NAT Gateway so the private subnet can reach KMS over the internet",
+      "Create a VPC Interface Endpoint for KMS, which uses AWS PrivateLink",
+      "Create a VPC Gateway Endpoint for KMS to avoid data transfer charges",
+      "Set up a VPN connection to the KMS service endpoint"
+    ],
+    "correctAnswer": 1,
+    "explanation": "KMS is accessed via Interface Endpoints (PrivateLink), not Gateway Endpoints. Gateway Endpoints only support S3 and DynamoDB. The Interface Endpoint creates an ENI in your VPC, and KMS traffic stays on the AWS private network. A NAT Gateway would route through the internet, violating the requirement."
+  },
+  {
+    "id": "d1-vpc-02",
+    "domain": "domain1",
+    "question": "A company has on-premises applications that need to access an internal API hosted in AWS via PrivateLink. The on-premises network is connected to AWS via Direct Connect. Which VPC endpoint type supports this?",
+    "options": [
+      "Gateway Endpoint — route table entries work across Direct Connect",
+      "Interface Endpoint — ENI with private IP accessible from on-premises via Direct Connect",
+      "Gateway Load Balancer Endpoint — designed for on-premises traffic inspection",
+      "No VPC endpoint supports on-premises access; a public endpoint with VPN is required"
+    ],
+    "correctAnswer": 1,
+    "explanation": "Interface Endpoints create ENIs with private IP addresses that are accessible from on-premises networks connected via Direct Connect or VPN. Gateway Endpoints only work within the VPC — they cannot be accessed from peered VPCs, VPN, or Direct Connect connections."
+  },
+  {
+    "id": "d1-shield-01",
+    "domain": "domain1",
+    "question": "A company hosts a public-facing web application on ALB and wants protection against application-layer (Layer 7) DDoS attacks with the ability to engage a dedicated AWS response team. What services are required?",
+    "options": [
+      "AWS Shield Standard and AWS WAF",
+      "AWS Shield Advanced only — it includes Layer 7 protection and SRT access",
+      "AWS Shield Advanced, AWS WAF, and a Business or Enterprise Support plan",
+      "AWS WAF with rate-limiting rules and Amazon GuardDuty for threat detection"
+    ],
+    "correctAnswer": 2,
+    "explanation": "Shield Advanced provides L7 DDoS mitigation and includes the Shield Response Team (SRT), but SRT access requires a Business or Enterprise Support plan — just having Shield Advanced isn't enough. WAF is included at no extra cost for Shield Advanced-protected resources."
+  },
+  {
+    "id": "d1-shield-02",
+    "domain": "domain1",
+    "question": "During a DDoS attack, a company's Auto Scaling group scales out significantly, causing a large spike in EC2 and ELB costs. The company has AWS Shield Advanced. What happens regarding these costs?",
+    "options": [
+      "Shield Advanced automatically prevents the scaling, blocking the attack at the network level",
+      "Shield Advanced provides DDoS cost protection as service credits for the scaling charges caused by the attack",
+      "Shield Advanced refunds 100% of all AWS charges incurred during the attack period",
+      "Shield Advanced has no cost protection features; the company must pay the full amount"
+    ],
+    "correctAnswer": 1,
+    "explanation": "Shield Advanced includes DDoS cost protection, which provides service credits for charges related to scaling during a DDoS attack. This covers ELB, CloudFront, Route 53, and EC2 Auto Scaling charges. Note: these are credits, not automatic billing forgiveness — you need to request them."
+  },
+  {
+    "id": "d2-vpc-01",
+    "domain": "domain2",
+    "question": "A solutions architect is designing a VPC for a three-tier web application. The application tier in private subnets needs to download software updates from the internet. What is the MOST highly available solution?",
+    "options": [
+      "Deploy a single NAT Gateway in one AZ and route all private subnets through it",
+      "Deploy a NAT Gateway in each AZ and configure each private subnet's route table to use the NAT Gateway in its own AZ",
+      "Deploy a NAT Instance in a public subnet with Auto Scaling for high availability",
+      "Attach an Internet Gateway directly to the private subnets"
+    ],
+    "correctAnswer": 1,
+    "explanation": "For high availability, deploy a NAT Gateway in each AZ. Each private subnet's route table points to the NAT Gateway in the same AZ. If one AZ fails, instances in other AZs still have internet access through their local NAT Gateway. A single NAT Gateway creates a single point of failure."
+  },
+  {
+    "id": "d2-vpc-02",
+    "domain": "domain2",
+    "question": "A developer creates a new subnet in a VPC with CIDR 10.0.1.0/24 (256 addresses). How many IP addresses are available for EC2 instances?",
+    "options": [
+      "256",
+      "254",
+      "251",
+      "250"
+    ],
+    "correctAnswer": 2,
+    "explanation": "AWS reserves 5 IP addresses in each subnet: .0 (network address), .1 (VPC router), .2 (DNS server), .3 (reserved for future use), and .255 (broadcast). So from 256 total addresses, 251 are usable."
+  },
+  {
+    "id": "d2-elb-01",
+    "domain": "domain2",
+    "question": "A company needs a load balancer that provides a static IP address for whitelisting by a partner's firewall and must handle millions of TCP connections per second. Which load balancer type should they use?",
+    "options": [
+      "Application Load Balancer with an Elastic IP association",
+      "Network Load Balancer, which supports static IPs and Elastic IPs per AZ",
+      "Classic Load Balancer with a pre-registered Elastic IP",
+      "Gateway Load Balancer for high-throughput TCP traffic"
+    ],
+    "correctAnswer": 1,
+    "explanation": "NLB is the only load balancer that supports static IPs and Elastic IP association. It operates at Layer 4, handles millions of requests per second with ultra-low latency, and is designed for extreme TCP/UDP performance. ALB does not support static IPs."
+  },
+  {
+    "id": "d2-elb-02",
+    "domain": "domain2",
+    "question": "A company wants to route traffic to different microservices based on the URL path (e.g., /api/* goes to one target group, /web/* to another) and authenticate users via an OIDC provider. Which load balancer should they choose?",
+    "options": [
+      "Network Load Balancer with TLS listeners",
+      "Application Load Balancer with path-based routing rules and OIDC authentication action",
+      "Classic Load Balancer with host-based routing",
+      "Gateway Load Balancer with path-based inspection rules"
+    ],
+    "correctAnswer": 1,
+    "explanation": "ALB is the only load balancer that supports path-based routing, host-based routing, and built-in authentication (OIDC and Amazon Cognito). NLB operates at Layer 4 and cannot inspect HTTP paths. CLB has no path-based routing. GLB is for network appliance inspection."
+  },
+  {
+    "id": "d2-rds-01",
+    "domain": "domain2",
+    "question": "A company runs a PostgreSQL database on Amazon RDS and needs the fastest possible automatic failover with readable standby instances. Which deployment option should the architect choose?",
+    "options": [
+      "Multi-AZ DB instance deployment with a single standby",
+      "Multi-AZ DB cluster deployment with two readable standbys",
+      "Single-AZ deployment with a cross-region read replica",
+      "Aurora PostgreSQL with a Multi-AZ read replica"
+    ],
+    "correctAnswer": 1,
+    "explanation": "Multi-AZ DB cluster deployment provides 1 writer + 2 readers across 3 AZs with failover under 35 seconds — faster than the 60-120 seconds of a traditional Multi-AZ instance deployment. The readers can serve read traffic using the reader endpoint. Requires PostgreSQL 13.4+."
+  },
+  {
+    "id": "d2-rds-02",
+    "domain": "domain2",
+    "question": "A company's application has heavy read traffic that is overwhelming the primary RDS MySQL database. They need to scale read capacity without affecting write performance. Which solution is MOST appropriate?",
+    "options": [
+      "Enable Multi-AZ deployment to distribute read traffic to the standby",
+      "Create read replicas and point read queries to the replica endpoints",
+      "Vertically scale the RDS instance to a larger instance type",
+      "Enable RDS Proxy to pool and share database connections"
+    ],
+    "correctAnswer": 1,
+    "explanation": "Read replicas use asynchronous replication and can serve read traffic, effectively scaling read capacity horizontally. Multi-AZ standbys (in traditional deployment) do NOT serve read traffic. Vertical scaling has limits and causes downtime. RDS Proxy helps with connection management but doesn't scale read capacity."
+  },
+  {
+    "id": "d2-dynamo-01",
+    "domain": "domain2",
+    "question": "A social media application needs to query a DynamoDB table by UserID (partition key) and also frequently query by email address. The application needs strongly consistent reads for the email queries. Which index type should be used?",
+    "options": [
+      "A Global Secondary Index (GSI) with email as the partition key",
+      "A Local Secondary Index (LSI) with email as the sort key",
+      "A Global Secondary Index with both email and UserID as keys",
+      "No index needed — use a Scan operation with a filter expression on email"
+    ],
+    "correctAnswer": 0,
+    "explanation": "Trick question! GSIs only support eventually consistent reads, not strongly consistent. However, option A is still the best practical choice among these options. An LSI requires the same partition key as the base table, so email can only be a sort key with UserID as partition — this means you still need the UserID to query. A Scan is extremely inefficient. For truly strongly consistent reads by email, you'd need to maintain a separate table."
+  },
+  {
+    "id": "d2-dynamo-02",
+    "domain": "domain2",
+    "question": "A development team is building a new application with unpredictable traffic patterns — it may have zero requests for hours, then sudden bursts of thousands of requests per second. The DynamoDB table stores items averaging 2 KB each. Which capacity mode is MOST appropriate?",
+    "options": [
+      "Provisioned capacity with Auto Scaling set to aggressive scaling",
+      "On-demand capacity mode for automatic scaling with no capacity planning",
+      "Provisioned capacity with a high baseline to handle peak traffic",
+      "DAX (DynamoDB Accelerator) in front of a provisioned capacity table"
+    ],
+    "correctAnswer": 1,
+    "explanation": "On-demand mode is ideal for unpredictable, spiky workloads. It instantly scales to handle any request volume with no capacity planning needed. Provisioned with Auto Scaling can lag behind sudden spikes. Over-provisioning wastes money during idle periods. DAX is a caching layer, not a capacity solution."
+  },
+  {
+    "id": "d2-s3-01",
+    "domain": "domain2",
+    "question": "A company must store compliance documents for 7 years. The documents are accessed frequently in the first 30 days, rarely for the next year, and almost never after that. Which S3 lifecycle configuration minimizes cost?",
+    "options": [
+      "Store in S3 Standard, transition to Standard-IA after 30 days, then to Glacier Deep Archive after 365 days",
+      "Store in S3 Intelligent-Tiering for the entire lifecycle",
+      "Store in S3 Standard, transition to Glacier Instant Retrieval after 30 days, then to Glacier Deep Archive after 365 days",
+      "Store directly in Glacier Flexible Retrieval with Expedited retrievals enabled"
+    ],
+    "correctAnswer": 0,
+    "explanation": "Standard for frequent access, Standard-IA for infrequent access after 30 days (lower storage cost than Standard, per-retrieval fee acceptable for rare access), then Glacier Deep Archive for long-term archival (cheapest storage, 12-48hr retrieval acceptable for compliance). Intelligent-Tiering adds monitoring fees that exceed savings for a known access pattern."
+  },
+  {
+    "id": "d2-s3-02",
+    "domain": "domain2",
+    "question": "A company needs to replicate S3 objects from us-east-1 to eu-west-1 for disaster recovery, and also needs a copy in the same region for a different team's analytics workload. What replication configuration is needed?",
+    "options": [
+      "Configure Cross-Region Replication (CRR) to eu-west-1 only — the analytics team can access the same bucket",
+      "Configure Cross-Region Replication to eu-west-1 AND Same-Region Replication (SRR) to a second bucket in us-east-1",
+      "Enable versioning and use S3 batch operations to copy objects to both destinations",
+      "Use S3 Transfer Acceleration to speed up replication to both destinations"
+    ],
+    "correctAnswer": 1,
+    "explanation": "You need CRR for the cross-region DR copy and SRR for the same-region analytics copy. Both require versioning enabled on source and destination buckets. Transfer Acceleration speeds up uploads, not replication. Batch operations are one-time, not continuous."
+  },
+  {
+    "id": "d2-sqs-01",
+    "domain": "domain2",
+    "question": "An e-commerce application processes orders sequentially per customer. Orders from different customers can be processed in parallel. The system processes about 50,000 orders per second at peak. Which messaging solution should the architect choose?",
+    "options": [
+      "SQS Standard queue with application-level ordering logic",
+      "SQS FIFO queue with the customer ID as the message group ID",
+      "SQS FIFO queue with high-throughput mode enabled and customer ID as the message group ID",
+      "SNS topic with SQS Standard queue subscribers, one per customer"
+    ],
+    "correctAnswer": 2,
+    "explanation": "SQS FIFO with high-throughput mode supports up to 70,000 messages/sec (without batching). Using customer ID as the message group ID ensures strict ordering per customer while allowing parallel processing across customers. Standard FIFO queues cap at 300 TPS (3,000 with batching), which is insufficient."
+  },
+  {
+    "id": "d2-sqs-02",
+    "domain": "domain2",
+    "question": "A company wants a single event (e.g., 'order placed') to trigger three independent actions: send a confirmation email, update inventory, and log to an analytics system. Which architecture pattern should they use?",
+    "options": [
+      "SQS queue with three consumers polling the same queue",
+      "SNS topic with three SQS queue subscriptions (fan-out pattern)",
+      "EventBridge with three direct Lambda invocations",
+      "Step Functions workflow with three parallel branches"
+    ],
+    "correctAnswer": 1,
+    "explanation": "The SNS fan-out pattern delivers a copy of each message to all subscribed SQS queues. Each queue independently processes its task (email, inventory, analytics). If one fails, the others are unaffected. A single SQS queue with three consumers means each message is processed by only ONE consumer, not all three."
+  },
+  {
+    "id": "d2-dr-01",
+    "domain": "domain2",
+    "question": "A company has an RTO of 15 minutes and an RPO of 1 hour for their critical application. They want to minimize costs while meeting these recovery objectives. Which DR strategy is MOST appropriate?",
+    "options": [
+      "Backup and Restore — low cost, restore from backups when needed",
+      "Pilot Light — core infrastructure running, scale up on failover",
+      "Warm Standby — scaled-down full environment running, scale up on failover",
+      "Multi-Site Active-Active — full production in both regions"
+    ],
+    "correctAnswer": 2,
+    "explanation": "Warm Standby maintains a scaled-down but fully functional environment that can be scaled up within minutes, meeting the 15-minute RTO. Pilot Light typically takes 10s of minutes to scale up (might miss the 15-min RTO). Backup and Restore takes hours. Multi-Site is the most expensive option and exceeds the requirements."
+  },
+  {
+    "id": "d2-dr-02",
+    "domain": "domain2",
+    "question": "A financial services company requires near-zero RPO and RTO for their trading platform. Cost is not a primary concern. Which DR strategy should they implement?",
+    "options": [
+      "Warm Standby with automated failover via Route 53 health checks",
+      "Pilot Light with pre-configured Auto Scaling to rapidly provision resources",
+      "Multi-Site Active-Active with data replication and Route 53 failover routing",
+      "Backup and Restore with cross-region S3 replication and automated restore scripts"
+    ],
+    "correctAnswer": 2,
+    "explanation": "Multi-Site Active-Active is the only strategy that provides near-zero RPO and RTO. Both regions actively serve traffic, data is synchronously or near-synchronously replicated, and if one region fails, the other continues serving with no noticeable interruption. This is the most expensive but provides the highest availability."
+  },
+  {
+    "id": "d1-iam-04",
+    "domain": "domain1",
+    "topic": "iam-sts",
+    "question": "A financial services company has two AWS accounts: a Development account and a Production account. The DevOps team in the Development account needs to deploy CloudFormation stacks in the Production account. The security team requires that no long-term credentials are shared between accounts and that Production retains full control over what the DevOps team can do. What is the MOST secure solution?",
+    "options": [
+      "Create an IAM user in the Production account and share the access keys with the DevOps team securely via Secrets Manager",
+      "Create an IAM role in the Production account with a trust policy allowing the DevOps role in the Development account to assume it, and attach a permission policy scoped to CloudFormation actions",
+      "Create an S3 bucket policy in the Production account that grants the Development account full access to all resources",
+      "Attach AdministratorAccess to the DevOps team's IAM users in the Development account and use an SCP to allow cross-account access"
+    ],
+    "correctAnswer": 1,
+    "explanation": "A cross-account IAM role in Production with a trust policy referencing the Development account's DevOps role provides temporary credentials with no long-term key sharing. The Production account retains full control through both the trust policy (who can assume) and the permission policy (what they can do). SCPs do not enable cross-account access — they only restrict permissions."
+  },
+  {
+    "id": "d1-iam-05",
+    "domain": "domain1",
+    "topic": "iam-sts",
+    "question": "A company has an IAM policy attached to a developer's IAM user that grants \"Effect\": \"Allow\", \"Action\": \"s3:*\", \"Resource\": \"*\". However, the developer cannot delete objects from a specific S3 bucket used for compliance logs. A permissions boundary attached to the user allows all S3 actions. What is the MOST likely cause?",
+    "options": [
+      "The S3 bucket has a bucket policy with an explicit Deny for s3:DeleteObject for all principals",
+      "The permissions boundary overrides the identity-based policy and blocks deletion by default",
+      "The developer's access keys have expired and STS is not issuing new credentials",
+      "The IAM policy only applies to resources within the same Region as the IAM user"
+    ],
+    "correctAnswer": 0,
+    "explanation": "A bucket policy with an explicit Deny on s3:DeleteObject overrides the Allow from the identity-based policy — explicit Deny always wins. The permissions boundary allows all S3 actions so it is not restricting anything. IAM policies are global and not region-specific. IAM user access keys don't expire automatically."
+  },
+  {
+    "id": "d1-iam-06",
+    "domain": "domain1",
+    "topic": "iam-sts",
+    "question": "A startup is building a mobile application that allows users to sign in with their Google accounts and then upload photos to a specific S3 bucket. The application has millions of users. The company wants to avoid managing individual IAM users. Which approach should the solutions architect recommend?",
+    "options": [
+      "Create an IAM user for each mobile app user and distribute access keys through the application",
+      "Use Amazon Cognito identity pools to federate Google sign-in, and assign an IAM role with S3 upload permissions to authenticated users",
+      "Create a single IAM user with S3 permissions and embed the access keys in the mobile application code",
+      "Use IAM Identity Center to manage mobile app user access to the S3 bucket"
+    ],
+    "correctAnswer": 1,
+    "explanation": "Amazon Cognito identity pools provide web identity federation. Users sign in with Google, and Cognito exchanges the identity token for temporary AWS credentials via STS. The IAM role attached to the identity pool defines permissions. No IAM users are needed. IAM Identity Center is for workforce access, not customer-facing apps. Embedding keys in app code is a critical security vulnerability."
+  }
+]

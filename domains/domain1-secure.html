@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IAM &amp; STS — Domain 1: Secure Architectures — SAA-C03 Study Hub</title>
+  <link rel="stylesheet" href="../assets/css/style.css">
+  <script src="../assets/js/theme.js"></script>
+</head>
+<body>
+
+<nav class="navbar">
+  <a href="../index.html" class="nav-brand">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+    SAA-C03 Hub
+  </a>
+  <ul class="nav-links">
+    <li><a href="../index.html">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      Home</a></li>
+    <li><a href="domain1.html" class="active">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      Domains</a></li>
+    <li><a href="../flashcards.html">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+      Flashcards</a></li>
+    <li><a href="../quiz.html">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      Quiz Mode</a></li>
+    <li><a href="../interview/index.html">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Interview Prep</a></li>
+  </ul>
+  <div class="nav-right">
+    <button class="theme-toggle" aria-label="Toggle theme"></button>
+    <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+  </div>
+</nav>
+
+<div class="page-wrapper">
+  <div class="container page-content">
+
+    <div class="page-header">
+      <div class="breadcrumb">
+        <a href="../index.html">Home</a> <span>/</span> <a href="domain1.html">Domain 1</a> <span>/</span> <span>IAM &amp; STS</span>
+      </div>
+      <h1 style="display:flex;align-items:center;gap:0.6rem;">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--domain1)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        IAM &amp; STS
+      </h1>
+      <p>Identity and Access Management and Security Token Service &mdash; the foundation of every secure AWS architecture.</p>
+    </div>
+
+    <!-- Table of Contents -->
+    <nav class="toc" aria-label="Table of contents">
+      <h3>On This Page</h3>
+      <ol>
+        <li><a href="#learn">Learn from Zero &mdash; Plain-English Explanation</a></li>
+        <li><a href="#real-world">When Real Architects Actually Use This</a></li>
+        <li><a href="#diagram">How Role Assumption Works &mdash; Visual Walkthrough</a></li>
+        <li><a href="#gotchas">SAA-C03 Exam Gotchas</a></li>
+        <li><a href="#practice">Scenario-Based Practice Questions</a></li>
+      </ol>
+    </nav>
+
+    <!-- ============================================= -->
+    <!-- SECTION 1: Learn from Zero                    -->
+    <!-- ============================================= -->
+    <section class="topic-section" id="learn">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain1)" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        Learn from Zero
+      </h2>
+
+      <!-- What is IAM -->
+      <h3>What Is IAM and Why Does AWS Need It?</h3>
+      <p>When you first create an AWS account, you get a single <strong>root user</strong> with unlimited access to every service and resource. That is extremely dangerous for daily work. AWS Identity and Access Management (IAM) lets you create separate identities &mdash; users, groups, and roles &mdash; each with only the permissions they need. It is a free, global service (not region-specific) and underpins every interaction with AWS.</p>
+
+      <div class="key-concept">
+        <strong>Core exam concept:</strong> IAM answers two questions for every API call &mdash; <em>Who are you?</em> (authentication) and <em>What are you allowed to do?</em> (authorization). Authentication proves identity; authorization checks permissions. Every AWS API request goes through both steps.
+      </div>
+
+      <!-- Principals, Users, Groups, Roles -->
+      <h3>Users, Groups, Roles, and Principals</h3>
+      <p>A <strong>principal</strong> is any entity that can make a request to AWS. The three main kinds of principals are:</p>
+      <ul>
+        <li><strong>IAM Users</strong> &mdash; represent a single person or application. Each user has permanent credentials (a password for the console or access keys for the API). Because the credentials are long-lived, they are a security risk if leaked.</li>
+        <li><strong>IAM Groups</strong> &mdash; a collection of IAM users. You attach policies to the group, and every user in the group inherits those permissions. Groups cannot be nested, and a group cannot be a principal in a policy. Groups are purely an organizational convenience for managing user permissions.</li>
+        <li><strong>IAM Roles</strong> &mdash; an identity that provides <strong>temporary credentials</strong> via AWS STS. Roles are not tied to a single person or machine. Anyone (or anything) that the role trusts can <em>assume</em> it and receive short-lived credentials. Roles are the recommended way for applications, services, and cross-account access.</li>
+      </ul>
+
+      <div class="key-concept">
+        <strong>Exam tip:</strong> Whenever the exam says <em>"no long-term credentials"</em> or <em>"most secure"</em>, the answer almost always involves an <strong>IAM role</strong>, not an IAM user.
+      </div>
+
+      <!-- Authentication vs Authorization -->
+      <h3>Authentication vs Authorization</h3>
+      <p><strong>Authentication</strong> is proving who you are. For an IAM user, that means signing in with a password or presenting access keys. For a role, it means calling STS and receiving temporary credentials. <strong>Authorization</strong> happens after authentication &mdash; AWS evaluates the policies attached to your identity (and to the resource) to decide whether your specific API call is allowed or denied.</p>
+
+      <!-- Policies -->
+      <h3>IAM Policies &mdash; The Permission Rules</h3>
+      <p>A <strong>policy</strong> is a JSON document that describes what actions are allowed or denied on which resources. Policies are the mechanism for authorization in AWS.</p>
+
+      <h3>Identity-Based vs Resource-Based Policies</h3>
+      <ul>
+        <li><strong>Identity-based policies</strong> are attached to a user, group, or role. They say: <em>"This identity can do X on resource Y."</em></li>
+        <li><strong>Resource-based policies</strong> are attached directly to a resource (for example, an S3 bucket policy or an SQS queue policy). They say: <em>"Principal Z can do X on this resource."</em> Resource-based policies have a <code>Principal</code> field to specify who they apply to.</li>
+      </ul>
+      <p>When an identity-based policy and a resource-based policy in the <strong>same account</strong> both grant access, either one alone is enough &mdash; their permissions are combined (a union). For <strong>cross-account</strong> access, both sides must explicitly allow the action: the identity's account must allow the call, <em>and</em> the resource's account must allow the principal.</p>
+
+      <h3>Managed Policies vs Inline Policies</h3>
+      <div class="table-wrap">
+        <table class="comparison-table">
+          <thead>
+            <tr><th>Feature</th><th>AWS Managed Policy</th><th>Customer Managed Policy</th><th>Inline Policy</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Created by</td><td>AWS</td><td>You</td><td>You</td></tr>
+            <tr><td>Reusable across identities</td><td class="check">&#10003;</td><td class="check">&#10003;</td><td class="cross">&#10007;</td></tr>
+            <tr><td>Versioning</td><td class="check">&#10003;</td><td class="check">&#10003;</td><td class="cross">&#10007;</td></tr>
+            <tr><td>Deleted with identity</td><td class="cross">&#10007;</td><td class="cross">&#10007;</td><td class="check">&#10003;</td></tr>
+            <tr><td>Best for</td><td>Common baselines</td><td>Custom shared rules</td><td>Strict 1:1 binding</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>AWS recommends <strong>customer managed policies</strong> for most use cases because they are reusable, versionable, and under your control. Inline policies are used only when a permission must be tightly coupled to a specific identity and deleted when that identity is deleted.</p>
+
+      <!-- Least Privilege -->
+      <h3>The Principle of Least Privilege</h3>
+      <p>Grant only the minimum permissions needed to perform a task. Start with no permissions and add only what is required. AWS provides tools like IAM Access Analyzer and the last-accessed data to help you tighten policies over time.</p>
+
+      <!-- Deny Logic -->
+      <h3>Allow, Deny, and How Policy Evaluation Works</h3>
+      <p>Understanding the deny/allow logic is critical for the exam.</p>
+      <ol>
+        <li>By default, all requests are <strong>implicitly denied</strong> (no permission = no access).</li>
+        <li>An <code>Allow</code> in an applicable policy overrides the implicit deny.</li>
+        <li>An <strong>explicit <code>Deny</code></strong> in any applicable policy always overrides any <code>Allow</code>.</li>
+      </ol>
+
+      <div class="key-concept">
+        <strong>The golden rule:</strong> Explicit Deny &gt; Allow &gt; Implicit Deny. If <em>any</em> policy says <code>"Effect": "Deny"</code> for an action, that action is denied &mdash; period. No amount of <code>Allow</code> statements elsewhere can override it.
+      </div>
+
+      <p>AWS evaluates all applicable policies together: identity-based policies, resource-based policies, permissions boundaries, SCPs, and session policies. The effective permission is the intersection of what is allowed across all of these layers (except for same-account resource-based policies, which are unioned with identity-based policies).</p>
+
+      <!-- Roles vs Users -->
+      <h3>IAM Roles vs IAM Users &mdash; Why Temporary Credentials Win</h3>
+      <p>IAM users have <strong>long-term access keys</strong> &mdash; an access key ID and a secret access key that never change until you manually rotate them. If these keys are committed to source code, leaked in logs, or stolen, an attacker has persistent access until you discover and revoke them.</p>
+      <p>IAM roles issue <strong>temporary security credentials</strong> through STS. These credentials have an access key, a secret key, <em>and</em> a session token, and they expire automatically (from 15 minutes to 12 hours, depending on how they were obtained). If temporary credentials are leaked, the window of exposure is limited to their lifetime.</p>
+
+      <div class="table-wrap">
+        <table class="comparison-table">
+          <thead>
+            <tr><th>Aspect</th><th>IAM User (Access Keys)</th><th>IAM Role (Temp Credentials)</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Credential lifetime</td><td>Permanent until rotated</td><td>15 min &ndash; 12 hours, auto-expire</td></tr>
+            <tr><td>Rotation</td><td>Manual</td><td>Automatic on expiry</td></tr>
+            <tr><td>Leaked credential risk</td><td>High &mdash; works until revoked</td><td>Lower &mdash; expires automatically</td></tr>
+            <tr><td>Best for</td><td>Humans in limited cases</td><td>Applications, services, cross-account</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- STS -->
+      <h3>What Is AWS STS?</h3>
+      <p>AWS Security Token Service (STS) is the service that <strong>issues temporary security credentials</strong>. When someone (or something) assumes an IAM role, STS is what actually creates and returns the short-lived credentials. STS itself does not grant permissions &mdash; the <em>role's permission policy</em> determines what the caller can do once they have the credentials.</p>
+
+      <!-- AssumeRole -->
+      <h3><code>AssumeRole</code>, Trust Policies, and Permission Policies</h3>
+      <p>Every IAM role has <strong>two</strong> policies that work together:</p>
+      <ol>
+        <li><strong>Trust policy</strong> (also called the role's <em>assume role policy</em>) &mdash; defines <em>who</em> is allowed to call <code>sts:AssumeRole</code> for this role. This is a resource-based policy on the role itself.</li>
+        <li><strong>Permission policy</strong> &mdash; defines <em>what</em> the role can do once assumed. This is an identity-based policy attached to the role.</li>
+      </ol>
+      <p>Think of the trust policy as the door lock (who can get in) and the permission policy as the access badge (what they can do once inside).</p>
+      <p>When you call <code>sts:AssumeRole</code>, STS checks whether you are listed in the trust policy. If yes, it returns temporary credentials whose permissions are defined by the role's permission policy.</p>
+
+      <!-- Cross-Account -->
+      <h3>Cross-Account Access</h3>
+      <p>A common pattern is granting an identity in Account A access to resources in Account B. This requires:</p>
+      <ol>
+        <li>A role in Account B with a <strong>trust policy</strong> that allows the principal in Account A to assume it.</li>
+        <li>A <strong>permission policy</strong> on that role specifying what it can do in Account B.</li>
+        <li>The principal in Account A must also have an IAM policy allowing <code>sts:AssumeRole</code> on the role in Account B (unless the calling principal is the root user of Account A, which is implicitly trusted by the trust policy).</li>
+      </ol>
+      <p>Both accounts must cooperate &mdash; neither side can unilaterally grant cross-account access through roles alone.</p>
+
+      <!-- EC2 Roles -->
+      <h3>IAM Roles for EC2 and Other AWS Workloads</h3>
+      <p>When an application runs on EC2, you attach an IAM role to the instance through an <strong>instance profile</strong>. The EC2 instance metadata service automatically provides temporary credentials to any application running on the instance. The credentials are rotated automatically before they expire. The application never sees or stores long-term keys.</p>
+      <p>The same pattern applies to Lambda (execution role), ECS tasks (task role), and other AWS compute services. The key idea: <em>the compute service manages credential delivery so your application code never handles secrets</em>.</p>
+
+      <!-- Identity Center & Federation -->
+      <h3>IAM Identity Center and Federation</h3>
+      <p><strong>IAM Identity Center</strong> (formerly AWS SSO) is the recommended way to give human users (employees) access to multiple AWS accounts and business applications from a single portal. Instead of creating IAM users in every account, you connect your corporate identity provider (Active Directory, Okta, etc.) to Identity Center, and users sign in once to access all their accounts.</p>
+      <p><strong>Federation</strong> is the broader concept of letting external identities access AWS without creating IAM users. It includes SAML 2.0 federation, web identity federation (for mobile/web apps using Google, Facebook, or Amazon Cognito), and IAM Roles Anywhere (for on-premises workloads with X.509 certificates).</p>
+
+      <div class="key-concept">
+        <strong>Exam relevance:</strong> If a question asks about providing <em>workforce access to multiple accounts</em>, the answer is <strong>IAM Identity Center</strong>. If a question asks about <em>mobile or web application users</em> signing in with social providers, the answer involves <strong>Cognito</strong> or <strong>web identity federation</strong>. You rarely need to know deep federation details &mdash; just which service matches which scenario.
+      </div>
+
+      <!-- MFA & Security Practices -->
+      <h3>MFA, Access Keys, and Credential Rotation</h3>
+      <ul>
+        <li><strong>Multi-Factor Authentication (MFA)</strong> adds a second factor (usually a virtual device like Google Authenticator or a hardware key) to sign-in. AWS strongly recommends MFA for the root user and all human users. You can also write IAM policies that require MFA for sensitive actions (e.g., deleting S3 objects with MFA Delete, or stopping EC2 instances).</li>
+        <li><strong>Access key rotation:</strong> If you must use long-term access keys (for example, for a legacy on-premises application), rotate them regularly. Create a new key, update the application, verify it works, then deactivate and delete the old key.</li>
+        <li><strong>Never hard-code credentials:</strong> Embedding access keys in source code, configuration files, or AMIs is a critical security risk. Use IAM roles (for AWS workloads) or Secrets Manager / Parameter Store (for third-party credentials).</li>
+      </ul>
+
+      <!-- Permission Boundaries -->
+      <h3>Permissions Boundaries (Supplementary)</h3>
+      <p>A <strong>permissions boundary</strong> is an advanced feature that sets the <em>maximum</em> permissions an IAM user or role can have. It does not grant permissions on its own &mdash; it limits what identity-based policies can grant. It is conceptually similar to an SCP but applied at the individual identity level instead of the account level.</p>
+      <p>On the exam, permissions boundaries most often appear in questions about delegated administration: allowing a developer to create roles without exceeding their own privilege level.</p>
+    </section>
+
+    <hr class="topic-divider">
+
+    <!-- ============================================= -->
+    <!-- SECTION 2: When Real Architects Use This      -->
+    <!-- ============================================= -->
+    <section class="topic-section" id="real-world">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain2)" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        When Real Architects Actually Use This
+      </h2>
+
+      <!-- Scenario 1 -->
+      <div class="real-world">
+        <h4>EC2 Application Accessing S3 Without Storing Keys</h4>
+        <p><strong>Requirement:</strong> A Python application on EC2 needs to read objects from an S3 bucket. The security team says no credentials in code or config files.</p>
+        <p><strong>Solution:</strong> Create an IAM role with a policy allowing <code>s3:GetObject</code> on the target bucket. Attach the role to the EC2 instance through an instance profile. The AWS SDK automatically retrieves temporary credentials from the instance metadata service &mdash; no code changes required.</p>
+        <p><strong>Why not an IAM user with access keys?</strong> Access keys are permanent, must be manually rotated, and are a liability if the instance is compromised. The role's temporary credentials rotate automatically and expire within hours.</p>
+      </div>
+
+      <!-- Scenario 2 -->
+      <div class="real-world">
+        <h4>Granting a Developer Read-Only Access</h4>
+        <p><strong>Requirement:</strong> A junior developer needs to view CloudWatch logs and read S3 objects in a staging account, but must not modify any production resources.</p>
+        <p><strong>Solution:</strong> Create an IAM group called <code>ReadOnlyDevelopers</code>. Attach the AWS managed policy <code>ReadOnlyAccess</code>. Add the developer's IAM user to this group. For extra safety, attach an SCP at the OU level that denies write actions to production resources.</p>
+        <p><strong>Why a group and not an inline policy on the user?</strong> Groups make policy management scalable. When the next developer joins, you add them to the group instead of duplicating policies. Managed policies are maintained by AWS and cover new services automatically.</p>
+      </div>
+
+      <!-- Scenario 3 -->
+      <div class="real-world">
+        <h4>Two AWS Accounts Sharing Access to a Resource</h4>
+        <p><strong>Requirement:</strong> The analytics team in Account B needs to read data from an S3 bucket owned by Account A.</p>
+        <p><strong>Solution (role-based):</strong> Create a role in Account A with a trust policy allowing Account B's specific IAM role or user to assume it, and a permission policy allowing <code>s3:GetObject</code> on the bucket. In Account B, grant the analytics role permission to call <code>sts:AssumeRole</code> on the Account A role.</p>
+        <p><strong>Alternative (bucket policy):</strong> Add a resource-based policy on the S3 bucket in Account A that directly grants <code>s3:GetObject</code> to the Account B principal. This is simpler for S3 specifically, but role-based cross-account access is more general and works for any service.</p>
+        <p><strong>Why not share access keys between accounts?</strong> Sharing long-term credentials across organizational boundaries is an audit nightmare and a security risk. Cross-account roles provide traceable, temporary, revocable access.</p>
+      </div>
+
+      <!-- Scenario 4 -->
+      <div class="real-world">
+        <h4>Application Assuming a Role in Another Account</h4>
+        <p><strong>Requirement:</strong> A deployment pipeline in Account A (DevOps) needs to update Lambda functions in Account B (Production).</p>
+        <p><strong>Solution:</strong> Create a <code>DeploymentRole</code> in Account B with a trust policy that allows the pipeline's role in Account A to assume it, and a permission policy with <code>lambda:UpdateFunctionCode</code>. The pipeline calls <code>sts:AssumeRole</code>, receives temporary credentials for Account B, and uses those to deploy.</p>
+        <p><strong>Why this matters:</strong> The trust policy in Account B explicitly controls which external principals can access its resources. If the DevOps team is restructured or the pipeline role changes, Account B can update the trust policy without touching any of its own internal permissions.</p>
+      </div>
+
+      <!-- Scenario 5 -->
+      <div class="real-world">
+        <h4>Centralized Workforce Access to Multiple Accounts</h4>
+        <p><strong>Requirement:</strong> A company with 15 AWS accounts needs employees to sign in once and access only the accounts relevant to their role.</p>
+        <p><strong>Solution:</strong> Set up <strong>IAM Identity Center</strong> connected to the corporate Active Directory. Define permission sets (collections of policies) and assign them to user groups for specific accounts. Employees sign in to the Identity Center portal and see only their authorized accounts.</p>
+        <p><strong>Why not create IAM users in each account?</strong> With 15 accounts, you would need to manage hundreds of users, rotate credentials in every account, and handle offboarding in 15 places. Identity Center provides a single point for access management, auditing, and revocation.</p>
+      </div>
+
+      <!-- Scenario 6 -->
+      <div class="real-world">
+        <h4>Restricting Permissions Despite Broad Access Grants</h4>
+        <p><strong>Requirement:</strong> A security team needs to ensure that even users with <code>AdministratorAccess</code> cannot delete DynamoDB tables in production.</p>
+        <p><strong>Solution:</strong> Attach an SCP (Service Control Policy) to the production OU that contains an explicit <code>Deny</code> for <code>dynamodb:DeleteTable</code>. Because explicit deny always wins, no identity-based policy in any member account can override it.</p>
+        <p><strong>Why SCPs and not just IAM policies?</strong> IAM policies are managed per account. A determined admin in a member account could remove the deny from their own user. SCPs are controlled at the organization level and cannot be overridden by anyone in the member account &mdash; they are a guardrail from above.</p>
+      </div>
+    </section>
+
+    <hr class="topic-divider">
+
+    <!-- ============================================= -->
+    <!-- SECTION 3: SVG Diagram                        -->
+    <!-- ============================================= -->
+    <section class="topic-section" id="diagram">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain3)" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+        How Role Assumption Works
+      </h2>
+      <p>The diagram below shows the complete flow when an application assumes an IAM role to access an AWS resource. Notice that STS issues the temporary credentials, but the <strong>role's permission policy</strong> (not STS) determines what the credentials can do.</p>
+
+      <div class="diagram-container">
+        <svg viewBox="0 0 820 340" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagram showing IAM role assumption flow: Application calls STS AssumeRole, STS checks the trust policy, returns temporary credentials, and the application uses those credentials to access an AWS resource authorized by the role's permission policy.">
+
+          <!-- Background grid (subtle) -->
+          <defs>
+            <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+              <path d="M 20 0 L 0 0 0 20" fill="none" stroke="var(--border)" stroke-width="0.3" opacity="0.4"/>
+            </pattern>
+            <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+              <polygon points="0 0, 10 3.5, 0 7" fill="var(--accent)"/>
+            </marker>
+            <marker id="arrowhead-green" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+              <polygon points="0 0, 10 3.5, 0 7" fill="var(--domain4)"/>
+            </marker>
+          </defs>
+          <rect width="820" height="340" fill="var(--bg-card)" rx="8"/>
+          <rect width="820" height="340" fill="url(#grid)" rx="8"/>
+
+          <!-- Step labels -->
+          <text x="410" y="28" text-anchor="middle" font-size="14" font-weight="700" fill="var(--text-primary)" font-family="Inter, sans-serif">IAM Role Assumption Flow</text>
+
+          <!-- === Box 1: Application / User === -->
+          <rect x="20" y="60" width="140" height="80" rx="10" ry="10" fill="var(--bg-primary)" stroke="var(--domain1)" stroke-width="2" stroke-dasharray="6 3"/>
+          <text x="90" y="96" text-anchor="middle" font-size="12" font-weight="600" fill="var(--text-primary)" font-family="Inter, sans-serif">Application</text>
+          <text x="90" y="114" text-anchor="middle" font-size="10" fill="var(--text-muted)" font-family="Inter, sans-serif">(EC2, Lambda, User)</text>
+
+          <!-- Arrow 1: App -> STS -->
+          <line x1="160" y1="100" x2="244" y2="100" stroke="var(--accent)" stroke-width="2" marker-end="url(#arrowhead)" stroke-dasharray="5 3"/>
+          <!-- Step 1 label -->
+          <rect x="172" y="72" width="60" height="20" rx="4" fill="var(--accent)" opacity="0.15"/>
+          <text x="202" y="86" text-anchor="middle" font-size="10" font-weight="600" fill="var(--accent)" font-family="Inter, sans-serif">Step 1</text>
+          <text x="202" y="66" text-anchor="middle" font-size="9" fill="var(--text-muted)" font-family="Inter, sans-serif">AssumeRole</text>
+
+          <!-- === Box 2: STS === -->
+          <rect x="250" y="60" width="130" height="80" rx="10" ry="10" fill="var(--bg-primary)" stroke="var(--accent)" stroke-width="2"/>
+          <text x="315" y="92" text-anchor="middle" font-size="13" font-weight="700" fill="var(--accent)" font-family="Inter, sans-serif">AWS STS</text>
+          <text x="315" y="110" text-anchor="middle" font-size="9" fill="var(--text-muted)" font-family="Inter, sans-serif">Security Token Service</text>
+
+          <!-- Arrow 2: STS -> Trust Policy check -->
+          <line x1="315" y1="140" x2="315" y2="186" stroke="var(--accent)" stroke-width="2" marker-end="url(#arrowhead)" stroke-dasharray="5 3"/>
+          <rect x="324" y="150" width="60" height="20" rx="4" fill="var(--accent)" opacity="0.15"/>
+          <text x="354" y="164" text-anchor="middle" font-size="10" font-weight="600" fill="var(--accent)" font-family="Inter, sans-serif">Step 2</text>
+          <text x="268" y="168" font-size="9" fill="var(--text-muted)" font-family="Inter, sans-serif">Checks</text>
+
+          <!-- === Box 3: Trust Policy === -->
+          <rect x="248" y="190" width="134" height="60" rx="8" ry="8" fill="rgba(249,115,22,0.08)" stroke="var(--domain1)" stroke-width="1.5"/>
+          <text x="315" y="216" text-anchor="middle" font-size="11" font-weight="600" fill="var(--domain1)" font-family="Inter, sans-serif">Trust Policy</text>
+          <text x="315" y="234" text-anchor="middle" font-size="9" fill="var(--text-secondary)" font-family="Inter, sans-serif">"Who can assume me?"</text>
+
+          <!-- Arrow 3: STS returns temp creds -->
+          <line x1="380" y1="100" x2="469" y2="100" stroke="var(--domain4)" stroke-width="2" marker-end="url(#arrowhead-green)"/>
+          <rect x="394" y="72" width="60" height="20" rx="4" fill="var(--domain4)" opacity="0.15"/>
+          <text x="424" y="86" text-anchor="middle" font-size="10" font-weight="600" fill="var(--domain4)" font-family="Inter, sans-serif">Step 3</text>
+          <text x="424" y="66" text-anchor="middle" font-size="9" fill="var(--text-muted)" font-family="Inter, sans-serif">Temp credentials</text>
+
+          <!-- === Box 4: Temp Credentials === -->
+          <rect x="475" y="60" width="140" height="80" rx="10" ry="10" fill="var(--bg-primary)" stroke="var(--domain4)" stroke-width="2"/>
+          <text x="545" y="90" text-anchor="middle" font-size="11" font-weight="600" fill="var(--domain4)" font-family="Inter, sans-serif">Temporary Credentials</text>
+          <text x="545" y="108" text-anchor="middle" font-size="9" fill="var(--text-muted)" font-family="Inter, sans-serif">Access Key + Secret</text>
+          <text x="545" y="122" text-anchor="middle" font-size="9" fill="var(--text-muted)" font-family="Inter, sans-serif">+ Session Token</text>
+
+          <!-- Arrow 4: Temp creds checked against Permission Policy -->
+          <line x1="545" y1="140" x2="545" y2="186" stroke="var(--domain4)" stroke-width="2" marker-end="url(#arrowhead-green)" stroke-dasharray="5 3"/>
+          <text x="570" y="168" font-size="9" fill="var(--text-muted)" font-family="Inter, sans-serif">Scoped by</text>
+
+          <!-- === Box 5: Permission Policy === -->
+          <rect x="478" y="190" width="134" height="60" rx="8" ry="8" fill="rgba(34,197,94,0.08)" stroke="var(--domain4)" stroke-width="1.5"/>
+          <text x="545" y="216" text-anchor="middle" font-size="11" font-weight="600" fill="var(--domain4)" font-family="Inter, sans-serif">Permission Policy</text>
+          <text x="545" y="234" text-anchor="middle" font-size="9" fill="var(--text-secondary)" font-family="Inter, sans-serif">"What can I do?"</text>
+
+          <!-- Arrow 5: Use temp creds to access resource -->
+          <line x1="615" y1="100" x2="659" y2="100" stroke="var(--domain4)" stroke-width="2" marker-end="url(#arrowhead-green)"/>
+          <rect x="624" y="72" width="60" height="20" rx="4" fill="var(--domain4)" opacity="0.15"/>
+          <text x="654" y="86" text-anchor="middle" font-size="10" font-weight="600" fill="var(--domain4)" font-family="Inter, sans-serif">Step 4</text>
+          <text x="654" y="66" text-anchor="middle" font-size="9" fill="var(--text-muted)" font-family="Inter, sans-serif">API call</text>
+
+          <!-- === Box 6: AWS Resource === -->
+          <rect x="665" y="60" width="130" height="80" rx="10" ry="10" fill="var(--bg-primary)" stroke="var(--domain2)" stroke-width="2"/>
+          <text x="730" y="92" text-anchor="middle" font-size="12" font-weight="600" fill="var(--domain2)" font-family="Inter, sans-serif">AWS Resource</text>
+          <text x="730" y="110" text-anchor="middle" font-size="9" fill="var(--text-muted)" font-family="Inter, sans-serif">(S3, DynamoDB, etc.)</text>
+
+          <!-- Annotation box at bottom -->
+          <rect x="60" y="280" width="700" height="44" rx="6" fill="rgba(255,153,0,0.06)" stroke="var(--accent)" stroke-width="1" stroke-dasharray="4 2"/>
+          <text x="410" y="300" text-anchor="middle" font-size="11" fill="var(--text-secondary)" font-family="Inter, sans-serif">
+            <tspan font-weight="600" fill="var(--accent)">Key point:</tspan> STS issues credentials. The <tspan font-weight="600" fill="var(--domain1)">trust policy</tspan> controls who can assume the role.
+          </text>
+          <text x="410" y="316" text-anchor="middle" font-size="11" fill="var(--text-secondary)" font-family="Inter, sans-serif">
+            The <tspan font-weight="600" fill="var(--domain4)">permission policy</tspan> controls what those credentials can do. STS itself does not authorize actions on resources.
+          </text>
+        </svg>
+      </div>
+      <p class="diagram-label">Figure: IAM role assumption flow &mdash; from the initial AssumeRole call through STS credential issuance to the final authorized API call on an AWS resource.</p>
+    </section>
+
+    <hr class="topic-divider">
+
+    <!-- ============================================= -->
+    <!-- SECTION 4: Exam Gotchas                       -->
+    <!-- ============================================= -->
+    <section class="topic-section" id="gotchas">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        SAA-C03 Exam Gotchas
+      </h2>
+
+      <div class="gotcha">
+        <h4>Confusing the Trust Policy with the Permission Policy</h4>
+        <p>The <strong>trust policy</strong> decides <em>who can assume</em> the role. The <strong>permission policy</strong> decides <em>what the role can do</em>. If a question says an application "cannot assume a role," the problem is in the trust policy. If it says the application "assumed the role but gets Access Denied," the problem is in the permission policy (or a deny elsewhere).</p>
+        <p><strong>Exam clue:</strong> Look for whether the error happens at the <em>assume</em> step or the <em>use</em> step.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>Assuming an IAM User Is Always the Right Choice</h4>
+        <p>IAM users are appropriate for human console access in simple setups, but for <em>applications</em>, the answer is almost always an IAM role. If the question mentions EC2, Lambda, ECS, or any AWS compute service, use a role &mdash; not an IAM user with embedded access keys.</p>
+        <p><strong>Exam clue:</strong> Watch for phrases like "most secure," "best practice," or "no long-term credentials." These all point to roles.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>Confusing Long-Term Access Keys with STS Temporary Credentials</h4>
+        <p>Access keys (an access key ID and secret access key) are <strong>permanent</strong> and belong to IAM users. Temporary credentials include those two <em>plus</em> a session token, and they expire. When the exam asks about "temporary security credentials," it means STS-issued credentials from a role, <em>not</em> IAM user access keys.</p>
+        <p><strong>Exam clue:</strong> If a question mentions "session token" or "expiring credentials," the answer involves STS and roles.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>Assuming Allow Always Grants Access</h4>
+        <p>An <code>Allow</code> does not guarantee access if an <strong>explicit <code>Deny</code></strong> exists anywhere in the evaluation chain &mdash; SCPs, permissions boundaries, identity policies, or resource policies. Explicit Deny always wins.</p>
+        <p><strong>Exam clue:</strong> If a question describes a user who "has Allow * but still gets denied," check for an SCP or permissions boundary with an explicit Deny.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>Forgetting Both Sides of Cross-Account Access</h4>
+        <p>For cross-account role assumption, you need the trust policy in the <em>target</em> account to allow the caller, <strong>and</strong> the caller's own account must have an IAM policy allowing <code>sts:AssumeRole</code> on the target role. Missing either side causes access denial.</p>
+        <p><strong>Exam clue:</strong> Cross-account questions often have one answer that only configures one side. That answer is incomplete and wrong.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>Assuming Attaching a Policy to a User Grants Access Everywhere</h4>
+        <p>An identity-based policy on a user grants access only within the boundaries set by applicable SCPs, permissions boundaries, and session policies. Also, for cross-account resource access, the resource account must also grant access. Attaching <code>AdministratorAccess</code> to a user does not bypass organizational guardrails in member accounts.</p>
+        <p><strong>Exam clue:</strong> Questions about Organizations and SCPs often test this. "Has AdministratorAccess but cannot&hellip;" means an SCP or boundary is restricting.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>Confusing Authentication with Authorization</h4>
+        <p><strong>Authentication</strong> = proving identity (login, keys, MFA). <strong>Authorization</strong> = checking permissions (policies). A user can be <em>authenticated</em> (successfully signed in) but still <em>unauthorized</em> (denied by policy) for a specific action. These are separate steps.</p>
+        <p><strong>Exam clue:</strong> If a question says a user "can sign in but cannot access a resource," the issue is authorization (policy), not authentication.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>Hard-Coding Credentials in Application Code</h4>
+        <p>Storing AWS access keys in source code, environment variables baked into AMIs, or committed to version control is a critical security vulnerability. If the code is leaked, the keys provide long-lived access. The exam considers this a security anti-pattern.</p>
+        <p><strong>Exam clue:</strong> Any answer choice that mentions "embed access keys in the code" or "store credentials in the application config" is almost always the <em>wrong</em> answer.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>Forgetting Role Chaining Limits</h4>
+        <p>When a role assumes another role (<strong>role chaining</strong>), the maximum session duration is capped at <strong>1 hour</strong>, regardless of the role's configured maximum. Direct <code>AssumeRole</code> calls can last up to 12 hours, but chained calls cannot.</p>
+        <p><strong>Exam clue:</strong> If a question mentions a session "timing out after 1 hour" despite the role having a longer max duration, role chaining is the cause.</p>
+      </div>
+    </section>
+
+    <hr class="topic-divider">
+
+    <!-- ============================================= -->
+    <!-- SECTION 5: Practice Questions                 -->
+    <!-- ============================================= -->
+    <section class="topic-section" id="practice">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Scenario-Based Practice Questions
+      </h2>
+
+      <div class="practice-questions">
+        <h4>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          Practice Questions &mdash; IAM &amp; STS
+        </h4>
+
+        <!-- Q1 -->
+        <div class="practice-q">
+          <p class="q-text">Q1. A financial services company has two AWS accounts: a Development account and a Production account. The DevOps team in the Development account needs to deploy CloudFormation stacks in the Production account. The security team requires that no long-term credentials are shared between accounts and that Production retains full control over what the DevOps team can do. What is the MOST secure solution?</p>
+          <ul class="q-options">
+            <li><span class="q-letter">A.</span> Create an IAM user in the Production account and share the access keys with the DevOps team securely via Secrets Manager.</li>
+            <li><span class="q-letter">B.</span> Create an IAM role in the Production account with a trust policy allowing the DevOps role in the Development account to assume it, and attach a permission policy scoped to CloudFormation actions.</li>
+            <li><span class="q-letter">C.</span> Create an S3 bucket policy in the Production account that grants the Development account full access to all resources.</li>
+            <li><span class="q-letter">D.</span> Attach AdministratorAccess to the DevOps team's IAM users in the Development account and use an SCP to allow cross-account access.</li>
+          </ul>
+          <button class="reveal-btn">Show Answer</button>
+          <div class="answer-reveal">
+            <p><strong>Correct Answer: B</strong></p>
+            <p>A cross-account IAM role in Production with a trust policy referencing the Development account's DevOps role provides temporary credentials with no long-term key sharing. The Production account retains full control through both the trust policy (who can assume) and the permission policy (what they can do).</p>
+            <p><strong>Why not the others?</strong></p>
+            <ul>
+              <li><strong>A</strong> uses long-term access keys, which violates the "no long-term credentials" requirement and creates a risk if the keys are leaked.</li>
+              <li><strong>C</strong> is an S3-specific solution and does not address CloudFormation stack deployment. Also, "full access to all resources" violates least privilege.</li>
+              <li><strong>D</strong> gives the DevOps team admin access (violates least privilege) and SCPs do not enable cross-account access &mdash; they only restrict permissions within an organization.</li>
+            </ul>
+            <p><strong>Key exam clue:</strong> "No long-term credentials between accounts" + "target account controls permissions" = cross-account IAM role with a trust policy.</p>
+          </div>
+        </div>
+
+        <!-- Q2 -->
+        <div class="practice-q">
+          <p class="q-text">Q2. A company has an IAM policy attached to a developer's IAM user that grants <code>"Effect": "Allow", "Action": "s3:*", "Resource": "*"</code>. However, the developer cannot delete objects from a specific S3 bucket used for compliance logs. A permissions boundary is attached to the developer's user that allows all S3 actions. What is the MOST likely cause?</p>
+          <ul class="q-options">
+            <li><span class="q-letter">A.</span> The S3 bucket has a bucket policy with an explicit Deny for <code>s3:DeleteObject</code> for all principals.</li>
+            <li><span class="q-letter">B.</span> The permissions boundary overrides the identity-based policy and blocks deletion by default.</li>
+            <li><span class="q-letter">C.</span> The developer's access keys have expired and STS is not issuing new credentials.</li>
+            <li><span class="q-letter">D.</span> The IAM policy only applies to resources within the same Region as the IAM user.</li>
+          </ul>
+          <button class="reveal-btn">Show Answer</button>
+          <div class="answer-reveal">
+            <p><strong>Correct Answer: A</strong></p>
+            <p>The identity-based policy allows all S3 actions and the permissions boundary also allows all S3 actions, so the block is not coming from either of those. A <strong>bucket policy with an explicit Deny</strong> on <code>s3:DeleteObject</code> would override the Allow &mdash; explicit Deny always wins, regardless of what identity-based policies permit.</p>
+            <p><strong>Why not the others?</strong></p>
+            <ul>
+              <li><strong>B</strong> is wrong because the permissions boundary <em>allows</em> all S3 actions, so it is not restricting anything here. Permissions boundaries limit what identity policies can grant &mdash; they don't override allows from resource policies.</li>
+              <li><strong>C</strong> is wrong because the developer is an IAM user with long-term access keys, not using STS temporary credentials. Also, if keys had expired, <em>all</em> actions would fail, not just delete.</li>
+              <li><strong>D</strong> is wrong because IAM policies are global &mdash; they are not region-specific.</li>
+            </ul>
+            <p><strong>Key exam clue:</strong> "Has Allow for an action but still gets denied on a specific resource" = look for an explicit Deny in a bucket/resource policy or SCP.</p>
+          </div>
+        </div>
+
+        <!-- Q3 -->
+        <div class="practice-q">
+          <p class="q-text">Q3. A startup is building a mobile application that allows users to sign in with their Google accounts and then upload photos to a specific S3 bucket. The application has millions of users. The company wants to avoid managing individual IAM users. Which approach should the solutions architect recommend?</p>
+          <ul class="q-options">
+            <li><span class="q-letter">A.</span> Create an IAM user for each mobile app user and distribute access keys through the application.</li>
+            <li><span class="q-letter">B.</span> Use Amazon Cognito identity pools to federate Google sign-in, and assign an IAM role with S3 upload permissions to authenticated users.</li>
+            <li><span class="q-letter">C.</span> Create a single IAM user with S3 permissions and embed the access keys in the mobile application code.</li>
+            <li><span class="q-letter">D.</span> Use IAM Identity Center to manage mobile app user access to the S3 bucket.</li>
+          </ul>
+          <button class="reveal-btn">Show Answer</button>
+          <div class="answer-reveal">
+            <p><strong>Correct Answer: B</strong></p>
+            <p>Amazon Cognito identity pools provide <strong>web identity federation</strong>. Users sign in with Google (or other providers), and Cognito exchanges the identity token for temporary AWS credentials via STS. The IAM role attached to the identity pool defines what authenticated users can do (in this case, upload to S3). No IAM users are needed for the mobile users.</p>
+            <p><strong>Why not the others?</strong></p>
+            <ul>
+              <li><strong>A</strong> creates millions of IAM users &mdash; impractical, hard to manage, and IAM has a default limit of 5,000 users per account. Also distributes long-term credentials.</li>
+              <li><strong>C</strong> embeds long-term credentials in client code &mdash; anyone who decompiles the app gets full S3 access. This is a critical security vulnerability.</li>
+              <li><strong>D</strong> is designed for <em>workforce</em> (employee) access, not customer-facing mobile app users. It does not support social provider federation the way Cognito does.</li>
+            </ul>
+            <p><strong>Key exam clue:</strong> "Mobile/web app users" + "social sign-in" + "avoid IAM users" = Amazon Cognito identity pools with an IAM role.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+  <footer class="site-footer">
+    <p>AWS SAA-C03 Study Hub &mdash; Personal study material, not affiliated with AWS.</p>
+  </footer>
+</div>
+
+<script src="../assets/js/nav.js"></script>
+<script src="../assets/js/reveal.js"></script>
+<script src="../assets/js/progress.js"></script>
+</body>
+</html>

@@ -1,1 +1,227 @@
-[]
+[
+  {
+    "term": "IAM Role",
+    "definition": "An identity with permissions policies that can be assumed by users, applications, or AWS services. Provides temporary credentials — no long-term access keys.",
+    "gotcha": "Roles assumed via role chaining have a hard cap of 1 hour, regardless of the role's max session duration setting (which can be up to 12 hours for direct AssumeRole)."
+  },
+  {
+    "term": "IAM Instance Profile",
+    "definition": "A container for an IAM role that allows EC2 instances to assume the role and obtain temporary credentials automatically via the instance metadata service.",
+    "gotcha": "An instance profile can contain only one role. The console creates one automatically when you attach a role to an EC2 instance, but the CLI/API requires creating it separately."
+  },
+  {
+    "term": "IAM Identity Center",
+    "definition": "Centralized access management (formerly AWS SSO) for multiple AWS accounts and business applications. Uses a single sign-on portal.",
+    "gotcha": "This is the AWS-recommended way to manage workforce access across accounts. It replaces per-account IAM users for human access."
+  },
+  {
+    "term": "IAM Roles Anywhere",
+    "definition": "Allows workloads outside AWS (on-premises, other clouds) to obtain temporary AWS credentials using X.509 certificates from a trusted CA.",
+    "gotcha": "Requires a trust anchor (CA certificate) registered with IAM Roles Anywhere. The workload exchanges its certificate for temporary role credentials."
+  },
+  {
+    "term": "Service Control Policy (SCP)",
+    "definition": "An organization-level policy that sets the maximum permissions boundary for accounts in AWS Organizations. SCPs don't grant permissions — they limit what IAM policies can grant.",
+    "gotcha": "SCPs never affect the management account, even when attached to the root OU. They also cannot restrict service-linked roles. Max 5 SCPs per OU/account, 5,120 characters each."
+  },
+  {
+    "term": "SCP Intersection Model",
+    "definition": "Effective permissions = SCP ∩ IAM policy ∩ Permissions boundary. An action must be allowed by ALL layers. If any layer denies or doesn't allow, the action is denied.",
+    "gotcha": "A user with AdministratorAccess (Allow *) in a member account can still be blocked by an SCP. The SCP always wins for member accounts."
+  },
+  {
+    "term": "KMS Customer Managed Key",
+    "definition": "A KMS key you create, own, and manage. Supports CloudTrail logging, configurable rotation, cross-account sharing, and custom key policies. Costs $1/month + per-use fees.",
+    "gotcha": "Only customer managed keys allow you to control the rotation schedule and key policy. AWS managed keys rotate automatically every 365 days and you can't change this."
+  },
+  {
+    "term": "Envelope Encryption",
+    "definition": "A two-tier encryption pattern: KMS generates a data key → you encrypt data locally with the data key → store the KMS-encrypted copy of the data key alongside the encrypted data.",
+    "gotcha": "KMS never sees your plaintext data. The 4 KB KMS encrypt limit means you MUST use envelope encryption for anything larger. This is how S3 SSE-KMS, EBS encryption, etc. work internally."
+  },
+  {
+    "term": "Multi-Region KMS Key",
+    "definition": "KMS keys replicated across regions sharing the same key material (mrk- prefix). Data encrypted in one region can be decrypted in another without cross-region API calls.",
+    "gotcha": "Multi-region keys are not global — you must explicitly replicate them to each region you need. They're billed separately in each region."
+  },
+  {
+    "term": "Security Group",
+    "definition": "A stateful virtual firewall at the ENI (instance) level. Supports allow rules only. All rules are evaluated before making a decision. Return traffic is automatically allowed.",
+    "gotcha": "The default SG allows all inbound from members of the SAME security group and all outbound. A NEW custom SG denies all inbound, allows all outbound. Can reference other SGs as sources."
+  },
+  {
+    "term": "Network ACL (NACL)",
+    "definition": "A stateless firewall at the subnet level. Supports both allow and deny rules. Rules are evaluated in ascending number order — first match wins.",
+    "gotcha": "Because NACLs are stateless, you must explicitly allow ephemeral ports (1024-65535) outbound for responses to work. The default NACL allows all traffic; custom NACLs deny all by default."
+  },
+  {
+    "term": "AWS Secrets Manager",
+    "definition": "A service for storing, rotating, and managing secrets like database credentials and API keys. Supports automatic rotation via Lambda with native RDS/Redshift/DocumentDB integration.",
+    "gotcha": "Costs $0.40/secret/month vs Parameter Store Standard which is free. Use Secrets Manager only when you need automatic rotation or cross-region replication. Supports up to 65 KB per secret."
+  },
+  {
+    "term": "Parameter Store (SSM)",
+    "definition": "A hierarchical key-value store in AWS Systems Manager. Standard tier is free (up to 10,000 params, 4 KB each). Supports String, StringList, and SecureString (KMS-encrypted) types.",
+    "gotcha": "No built-in rotation. Advanced tier ($0.05/param/month) raises limits to 100,000 params and 8 KB, but once you upgrade a parameter to Advanced, you cannot downgrade it."
+  },
+  {
+    "term": "VPC Gateway Endpoint",
+    "definition": "A free VPC endpoint for S3 and DynamoDB only. Adds a route to your route table pointing to the endpoint. No ENI created, no PrivateLink.",
+    "gotcha": "Gateway endpoints ONLY work from within the VPC — they cannot be accessed from on-premises networks via VPN or Direct Connect, or from peered VPCs. Interface endpoints can."
+  },
+  {
+    "term": "VPC Interface Endpoint (PrivateLink)",
+    "definition": "Creates an ENI with a private IP in your subnet to access AWS services privately. Supports security groups and endpoint policies. Hourly + per-GB charges.",
+    "gotcha": "Used for most AWS services (KMS, STS, SQS, CloudWatch, etc.) — everything except S3 and DynamoDB (which use Gateway endpoints, though S3 also supports Interface endpoints)."
+  },
+  {
+    "term": "AWS Shield Standard",
+    "definition": "Free, automatic DDoS protection against common Layer 3/4 attacks (SYN floods, UDP reflection) for all AWS customers. No configuration needed.",
+    "gotcha": "Shield Standard is always on and free — if the exam asks 'at no additional cost' for DDoS protection, this is the answer. It does NOT provide Layer 7 protection or SRT access."
+  },
+  {
+    "term": "AWS Shield Advanced",
+    "definition": "$3,000/month per organization (1-year commitment). Provides L3/4 + L7 DDoS protection, SRT access, DDoS cost protection credits, and advanced metrics.",
+    "gotcha": "SRT (Shield Response Team) access requires a Business or Enterprise Support plan — just having Shield Advanced is not enough. DDoS cost protection gives service credits, not automatic refunds."
+  },
+  {
+    "term": "AWS WAF",
+    "definition": "Layer 7 web application firewall. Protects CloudFront, ALB, API Gateway, AppSync, Cognito, App Runner, Verified Access, and Amplify. Blocks SQL injection, XSS, and rate-limits requests.",
+    "gotcha": "WAF does NOT protect EC2 instances directly — only through a supported resource like CloudFront or ALB. Default limit is 1,500 WCU per web ACL."
+  },
+  {
+    "term": "NAT Gateway",
+    "definition": "A managed, highly-available gateway that allows instances in private subnets to access the internet for outbound traffic (updates, API calls) while preventing inbound connections from the internet.",
+    "gotcha": "NAT Gateways are per-AZ. For HA, deploy one per AZ and route each private subnet to its local NAT Gateway. They charge hourly + per-GB processed. They don't support security groups."
+  },
+  {
+    "term": "Multi-AZ (RDS)",
+    "definition": "RDS deployment with a synchronous standby replica in a different AZ for high availability. Automatic failover (60-120s for single standby, <35s for DB cluster). The standby is NOT readable in single standby mode.",
+    "gotcha": "Multi-AZ single standby does NOT serve read traffic — don't confuse it with read replicas. Multi-AZ DB cluster (newer) has 2 readable standbys but only supports MySQL 8.0.28+ and PostgreSQL 13.4+."
+  },
+  {
+    "term": "RDS Read Replica",
+    "definition": "An asynchronous copy of an RDS instance that serves read-only traffic. Up to 5 replicas per source (15 for Aurora). Can be cross-region. Can be promoted to a standalone DB (breaks replication).",
+    "gotcha": "Read replicas use async replication, so they have replication lag (eventual consistency). Multi-AZ standby uses sync replication. If an exam question mentions 'no stale data', read replicas may not be the answer."
+  },
+  {
+    "term": "DynamoDB Partition Key vs Sort Key",
+    "definition": "Partition key determines which partition stores the item (must distribute evenly). Sort key is optional and orders items within a partition. Together they form the composite primary key.",
+    "gotcha": "With a composite key (partition + sort), items can share the same partition key but must have unique sort keys. Queries on partition key are fast; queries on sort key alone require a full scan unless you have a GSI."
+  },
+  {
+    "term": "DynamoDB GSI vs LSI",
+    "definition": "GSI: different partition/sort key from table, eventually consistent only, 20 per table, add/remove anytime. LSI: same partition key different sort key, supports strongly consistent reads, 5 per table, must create at table creation.",
+    "gotcha": "LSIs CANNOT be added after table creation. If you realize you need an LSI later, you must recreate the table. LSIs also have a 10 GB limit per partition key value. GSIs are more flexible but only eventually consistent."
+  },
+  {
+    "term": "DynamoDB On-Demand vs Provisioned",
+    "definition": "On-demand: pay-per-request, instant auto-scaling, no capacity planning. Provisioned: set RCU/WCU, use Auto Scaling, more cost-effective for predictable workloads. Can switch modes once per 24 hours.",
+    "gotcha": "1 RCU = 1 strongly consistent read/sec for items up to 4 KB (or 2 eventually consistent reads). 1 WCU = 1 write/sec for items up to 1 KB. Items larger than these sizes consume multiple units."
+  },
+  {
+    "term": "S3 Storage Classes",
+    "definition": "Standard (frequent), Standard-IA (30-day min, 128KB min), One Zone-IA (1 AZ), Intelligent-Tiering (auto), Glacier Instant (90-day min, ms), Glacier Flexible (90-day min, min-hrs), Glacier Deep Archive (180-day min, 12-48hrs).",
+    "gotcha": "Early deletion fees apply: if you delete an IA object before 30 days, or a Glacier object before 90/180 days, you're charged for the full minimum duration. Minimum object size charges apply to IA classes (128 KB)."
+  },
+  {
+    "term": "S3 Intelligent-Tiering",
+    "definition": "Automatically moves objects between access tiers based on usage patterns. No retrieval fees. Charges a small monthly monitoring fee per object. Objects <128 KB stay in Frequent Access tier.",
+    "gotcha": "Best for unknown or changing access patterns. For KNOWN patterns, a lifecycle policy with specific transitions is more cost-effective (no monitoring fee). Has optional archive tiers you must enable."
+  },
+  {
+    "term": "S3 CRR vs SRR",
+    "definition": "CRR (Cross-Region Replication): copies objects to a bucket in a different region — for DR, compliance, or latency. SRR (Same-Region Replication): copies within the same region — for log aggregation or test/prod sync.",
+    "gotcha": "Both require versioning on source AND destination buckets. Replication is not retroactive — only new objects after enabling are replicated. Delete markers can optionally be replicated."
+  },
+  {
+    "term": "SQS Standard vs FIFO",
+    "definition": "Standard: unlimited throughput, at-least-once delivery, best-effort ordering. FIFO: exactly-once processing, strict ordering per message group. Standard FIFO: 300 TPS; High-throughput FIFO: up to 70,000/s.",
+    "gotcha": "FIFO queue names must end in .fifo. Standard queues may deliver duplicates, so your consumer must be idempotent. FIFO queues have a 5-minute deduplication window."
+  },
+  {
+    "term": "SNS Fan-Out Pattern",
+    "definition": "An SNS topic publishes a message to multiple SQS queue subscribers. Each queue gets its own copy of the message for independent processing.",
+    "gotcha": "Don't confuse with a single SQS queue with multiple consumers — that's competing consumers where each message goes to ONE consumer. Fan-out ensures ALL subscribers get every message."
+  },
+  {
+    "term": "Amazon EventBridge",
+    "definition": "Serverless event bus for event-driven architectures. Routes events from AWS services, custom apps, and SaaS partners to targets using content-based filtering rules. Supports scheduling, archive, and replay.",
+    "gotcha": "EventBridge replaces CloudWatch Events (same underlying service). Use EventBridge over SNS when you need content-based filtering, schema discovery, event archive/replay, or SaaS partner integration."
+  },
+  {
+    "term": "ALB vs NLB",
+    "definition": "ALB: Layer 7, HTTP/HTTPS routing (path, host, header), Lambda targets, auth (OIDC/Cognito). NLB: Layer 4, TCP/UDP/TLS, static IPs, ultra-high performance, PrivateLink support.",
+    "gotcha": "ALB does NOT support static/Elastic IPs. If an exam question mentions 'static IP' or 'whitelisting by IP', the answer is NLB. If it mentions 'path-based routing' or 'authentication', the answer is ALB."
+  },
+  {
+    "term": "Auto Scaling Policies",
+    "definition": "Target Tracking (maintain metric at target value, e.g., 70% CPU). Step Scaling (scale by amount based on alarm thresholds). Scheduled (scale at specific times). Predictive (ML-based forecast).",
+    "gotcha": "Target tracking is simplest and recommended for most cases. You cannot use target tracking with the same metric as step scaling. Cooldown periods prevent rapid scale-in/out oscillation."
+  },
+  {
+    "term": "DR: Backup & Restore",
+    "definition": "Cheapest DR strategy. Store backups in another region. Restore from backups when disaster occurs. Highest RTO (hours) and RPO (hours to last backup).",
+    "gotcha": "This is the only DR strategy with zero running costs in the DR region (just storage). But RTO can be many hours depending on data volume and infrastructure provisioning time."
+  },
+  {
+    "term": "DR: Pilot Light",
+    "definition": "Core infrastructure (database, replication) running in DR region, but application servers are off. Scale up on failover. RTO: tens of minutes. Lower cost than Warm Standby.",
+    "gotcha": "The 'light' is the database — it's the minimal critical component kept running. Application and web tiers must be provisioned during failover, which takes time. Exam may contrast this with Warm Standby."
+  },
+  {
+    "term": "DR: Warm Standby",
+    "definition": "A scaled-down but fully functional copy of the production environment running in the DR region. Scale up to production size on failover. RTO: minutes.",
+    "gotcha": "The key difference from Pilot Light: Warm Standby has ALL tiers running (just smaller), while Pilot Light only has the data tier running. Warm Standby costs more but recovers faster."
+  },
+  {
+    "term": "DR: Multi-Site Active-Active",
+    "definition": "Full production environments in multiple regions, both actively serving traffic. Data is synchronously or near-synchronously replicated. Near-zero RPO and RTO. Most expensive.",
+    "gotcha": "This is the only strategy that provides near-zero RPO/RTO. If the exam mentions 'near-zero downtime' or 'no data loss', this is likely the answer. Route 53 handles traffic distribution."
+  },
+  {
+    "term": "RPO vs RTO",
+    "definition": "RPO (Recovery Point Objective): maximum acceptable data loss measured in time (how far back can you lose?). RTO (Recovery Time Objective): maximum acceptable downtime (how fast must you recover?).",
+    "gotcha": "RPO is about DATA LOSS, RTO is about DOWNTIME. A lower RPO requires more frequent backups or replication. A lower RTO requires more standby infrastructure (and more cost)."
+  },
+  {
+    "term": "IAM Policy (Identity-Based vs Resource-Based)",
+    "definition": "Identity-based policies attach to users/groups/roles and say what that identity can do. Resource-based policies attach to resources (S3 buckets, SQS queues) and specify which principals can access them. Within the same account, either alone is sufficient. Cross-account requires both.",
+    "gotcha": "Resource-based policies have a Principal field; identity-based policies do not. For cross-account access, both the identity's account AND the resource's account must grant permission."
+  },
+  {
+    "term": "AWS STS (Security Token Service)",
+    "definition": "A global service that issues temporary security credentials (access key, secret key, and session token) when a principal assumes a role. STS itself does not authorize actions — the role's permission policy does.",
+    "gotcha": "STS credentials expire automatically (15 min to 12 hours). Role chaining via STS caps sessions at 1 hour regardless of the role's max session setting."
+  },
+  {
+    "term": "AssumeRole",
+    "definition": "The STS API call used to obtain temporary credentials for an IAM role. Requires the caller to be listed in the role's trust policy. Returns an access key, secret key, and session token.",
+    "gotcha": "AssumeRole requires BOTH the trust policy on the role to allow the caller AND the caller's own IAM policy to permit sts:AssumeRole on that role ARN (for cross-account). Missing either side = Access Denied."
+  },
+  {
+    "term": "Trust Policy (Role Trust Policy)",
+    "definition": "A resource-based policy on an IAM role that defines which principals (users, roles, accounts, or services) can call sts:AssumeRole to assume the role. It is the 'door lock' — who can get in.",
+    "gotcha": "The trust policy controls WHO can assume the role. The permission policy controls WHAT the role can do. Exam questions often test whether you know which policy to fix when access fails."
+  },
+  {
+    "term": "Explicit Deny",
+    "definition": "A Deny statement in any applicable policy. Explicit Deny ALWAYS overrides any Allow statement anywhere. Evaluation order: Explicit Deny > Allow > Implicit Deny (default no-permission state).",
+    "gotcha": "If any policy (SCP, permissions boundary, identity policy, resource policy) has an explicit Deny for an action, that action is denied — period. No amount of Allow statements can override it."
+  },
+  {
+    "term": "Principle of Least Privilege",
+    "definition": "Grant only the minimum permissions required for a task. Start with zero permissions and add only what is needed. Use IAM Access Analyzer and last-accessed data to identify and remove unused permissions.",
+    "gotcha": "The exam loves answers that follow least privilege. If one answer uses a broad wildcard (*) policy and another scopes to specific actions/resources, the scoped answer is usually correct."
+  },
+  {
+    "term": "IAM Permissions Boundary",
+    "definition": "An advanced IAM feature that sets the maximum permissions an IAM user or role can have. Does not grant permissions — only limits what identity-based policies can grant. Think of it as a ceiling on permissions.",
+    "gotcha": "Effective permissions = intersection of identity policy AND permissions boundary. If the boundary allows s3:* but the identity policy only allows s3:GetObject, the user can only GetObject. Commonly tested in delegated-admin scenarios."
+  },
+  {
+    "term": "Amazon Cognito (Identity Pools)",
+    "definition": "Provides temporary AWS credentials to mobile/web app users who sign in via social providers (Google, Facebook, Apple), SAML, or OpenID Connect. Uses web identity federation to exchange tokens for STS credentials scoped by an IAM role.",
+    "gotcha": "Cognito is for CUSTOMER-FACING app users. IAM Identity Center is for WORKFORCE (employee) users. If the exam mentions mobile apps + social login, Cognito is the answer."
+  }
+]
