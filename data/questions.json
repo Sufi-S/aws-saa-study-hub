@@ -640,5 +640,47 @@
     ],
     "correctAnswer": 3,
     "explanation": "PrivateLink exposes only the NLB targets (compliance API), not the entire VPC. It works with overlapping CIDRs because the consumer connects to an endpoint ENI in their own VPC. VPC peering (A) fails with overlapping CIDRs and exposes the whole VPC. A public ALB (B) exposes the API to the internet. Transit Gateway (C) also fails with overlapping CIDRs and provides broader access than needed."
+  },
+  {
+    "id": "d1-sw-01",
+    "domain": "domain1",
+    "topic": "shield-waf",
+    "question": "A company hosts a public-facing web application behind an Application Load Balancer. The security team wants to block HTTP requests that contain SQL injection patterns and also limit any single IP address to no more than 1,000 requests per 5 minutes. Which combination of AWS services meets these requirements with the LEAST operational overhead?",
+    "options": [
+      "Deploy a network firewall in the VPC with intrusion-prevention rules and configure NACLs with rate-limiting deny entries.",
+      "Associate an AWS WAF web ACL with the ALB. Add the AWS Managed Rules SQL database rule group and a rate-based rule with a threshold of 1,000.",
+      "Enable AWS Shield Advanced on the ALB and configure the Shield Response Team to write custom Lambda functions that block SQL injection.",
+      "Place an Amazon CloudFront distribution in front of the ALB and enable AWS Shield Standard, which automatically blocks SQL injection and rate-limits IPs."
+    ],
+    "correctAnswer": 1,
+    "explanation": "AWS WAF attaches directly to an ALB and provides managed rule groups for SQL injection detection plus rate-based rules that block IPs exceeding a threshold within a 5-minute window. NACLs cannot rate-limit (A). Shield Advanced protects against DDoS, not SQL injection (C). Shield Standard provides Layer 3/4 DDoS protection only — it does not inspect HTTP content or rate-limit individual IPs (D)."
+  },
+  {
+    "id": "d1-sw-02",
+    "domain": "domain1",
+    "topic": "shield-waf",
+    "question": "A global media company uses Amazon CloudFront to serve video content. During a recent DDoS attack, the company's AWS bill increased significantly due to CloudFront data-transfer charges caused by the attack traffic. Which AWS service feature would have helped the company receive a credit for the DDoS-related cost increase?",
+    "options": [
+      "AWS WAF rate-based rules with action set to Count",
+      "AWS Shield Standard automatic protections",
+      "AWS Shield Advanced DDoS cost protection",
+      "Amazon CloudFront Origin Shield caching"
+    ],
+    "correctAnswer": 2,
+    "explanation": "Shield Advanced DDoS cost protection provides credits for scaling charges on CloudFront, ELB, Route 53, and Auto Scaling that result from a DDoS attack. Shield Standard is free but does not include cost protection (B). WAF Count action only logs matches without blocking (A). CloudFront Origin Shield is a caching optimization, not a DDoS cost-mitigation feature (D)."
+  },
+  {
+    "id": "d1-sw-03",
+    "domain": "domain1",
+    "topic": "shield-waf",
+    "question": "A solutions architect needs to deploy a centralized set of AWS WAF rules across 15 AWS accounts in an organization. The rules must automatically apply to every new Application Load Balancer created in any account. Which approach meets this requirement?",
+    "options": [
+      "Create an SCP that denies ALB creation unless a WAF web ACL is attached, then share the web ACL using AWS RAM.",
+      "Use AWS CloudFormation StackSets to deploy the same WAF web ACL template to all accounts and set up an EventBridge rule to attach it to new ALBs.",
+      "Enable AWS Shield Advanced in every account, which automatically creates and attaches WAF web ACLs to all ALBs.",
+      "Configure AWS Firewall Manager with a WAF policy scoped to the organization. Firewall Manager automatically creates and attaches web ACLs to in-scope ALBs in all member accounts."
+    ],
+    "correctAnswer": 3,
+    "explanation": "AWS Firewall Manager is purpose-built for centrally managing WAF rules across multiple accounts in an AWS Organization. A WAF policy in Firewall Manager automatically creates web ACLs and attaches them to in-scope resources in all member accounts. SCPs cannot force WAF attachment and web ACLs cannot be shared via RAM (A). StackSets with EventBridge works but requires significant custom automation (B). Shield Advanced does not automatically create WAF rules (C)."
   }
 ]

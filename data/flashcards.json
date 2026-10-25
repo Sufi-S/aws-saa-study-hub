@@ -503,5 +503,80 @@
     "term": "aws:SourceVpce Condition Key",
     "definition": "An S3 bucket policy condition key that matches the VPC endpoint ID through which the request arrived. Used to restrict bucket access to requests arriving through a specific endpoint, enforcing private-only access patterns.",
     "gotcha": "Using aws:SourceVpce to deny non-endpoint access can lock you out of the bucket from the console, CLI, and CloudFormation. Always include an escape clause for a break-glass role. Condition key support varies by service."
+  },
+  {
+    "term": "Shield Standard vs Shield Advanced",
+    "definition": "Shield Standard is free and automatic on all AWS accounts, protecting against common Layer 3/4 DDoS attacks. Shield Advanced costs $3,000/month with a 1-year commitment and adds Layer 7 detection, SRT access, DDoS cost protection, and advanced metrics for protected resources.",
+    "gotcha": "Shield Standard has no console toggle — it is always on. Shield Advanced requires explicit enrollment per resource. The $3K/month fee is per organization, not per account, when using consolidated billing."
+  },
+  {
+    "term": "WAF Web ACL",
+    "definition": "A Web Access Control List is the primary WAF resource. It contains rules that inspect HTTP/HTTPS requests and take actions (Allow, Block, Count, CAPTCHA, Challenge). Each web ACL has a default action (Allow or Block) applied when no rule matches.",
+    "gotcha": "One resource can have only one web ACL attached, but one web ACL can be associated with multiple resources. CloudFront web ACLs must be created in us-east-1 (global scope); ALB/API Gateway web ACLs use regional scope."
+  },
+  {
+    "term": "WAF Rule Priority and Evaluation",
+    "definition": "WAF rules are evaluated in numeric priority order (lowest number = highest priority). The first terminating match (Allow or Block) stops evaluation. Count is non-terminating — it records the match but evaluation continues to the next rule.",
+    "gotcha": "If you put a broad Allow rule at a low priority number and a specific Block rule at a higher number, the Allow fires first and the Block never evaluates. Order your Block rules before Allow rules to enforce denials."
+  },
+  {
+    "term": "WAF Rate-Based Rules",
+    "definition": "Rate-based rules track the rate of requests from individual IP addresses over a 5-minute sliding window. When an IP exceeds the configured threshold (minimum 100), WAF blocks subsequent requests from that IP until the rate drops below the threshold.",
+    "gotcha": "The threshold is requests per 5-minute window, not per second. A threshold of 2,000 means 2,000 requests in any 5-minute period. Rate-based rules are terminating when they trigger a Block action."
+  },
+  {
+    "term": "WAF Managed Rule Groups",
+    "definition": "Pre-built collections of WAF rules maintained by AWS or AWS Marketplace sellers. AWS Managed Rules include the Core Rule Set (CRS), SQL database rules, Known Bad Inputs, and more. They are updated automatically as new threats emerge.",
+    "gotcha": "Managed rule groups consume WCU (Web ACL Capacity Units) toward the 1,500 WCU default limit per web ACL. You can override individual rule actions within a managed group (e.g., set a rule to Count instead of Block for testing)."
+  },
+  {
+    "term": "WAF Supported Resources",
+    "definition": "AWS WAF can be associated with: Amazon CloudFront, Application Load Balancer (ALB), Amazon API Gateway REST API, AWS AppSync GraphQL API, Amazon Cognito User Pool, AWS App Runner, and AWS Verified Access.",
+    "gotcha": "WAF does NOT support NLB (Layer 4), CLB (legacy), or EC2 instances directly. If the exam mentions protecting an NLB, the answer involves placing an ALB or CloudFront in front to attach WAF."
+  },
+  {
+    "term": "Shield Advanced DDoS Cost Protection",
+    "definition": "A Shield Advanced feature that provides credits for scaling-related charges on CloudFront, ELB, Route 53, and EC2 Auto Scaling groups that result from a DDoS attack. Prevents unexpected bills caused by attack-driven traffic spikes.",
+    "gotcha": "Cost protection only applies to resources explicitly enrolled in Shield Advanced — it is not account-wide. You must create a case with the Shield Response Team to receive the credit after an attack."
+  },
+  {
+    "term": "Shield Response Team (SRT)",
+    "definition": "A team of AWS DDoS experts available 24/7 to Shield Advanced customers. The SRT can help during active attacks by creating custom WAF rules, analyzing attack patterns, and recommending mitigations. Requires granting an IAM role for SRT access.",
+    "gotcha": "SRT access requires both Shield Advanced subscription AND an IAM role granting the SRT permissions in your account. SRT can proactively contact you during detected attacks if you enable proactive engagement with Route 53 health checks."
+  },
+  {
+    "term": "AWS Firewall Manager",
+    "definition": "A centralized security management service that lets you configure and deploy WAF rules, Shield Advanced protections, security group policies, and Network Firewall rules across multiple accounts in an AWS Organization.",
+    "gotcha": "Firewall Manager requires AWS Organizations — it does not work with standalone accounts. It is a management tool, not a traffic inspection tool. It deploys and enforces policies but does not process requests itself."
+  },
+  {
+    "term": "WAF Geo-Match Condition",
+    "definition": "A WAF rule statement that matches requests based on the country of origin (determined by source IP geolocation). Used to block or allow traffic from specific countries for compliance, licensing, or security reasons.",
+    "gotcha": "Geo-match uses source IP geolocation, which can be inaccurate for VPN/proxy users. If CloudFront is in front, WAF sees the viewer's real IP via X-Forwarded-For, not CloudFront's IP — but only if you configure the IP set forwarded header."
+  },
+  {
+    "term": "WAF Logging",
+    "definition": "WAF can log all inspected requests to Amazon CloudWatch Logs, Amazon S3, or Amazon Kinesis Data Firehose. Logs include matched rules, actions taken, request headers, and timestamps. Must be enabled per web ACL.",
+    "gotcha": "Log destination names must start with 'aws-waf-logs-' prefix. For CloudFront web ACLs, the Kinesis Data Firehose must be in us-east-1. Full request body is not logged — only the first 8 KB of inspected content."
+  },
+  {
+    "term": "WAF CAPTCHA and Challenge Actions",
+    "definition": "Beyond Allow, Block, and Count, WAF supports CAPTCHA (presents a visual puzzle) and Challenge (silent browser verification) actions. These help distinguish legitimate users from bots without outright blocking.",
+    "gotcha": "CAPTCHA and Challenge have configurable immunity times — once solved, the token is valid for a set duration. These actions only work with browser-based traffic; API clients cannot solve CAPTCHAs."
+  },
+  {
+    "term": "WAF Scope: Global vs Regional",
+    "definition": "WAF resources for CloudFront must be created with CLOUDFRONT (global) scope in us-east-1. WAF resources for ALB, API Gateway, AppSync, Cognito, App Runner, and Verified Access use REGIONAL scope and must be in the same region as the protected resource.",
+    "gotcha": "If you create a web ACL in us-west-2 with regional scope, you cannot attach it to a CloudFront distribution. CloudFront always requires global scope in us-east-1. This is a common exam trick."
+  },
+  {
+    "term": "Shield + WAF + CloudFront Layered Architecture",
+    "definition": "The recommended AWS DDoS protection pattern: CloudFront distributes traffic globally and absorbs surges at edge locations, Shield Standard automatically protects against Layer 3/4 attacks, and WAF filters malicious Layer 7 HTTP requests. Together they provide defense-in-depth.",
+    "gotcha": "Even with this full stack, the application must still handle authentication, authorization, and input validation. WAF blocks known attack patterns but cannot replace secure coding practices. This layered architecture is a frequent exam answer."
+  },
+  {
+    "term": "Web ACL Capacity Units (WCU)",
+    "definition": "WCU is a measure of the operational resources required to run WAF rules. Each web ACL has a default limit of 1,500 WCU. Simple match rules cost 1 WCU; complex regex or managed rule groups cost more. WCU is calculated at rule creation time, not at request time.",
+    "gotcha": "Running out of WCU means you cannot add more rules to that web ACL. Plan capacity before adding multiple managed rule groups. You can request a WCU limit increase through AWS Support, but the default 1,500 handles most use cases."
   }
 ]

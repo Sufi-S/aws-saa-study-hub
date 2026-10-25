@@ -87,6 +87,11 @@
         <li><a href="#vpe-diagram">VPC Endpoints &amp; PrivateLink &mdash; Architecture Diagram</a></li>
         <li><a href="#vpe-gotchas">VPC Endpoints &amp; PrivateLink &mdash; Exam Gotchas</a></li>
         <li><a href="#vpe-practice">VPC Endpoints &amp; PrivateLink &mdash; Practice Questions</a></li>
+        <li><a href="#sw-learn"><strong>Shield &amp; WAF</strong> &mdash; Learn from Zero</a></li>
+        <li><a href="#sw-real-world">Shield &amp; WAF &mdash; Real-World Scenarios</a></li>
+        <li><a href="#sw-diagram">Shield &amp; WAF &mdash; Architecture Diagram</a></li>
+        <li><a href="#sw-gotchas">Shield &amp; WAF &mdash; Exam Gotchas</a></li>
+        <li><a href="#sw-practice">Shield &amp; WAF &mdash; Practice Questions</a></li>
       </ol>
     </nav>
 
@@ -4053,6 +4058,681 @@ Rule#   Type    Port    Source          Action
             <p><strong>Key exam clue:</strong> "Expose one service" + "different accounts" + "overlapping CIDRs" + "no broad network access" = PrivateLink with NLB + endpoint service.</p>
             <p><strong>Takeaway:</strong> PrivateLink = expose one service privately. Works with overlapping CIDRs. Consumer sees only NLB targets. Use it when the requirement is service-level, not network-level connectivity.</p>
           </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================= -->
+    <!-- TOPIC 7: AWS Shield & AWS WAF                 -->
+    <!-- ============================================= -->
+
+    <hr class="topic-divider" style="margin-top:4rem;">
+
+    <div class="page-header" style="border-bottom:none;padding-bottom:0;margin-bottom:1.5rem;">
+      <h1 style="display:flex;align-items:center;gap:0.6rem;font-size:1.75rem;">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="var(--domain1)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+        AWS Shield &amp; AWS WAF
+      </h1>
+      <p>DDoS protection and web application request filtering &mdash; defending internet-facing applications at the infrastructure and application layers.</p>
+    </div>
+
+    <!-- SW SECTION 1: Learn from Zero -->
+    <section class="topic-section" id="sw-learn">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain1)" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        Learn from Zero
+      </h2>
+
+      <!-- Part 1A: Web and Network Security Fundamentals -->
+      <h3>Web and Network Security Fundamentals</h3>
+      <p>A <strong>web application</strong> is software that responds to HTTP/HTTPS requests from clients (browsers, mobile apps, APIs). Clients send requests to a server, the server processes them, and returns a response. Every internet-facing application is potentially reachable by anyone with network access &mdash; including attackers.</p>
+
+      <p><strong>Common web threats</strong> fall into two broad categories:</p>
+      <ul>
+        <li><strong>Infrastructure-layer attacks (Layer 3/4)</strong> &mdash; floods of network packets (SYN floods, UDP reflection attacks) that overwhelm the server&rsquo;s network capacity or exhaust connection state. These target the <em>network and transport layers</em>. The goal is to make the service unreachable, not to exploit application logic.</li>
+        <li><strong>Application-layer attacks (Layer 7)</strong> &mdash; malicious HTTP/HTTPS requests designed to exploit application vulnerabilities (SQL injection, cross-site scripting) or exhaust application resources (HTTP flood, slow-read attacks). These target the <em>application layer</em> and look like legitimate requests at the network level.</li>
+      </ul>
+
+      <p>A <strong>Distributed Denial of Service (DDoS)</strong> attack uses many sources (compromised machines, botnets) to generate massive traffic volumes or excessive requests. The goal is to overwhelm the target so legitimate users cannot access the service. DDoS attacks can be volumetric (flooding bandwidth), protocol-based (exhausting connection state), or application-layer (overwhelming the application with expensive requests).</p>
+
+      <div class="key-concept">
+        <strong>Example:</strong> An online shopping site launches a flash sale. Simultaneously, an attacker floods the site with millions of fake HTTP requests. Legitimate customers see timeouts. This is an application-layer DDoS attack. Meanwhile, a separate volumetric attack sends a flood of UDP packets to overwhelm the network link. These are different attacks requiring different defenses.
+      </div>
+
+      <p><strong>Key distinctions:</strong></p>
+      <ul>
+        <li><strong>Availability</strong> &mdash; keeping the service reachable (DDoS protection).</li>
+        <li><strong>Application security</strong> &mdash; preventing malicious requests from exploiting vulnerabilities (WAF, secure coding).</li>
+        <li><strong>Network security</strong> &mdash; controlling which traffic reaches your resources (security groups, NACLs, firewalls).</li>
+      </ul>
+      <p>These concerns overlap but require different tools. No single product prevents every possible attack. A well-architected application combines multiple layers of protection.</p>
+      <p>Not every unusual traffic spike is an attack &mdash; a viral social media post can generate legitimate surges that look similar to DDoS traffic. Good monitoring and scaling design help distinguish real attacks from popularity spikes.</p>
+
+      <!-- Part 1B: AWS Shield -->
+      <h3>AWS Shield</h3>
+      <p><strong>AWS Shield</strong> provides DDoS protection for AWS applications. It operates at two tiers:</p>
+
+      <h4>Shield Standard</h4>
+      <p>Shield Standard is <strong>automatically enabled for all AWS customers at no extra cost</strong>. It provides protection against common infrastructure-layer DDoS attacks (Layer 3 and Layer 4), including SYN floods, UDP reflection, and other volumetric attacks. Shield Standard protects resources behind CloudFront, Route 53, and Elastic Load Balancing automatically.</p>
+
+      <h4>Shield Advanced</h4>
+      <p>Shield Advanced is a <strong>paid subscription</strong> that provides enhanced DDoS protection with additional capabilities:</p>
+      <ul>
+        <li><strong>Enhanced detection</strong> &mdash; more sophisticated detection including application-layer (Layer 7) DDoS detection with health-based monitoring.</li>
+        <li><strong>DDoS Response Team (SRT)</strong> &mdash; 24/7 access to AWS DDoS specialists who can help during active attacks.</li>
+        <li><strong>Cost protection</strong> &mdash; credits for scaling charges incurred during DDoS attacks on protected resources.</li>
+        <li><strong>Advanced metrics and reporting</strong> &mdash; near-real-time visibility into DDoS events and attack forensics.</li>
+        <li><strong>Automatic application-layer DDoS mitigation</strong> &mdash; can automatically create and deploy WAF rules to counter application-layer attacks on protected resources.</li>
+        <li><strong>Supported protected resources</strong> &mdash; EC2 instances, Elastic Load Balancers, CloudFront distributions, Route 53 hosted zones, and Global Accelerator standard accelerators.</li>
+      </ul>
+
+      <table class="comparison-table" style="width:100%;margin:1rem 0;">
+        <thead>
+          <tr><th>Feature</th><th>Shield Standard</th><th>Shield Advanced</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Cost</td><td>Free (included with all AWS accounts)</td><td>Paid subscription (verify current pricing)</td></tr>
+          <tr><td>Protection scope</td><td>Common Layer 3/4 DDoS attacks</td><td>Layer 3/4 + enhanced Layer 7 DDoS detection</td></tr>
+          <tr><td>Automatic for</td><td>CloudFront, Route 53, ELB</td><td>Must explicitly add protected resources</td></tr>
+          <tr><td>DDoS Response Team</td><td>Not available</td><td>24/7 access to SRT</td></tr>
+          <tr><td>Cost protection</td><td>Not available</td><td>Credits for DDoS-related scaling costs</td></tr>
+          <tr><td>Advanced metrics</td><td>Basic</td><td>Near-real-time attack visibility and forensics</td></tr>
+          <tr><td>Automatic app-layer mitigation</td><td>No</td><td>Yes (creates WAF rules automatically)</td></tr>
+          <tr><td>Health-based detection</td><td>No</td><td>Yes (uses Route 53 health checks)</td></tr>
+        </tbody>
+      </table>
+
+      <div class="key-concept">
+        <strong>When to consider Shield Advanced:</strong> Business-critical, internet-facing applications where extended DDoS incidents could cause significant revenue loss or reputational damage. The DDoS Response Team, cost protection, and automatic application-layer mitigation justify the cost for high-risk services. For most workloads, Shield Standard combined with good architecture (CloudFront, Auto Scaling, ELB) provides adequate baseline protection.
+      </div>
+
+      <p><strong>Shield is not a replacement for application-layer filtering.</strong> Shield defends against DDoS &mdash; overwhelming traffic volume. It does not inspect individual HTTP requests for SQL injection, XSS, or business-logic abuse. For that, you need AWS WAF.</p>
+
+      <!-- Part 1C: AWS WAF Fundamentals -->
+      <h3>AWS WAF Fundamentals</h3>
+      <p><strong>AWS WAF</strong> is a web application firewall that lets you monitor and control HTTP/HTTPS requests forwarded to your protected resources. Unlike Shield (which focuses on DDoS), WAF inspects individual requests against rules you define.</p>
+
+      <h4>Supported Resources</h4>
+      <p>WAF protects the following resource types:</p>
+      <ul>
+        <li>Amazon CloudFront distributions</li>
+        <li>Application Load Balancers (ALBs)</li>
+        <li>Amazon API Gateway REST APIs</li>
+        <li>AWS AppSync GraphQL APIs</li>
+        <li>Amazon Cognito user pools</li>
+        <li>AWS App Runner services</li>
+        <li>AWS Verified Access instances</li>
+      </ul>
+      <p>Not all AWS resources support WAF. Network Load Balancers, EC2 instances directly, and S3 buckets are <em>not</em> WAF-protected resources. WAF operates on HTTP/HTTPS traffic, not raw network packets.</p>
+
+      <h4>Web ACLs</h4>
+      <p>A <strong>web access control list (web ACL)</strong> is the central resource in WAF. You associate a web ACL with one or more supported resources. Every HTTP/HTTPS request to that resource is evaluated against the web ACL&rsquo;s rules.</p>
+
+      <h4>Rules and Actions</h4>
+      <p>A <strong>rule</strong> defines a condition and an action:</p>
+      <ul>
+        <li><strong>Allow</strong> &mdash; the request is permitted through (terminating action).</li>
+        <li><strong>Block</strong> &mdash; the request is denied, typically with a 403 response (terminating action).</li>
+        <li><strong>Count</strong> &mdash; the request is counted but not blocked or allowed by this rule (non-terminating). Processing continues to the next rule. Count mode is invaluable for testing rules before enforcement.</li>
+        <li><strong>CAPTCHA / Challenge</strong> &mdash; presents a verification challenge to the client.</li>
+      </ul>
+      <p>Each web ACL has a <strong>default action</strong> (Allow or Block) that applies when no rule produces a terminating match. If all rules evaluate without a terminating action, the default action determines the outcome.</p>
+
+      <h4>Rule Priority</h4>
+      <p>Rules in a web ACL are evaluated in <strong>priority order</strong> (lowest number = highest priority = evaluated first). The first rule that matches with a terminating action (Allow or Block) determines the result. Remaining rules are not evaluated. This is why rule ordering matters &mdash; a broad Allow rule at a high priority can unintentionally allow traffic that a later Block rule would have caught.</p>
+
+      <h4>Common Rule Types</h4>
+      <ul>
+        <li><strong>IP set rules</strong> &mdash; match requests from specific IP addresses or CIDR ranges. Use for allowlists or blocklists.</li>
+        <li><strong>String match rules</strong> &mdash; inspect request components (URI, headers, query strings, body) for specific strings or regular expressions.</li>
+        <li><strong>Geographic match rules</strong> &mdash; match requests based on the originating country. Useful for geo-blocking, but geographic matching is based on IP geolocation, not user authentication.</li>
+        <li><strong>Rate-based rules</strong> &mdash; count requests from a given source and trigger an action when the rate exceeds a threshold within a defined time window. Used to detect excessive login attempts, API abuse, or simple application-layer DDoS patterns.</li>
+        <li><strong>SQL injection and XSS match rules</strong> &mdash; inspect request components for patterns consistent with SQL injection or cross-site scripting attacks.</li>
+      </ul>
+
+      <h4>Managed Rule Groups</h4>
+      <p><strong>Managed rule groups</strong> are pre-built collections of rules maintained by AWS or third-party sellers in the AWS Marketplace:</p>
+      <ul>
+        <li><strong>AWS Managed Rules</strong> &mdash; include the Core Rule Set (CRS) for common web exploits, SQL injection protection, known bad inputs, IP reputation lists, and bot control rules.</li>
+        <li><strong>Marketplace rule groups</strong> &mdash; third-party security vendors publish specialized rule sets.</li>
+      </ul>
+      <p>Managed rules simplify protection but must be tested. A managed rule group can flag legitimate requests as malicious (false positives). Always deploy new rule groups in <strong>count mode</strong> first, review the matched requests, and switch to block mode only after confirming the rules do not affect legitimate traffic.</p>
+
+      <div class="key-concept">
+        <strong>WAF does not guarantee perfect detection.</strong> A WAF rule detecting a suspicious pattern (e.g., a SQL keyword in a query string) is not the same as proving the request is malicious. Some legitimate requests may contain patterns that look suspicious. Applications still require secure coding practices (parameterized queries, output encoding) and proper authorization. WAF is a defense layer, not the only defense.
+      </div>
+
+      <!-- Part 1D: WAF Rule Evaluation -->
+      <h3>How a Web ACL Evaluates Requests</h3>
+      <p>Understanding rule evaluation order is critical for the exam. Consider this web ACL:</p>
+      <table class="comparison-table" style="width:100%;margin:1rem 0;">
+        <thead>
+          <tr><th>Priority</th><th>Rule</th><th>Action</th><th>Type</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>1</td><td>Block IP 203.0.113.0/24</td><td>Block</td><td>Terminating</td></tr>
+          <tr><td>2</td><td>AWS Managed Rules &mdash; Core Rule Set</td><td>Block (within group)</td><td>Terminating</td></tr>
+          <tr><td>3</td><td>Rate limit: 2,000 req/5min per IP</td><td>Block</td><td>Terminating (when threshold exceeded)</td></tr>
+          <tr><td>4</td><td>Count all requests from country X</td><td>Count</td><td>Non-terminating</td></tr>
+          <tr><td>&mdash;</td><td><em>Default action</em></td><td>Allow</td><td>&mdash;</td></tr>
+        </tbody>
+      </table>
+
+      <p><strong>Evaluation flow for an incoming request:</strong></p>
+      <ol>
+        <li><strong>Priority 1:</strong> Is the source IP in 203.0.113.0/24? If yes &rarr; <strong>Block</strong> (terminating). Evaluation stops.</li>
+        <li><strong>Priority 2:</strong> Does the request match any Core Rule Set pattern (SQLi, XSS, etc.)? If yes &rarr; <strong>Block</strong> (terminating). Evaluation stops.</li>
+        <li><strong>Priority 3:</strong> Has this IP exceeded 2,000 requests in 5 minutes? If yes &rarr; <strong>Block</strong> (terminating). Evaluation stops.</li>
+        <li><strong>Priority 4:</strong> Is the request from country X? If yes &rarr; <strong>Count</strong> (non-terminating). The request is counted and logged, but processing <em>continues</em>.</li>
+        <li><strong>Default action:</strong> No terminating rule matched &rarr; <strong>Allow</strong>.</li>
+      </ol>
+
+      <div class="key-concept">
+        <strong>Key takeaways for rule evaluation:</strong>
+        <ul style="margin-bottom:0;">
+          <li><strong>Terminating actions</strong> (Allow, Block) stop processing immediately. No further rules are checked.</li>
+          <li><strong>Non-terminating actions</strong> (Count) record a match but do not stop processing. The request continues to the next rule.</li>
+          <li><strong>Rule groups</strong> contain their own prioritized rules. The group itself has a priority within the web ACL.</li>
+          <li><strong>The default action</strong> fires only when no terminating rule matches. If the default is Allow, all traffic not explicitly blocked passes through.</li>
+          <li><strong>A poorly ordered broad Allow rule</strong> at priority 1 would bypass every subsequent block rule. Always put restrictive rules at higher priority.</li>
+          <li><strong>Count mode</strong> is essential for safely testing rules before enabling blocking behavior.</li>
+        </ul>
+      </div>
+
+      <p><strong>Logging</strong> is critical. WAF can log all evaluated requests to CloudWatch Logs, S3, or Kinesis Data Firehose. Logs show which rule matched, what action was taken, and the request details. This is how you diagnose false positives &mdash; look at blocked requests, identify legitimate patterns, and create exceptions.</p>
+
+      <!-- Part 1E: WAF Managed Protections -->
+      <h3>WAF Managed Protections and Custom Rules</h3>
+
+      <h4>AWS Managed Rule Groups</h4>
+      <p>AWS provides several managed rule groups that cover common web threats:</p>
+      <ul>
+        <li><strong>Core Rule Set (CRS)</strong> &mdash; protects against a broad range of common web exploits including request anomalies and known bad patterns.</li>
+        <li><strong>SQL Injection</strong> &mdash; inspects request components for SQL injection patterns. Complements (but does not replace) parameterized queries in application code.</li>
+        <li><strong>Cross-Site Scripting (XSS)</strong> &mdash; detects script injection patterns in request parameters.</li>
+        <li><strong>Known Bad Inputs</strong> &mdash; blocks requests matching patterns associated with exploitation of known vulnerabilities.</li>
+        <li><strong>IP Reputation</strong> &mdash; blocks requests from IP addresses known to be associated with malicious activity.</li>
+        <li><strong>Bot Control</strong> &mdash; identifies and manages bot traffic. Can challenge suspected bots while allowing legitimate ones (search engine crawlers).</li>
+      </ul>
+
+      <h4>Rate-Based Rules</h4>
+      <p>Rate-based rules count requests from a source (typically per IP) within a time window and trigger an action when the threshold is exceeded. They help control:</p>
+      <ul>
+        <li>Excessive login attempts (credential stuffing defense).</li>
+        <li>API abuse from a single client.</li>
+        <li>Simple application-layer DDoS patterns.</li>
+      </ul>
+      <p>Rate limiting and infrastructure-layer DDoS mitigation (Shield) are related but not identical. Rate-based rules operate at the application layer (HTTP requests). Shield operates at the network/transport layer (packets). A sophisticated DDoS attack may require both.</p>
+
+      <h4>Custom Rules</h4>
+      <p>Organizations can create custom rules for their specific needs: blocking requests with specific header patterns, restricting access to admin paths, enforcing API versioning, or allowing only expected content types. Custom rules and managed rules complement each other &mdash; managed rules cover common threats, custom rules address application-specific requirements.</p>
+
+      <!-- Part 1F: WAF Integration -->
+      <h3>WAF Integration with AWS Architecture</h3>
+
+      <h4>CloudFront + WAF</h4>
+      <p>For globally distributed applications, associating a web ACL with a <strong>CloudFront distribution</strong> places WAF inspection at the edge &mdash; close to users worldwide. Requests are filtered before they reach the origin. The web ACL must use <strong>CloudFront scope</strong> (global) when associated with a CloudFront distribution.</p>
+      <p><strong>Origin protection:</strong> Even with CloudFront + WAF, the origin may be vulnerable if clients can access it directly (bypassing CloudFront). Protect the origin by restricting its security group to CloudFront&rsquo;s IP ranges, using an origin access identity/control for S3, or placing the origin in a private subnet behind an ALB that only accepts traffic from CloudFront.</p>
+
+      <h4>ALB + WAF</h4>
+      <p>For regional applications, a web ACL associated with an <strong>Application Load Balancer</strong> inspects requests after they pass through the load balancer. The web ACL must use <strong>regional scope</strong> for ALB, API Gateway, AppSync, and other non-CloudFront resources.</p>
+
+      <h4>API Gateway + WAF</h4>
+      <p>WAF can protect <strong>API Gateway REST APIs</strong>, filtering suspicious requests before they reach backend Lambda functions or integrations. This is useful for public APIs that need rate limiting and injection protection.</p>
+
+      <p><strong>WAF does not replace:</strong></p>
+      <ul>
+        <li><strong>Authentication</strong> &mdash; WAF does not verify user identity. Use Cognito, IAM, or API keys for that.</li>
+        <li><strong>Authorization</strong> &mdash; WAF does not check what an authenticated user is allowed to do.</li>
+        <li><strong>Encryption in transit</strong> &mdash; WAF does not configure TLS. Use ACM certificates on your load balancer or CloudFront.</li>
+        <li><strong>Secure coding</strong> &mdash; WAF catches many attack patterns but cannot prevent every vulnerability. Input validation, parameterized queries, and output encoding remain essential.</li>
+      </ul>
+
+      <!-- Part 1G: Service Comparison -->
+      <h3>Shield vs WAF vs Other Security Services</h3>
+
+      <table class="comparison-table" style="width:100%;margin:1rem 0;font-size:0.92em;">
+        <thead>
+          <tr><th>Service</th><th>Primary Purpose</th><th>Layer</th><th>Key Capability</th><th>Typical Use</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>AWS Shield Standard</strong></td>
+            <td>Baseline DDoS protection</td>
+            <td>Layer 3/4</td>
+            <td>Automatic, free, protects CF/R53/ELB</td>
+            <td>All internet-facing workloads (default)</td>
+          </tr>
+          <tr>
+            <td><strong>AWS Shield Advanced</strong></td>
+            <td>Enhanced DDoS protection</td>
+            <td>Layer 3/4/7</td>
+            <td>SRT, cost protection, auto app-layer mitigation</td>
+            <td>Business-critical public services</td>
+          </tr>
+          <tr>
+            <td><strong>AWS WAF</strong></td>
+            <td>Web request filtering</td>
+            <td>Layer 7</td>
+            <td>Rules for SQLi, XSS, rate limiting, geo-blocking</td>
+            <td>Protecting web apps and APIs</td>
+          </tr>
+          <tr>
+            <td><strong>Amazon CloudFront</strong></td>
+            <td>Content delivery + edge security</td>
+            <td>Edge</td>
+            <td>Distributes traffic globally, integrates with Shield and WAF</td>
+            <td>Global applications, DDoS absorption</td>
+          </tr>
+          <tr>
+            <td><strong>Amazon Route 53</strong></td>
+            <td>DNS routing</td>
+            <td>DNS</td>
+            <td>Health-check routing, failover, anycast DDoS resilience</td>
+            <td>DNS resilience, not standalone DDoS defense</td>
+          </tr>
+          <tr>
+            <td><strong>Security Groups / NACLs</strong></td>
+            <td>Network packet filtering</td>
+            <td>Layer 3/4</td>
+            <td>IP/port-based allow/deny at instance or subnet level</td>
+            <td>VPC network security (not HTTP inspection)</td>
+          </tr>
+          <tr>
+            <td><strong>AWS Network Firewall</strong></td>
+            <td>VPC network traffic inspection</td>
+            <td>Layer 3&ndash;7</td>
+            <td>Stateful inspection, IDS/IPS, domain filtering</td>
+            <td>VPC egress/ingress filtering (not same as WAF)</td>
+          </tr>
+          <tr>
+            <td><strong>AWS Firewall Manager</strong></td>
+            <td>Centralized security policy management</td>
+            <td>Management</td>
+            <td>Deploy WAF, Shield, SG, Network Firewall policies across accounts</td>
+            <td>Multi-account organizations</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>Each service addresses a specific requirement. Shield handles DDoS. WAF filters HTTP requests. CloudFront distributes and absorbs. Security groups filter packets. Firewall Manager centralizes policies. They work together in a layered architecture, not as substitutes for each other.</p>
+
+      <!-- Part 1H: Operational Considerations -->
+      <h3>Security Design, False Positives, and Operational Considerations</h3>
+      <ul>
+        <li><strong>False positives:</strong> A WAF rule may block legitimate requests that happen to match a suspicious pattern (e.g., a product description containing the word &ldquo;SELECT&rdquo; triggering an SQLi rule). Always deploy rules in count mode first, review logs, create targeted exceptions, and then enable blocking.</li>
+        <li><strong>Count mode:</strong> Non-terminating &mdash; records matches without blocking. Essential for testing new rules and managed rule groups. Review CloudWatch metrics and WAF logs to assess impact before switching to block.</li>
+        <li><strong>Logging and metrics:</strong> WAF logs every evaluated request (when logging is enabled). Logs include the matching rule, action taken, request headers, and other details. Use these to investigate false positives, tune rules, and detect attacks. Sensitive request data may need log redaction for privacy compliance.</li>
+        <li><strong>Rate-based rule tuning:</strong> Set thresholds based on your application&rsquo;s normal traffic patterns. A threshold that is too low blocks legitimate users during traffic spikes. Too high and it fails to catch abuse. Monitor and adjust.</li>
+        <li><strong>Layered architecture:</strong> Combine Shield (DDoS), WAF (request filtering), CloudFront (edge distribution), Auto Scaling (capacity), security groups (network filtering), and application security (auth, input validation). Each layer catches what the others miss.</li>
+        <li><strong>Testing before deployment:</strong> Never deploy blocking rules directly to production. Use count mode, staged rollouts, and canary testing. A misconfigured WAF rule can cause a complete outage for legitimate users.</li>
+        <li><strong>Monitoring and incident response:</strong> Shield and WAF are preventive controls. They do not eliminate the need for monitoring (CloudWatch alarms, anomaly detection), incident response plans, and recovery procedures. A successful defense still requires detection, response, and learning.</li>
+      </ul>
+
+    </section>
+
+    <hr class="topic-divider">
+
+    <!-- SW SECTION 2: Real-World Scenarios -->
+    <section class="topic-section" id="sw-real-world">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain1)" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        When Real Architects Actually Use This
+      </h2>
+
+      <!-- Scenario A -->
+      <div class="scenario">
+        <h4>Scenario A: Protecting an E-Commerce Site from DDoS</h4>
+        <p><strong>Requirement:</strong> A company runs a public e-commerce website. During peak sales events, they need resilience against DDoS attacks that could make the site unreachable.</p>
+        <p><strong>Recommended architecture:</strong></p>
+        <ul>
+          <li><strong>CloudFront</strong> distributes content globally and absorbs volumetric traffic at the edge.</li>
+          <li><strong>Shield Standard</strong> automatically protects CloudFront, Route 53, and ELB against common Layer 3/4 attacks &mdash; no extra cost.</li>
+          <li><strong>Auto Scaling</strong> behind the ALB handles legitimate traffic surges.</li>
+          <li><strong>WAF on CloudFront</strong> filters malicious HTTP requests (application-layer attacks).</li>
+        </ul>
+        <p><strong>When to add Shield Advanced:</strong> If the business cannot tolerate extended DDoS incidents, needs the DDoS Response Team, or wants cost protection against scaling charges caused by attacks.</p>
+        <p><strong>Key distinction:</strong> Shield defends against traffic volume. WAF filters individual requests. CloudFront distributes load. Auto Scaling adds capacity. They solve different parts of the problem.</p>
+        <p><strong>Exam clue:</strong> &ldquo;DDoS protection&rdquo; + &ldquo;internet-facing&rdquo; + &ldquo;no extra cost&rdquo; = Shield Standard + CloudFront. Add &ldquo;business-critical&rdquo; + &ldquo;response team&rdquo; = Shield Advanced.</p>
+      </div>
+
+      <!-- Scenario B -->
+      <div class="scenario">
+        <h4>Scenario B: Blocking SQL Injection Attempts</h4>
+        <p><strong>Requirement:</strong> A company operates a public web application and wants to detect and block HTTP requests containing SQL injection patterns.</p>
+        <p><strong>Recommended approach:</strong> Attach a <strong>WAF web ACL</strong> to the ALB or CloudFront distribution. Add the <strong>AWS Managed Rules SQL injection rule group</strong> in <strong>count mode</strong>. Monitor for one to two weeks, review flagged requests, create exceptions for legitimate patterns, then switch to block mode.</p>
+        <p><strong>Why count mode first:</strong> SQL injection rules can flag legitimate requests (e.g., a form field containing &ldquo;DROP&rdquo; as a product category). Blocking immediately risks a user-facing outage.</p>
+        <p><strong>Why WAF alone is not enough:</strong> WAF catches many SQLi patterns at the perimeter, but a determined attacker can craft payloads that evade pattern matching. The application must also use parameterized queries and input validation. WAF is a defense layer, not a substitute for secure coding.</p>
+        <p><strong>Exam clue:</strong> &ldquo;Block SQL injection&rdquo; + &ldquo;web application&rdquo; = WAF with SQL injection managed rules. Not Shield (Shield is for DDoS, not request content).</p>
+      </div>
+
+      <!-- Scenario C -->
+      <div class="scenario">
+        <h4>Scenario C: Controlling Excessive Login Requests</h4>
+        <p><strong>Requirement:</strong> An application&rsquo;s login endpoint receives thousands of requests per minute from a small number of IP addresses, suggesting credential-stuffing attacks.</p>
+        <p><strong>Recommended approach:</strong> Create a <strong>WAF rate-based rule</strong> that limits requests per IP to the login URI path. Set the threshold based on normal traffic patterns (e.g., 100 requests per 5 minutes per IP). Requests exceeding the threshold are blocked temporarily.</p>
+        <p><strong>Complementary controls:</strong> Rate limiting alone does not stop distributed credential stuffing (thousands of IPs, few requests each). Also implement account lockout, CAPTCHA, MFA, and monitor for anomalous login patterns.</p>
+        <p><strong>Why not just Shield?</strong> Shield defends against volumetric DDoS &mdash; millions of packets designed to overwhelm infrastructure. Credential stuffing uses a moderate number of well-formed HTTP requests that look legitimate at the network layer. WAF rate-based rules operate at the HTTP level where these attacks are visible.</p>
+        <p><strong>Exam clue:</strong> &ldquo;Excessive requests to login endpoint&rdquo; + &ldquo;per IP&rdquo; = WAF rate-based rule.</p>
+      </div>
+
+      <!-- Scenario D -->
+      <div class="scenario">
+        <h4>Scenario D: Protecting a Global Application at the Edge</h4>
+        <p><strong>Requirement:</strong> A company serves users on six continents and wants DDoS protection and request filtering as close to users as possible.</p>
+        <p><strong>Recommended architecture:</strong></p>
+        <ol>
+          <li><strong>CloudFront</strong> &mdash; global distribution, edge caching, TLS termination.</li>
+          <li><strong>WAF web ACL</strong> (CloudFront scope, global) &mdash; inspects requests at the edge before they reach the origin.</li>
+          <li><strong>Shield Standard</strong> &mdash; automatic Layer 3/4 protection on CloudFront.</li>
+          <li><strong>Origin protection</strong> &mdash; restrict the ALB security group to CloudFront&rsquo;s IP ranges so users cannot bypass CloudFront and hit the origin directly.</li>
+        </ol>
+        <p><strong>Scope requirement:</strong> A CloudFront web ACL must be created in the <strong>us-east-1 (global)</strong> scope. A regional ALB web ACL uses the ALB&rsquo;s Region. These are different scopes &mdash; you cannot associate a regional web ACL with CloudFront or vice versa.</p>
+        <p><strong>Exam clue:</strong> &ldquo;Global application&rdquo; + &ldquo;edge filtering&rdquo; + &ldquo;DDoS protection&rdquo; = CloudFront + WAF (global scope) + Shield.</p>
+      </div>
+
+      <!-- Scenario E -->
+      <div class="scenario">
+        <h4>Scenario E: Protecting a Public API</h4>
+        <p><strong>Requirement:</strong> A company exposes a REST API via API Gateway. The API is public, and the company wants to control abusive traffic while allowing legitimate clients.</p>
+        <p><strong>Recommended approach:</strong> Associate a <strong>WAF web ACL</strong> with the API Gateway stage. Add rate-based rules (per IP), the Core Rule Set managed group (for common exploits), and geo-blocking if the API serves only specific regions.</p>
+        <p><strong>Authentication still needed:</strong> WAF filters traffic patterns, not identity. The API should still use API keys, IAM authorization, or Cognito tokens to authenticate legitimate callers. A WAF Allow does not mean the caller is authorized to access a specific API resource.</p>
+        <p><strong>Exam clue:</strong> &ldquo;Public API&rdquo; + &ldquo;filter suspicious requests&rdquo; + &ldquo;rate limiting&rdquo; = WAF on API Gateway.</p>
+      </div>
+
+      <!-- Scenario F -->
+      <div class="scenario">
+        <h4>Scenario F: Centralized WAF Policies Across Accounts</h4>
+        <p><strong>Requirement:</strong> An organization with 50 AWS accounts wants consistent WAF protections on all public-facing ALBs without relying on each team to configure WAF manually.</p>
+        <p><strong>Recommended approach:</strong> Use <strong>AWS Firewall Manager</strong> with <strong>AWS Organizations</strong>. Create a Firewall Manager WAF policy that defines the required web ACL and rule groups. Firewall Manager automatically applies the web ACL to all matching resources across all member accounts, even as new resources are created.</p>
+        <p><strong>Key point:</strong> Firewall Manager is not WAF or Shield &mdash; it is a <em>management layer</em> that deploys and enforces WAF, Shield Advanced, security group, and Network Firewall policies centrally. The actual protection comes from WAF and Shield.</p>
+        <p><strong>Exam clue:</strong> &ldquo;Consistent WAF policies across multiple accounts&rdquo; = Firewall Manager + Organizations.</p>
+      </div>
+
+      <!-- Scenario G -->
+      <div class="scenario">
+        <h4>Scenario G: Evaluating Shield Advanced</h4>
+        <p><strong>Requirement:</strong> A financial services company runs a trading platform that generates significant revenue per hour. An extended DDoS attack could cost millions in lost transactions. The company wants dedicated AWS support during attacks and protection against unexpected scaling costs.</p>
+        <p><strong>Analysis:</strong> Shield Advanced provides the <strong>DDoS Response Team (SRT)</strong> for expert assistance during attacks, <strong>cost protection</strong> for DDoS-related scaling charges, <strong>health-based detection</strong> using Route 53 health checks, and <strong>automatic application-layer mitigation</strong>. For a business where downtime cost far exceeds the Shield Advanced subscription cost, the investment is justified.</p>
+        <p><strong>For most workloads:</strong> Shield Standard + CloudFront + Auto Scaling + WAF provides strong baseline protection at no extra DDoS cost. Shield Advanced is for businesses where the consequences of a successful DDoS attack are severe enough to warrant premium protection.</p>
+        <p><strong>Exam clue:</strong> &ldquo;Business-critical&rdquo; + &ldquo;DDoS Response Team&rdquo; + &ldquo;cost protection&rdquo; = Shield Advanced.</p>
+      </div>
+
+      <!-- Scenario H -->
+      <div class="scenario">
+        <h4>Scenario H: Troubleshooting Legitimate Requests Being Blocked</h4>
+        <p><strong>Situation:</strong> After deploying the AWS Managed Rules Core Rule Set, customers report that submitting product reviews fails with a 403 error.</p>
+        <p><strong>Troubleshooting process:</strong></p>
+        <ol>
+          <li><strong>Check WAF logs:</strong> Enable full logging (CloudWatch Logs, S3, or Kinesis). Identify which rule is matching the blocked requests.</li>
+          <li><strong>Identify the matching rule:</strong> The log shows the Core Rule Set&rsquo;s <code>CrossSiteScripting_BODY</code> rule is blocking requests because product reviews contain angle brackets (&lt; and &gt;) that the XSS rule flags.</li>
+          <li><strong>Switch to count mode:</strong> Change the Core Rule Set rule group action from Block to Count. Legitimate requests now pass through while you assess the impact.</li>
+          <li><strong>Create a targeted exception:</strong> Add a rule at higher priority that allows requests to the <code>/reviews</code> path from authenticated users, bypassing the XSS body check for that specific endpoint.</li>
+          <li><strong>Re-enable blocking:</strong> After confirming the exception works correctly, switch the Core Rule Set back to Block mode.</li>
+          <li><strong>Monitor:</strong> Continue reviewing logs and metrics to catch regressions.</li>
+        </ol>
+        <p><strong>Why not just disable WAF?</strong> Disabling all protection removes every rule, including rate limiting, IP blocking, and SQLi protection. Count mode on the specific offending rule preserves all other protections while you investigate.</p>
+      </div>
+    </section>
+
+    <hr class="topic-divider">
+
+    <!-- SW SECTION 3: Architecture Diagram -->
+    <section class="topic-section" id="sw-diagram">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain1)" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+        Shield &amp; WAF Protection Architecture
+      </h2>
+
+      <svg role="img" aria-label="Diagram showing how AWS Shield protects against DDoS at the infrastructure layer while AWS WAF filters HTTP requests at the application layer, both integrated with CloudFront and ALB" viewBox="0 0 900 560" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:900px;height:auto;margin:1.5rem auto;display:block;font-family:inherit;">
+        <title>AWS Shield and WAF Protection Architecture</title>
+        <desc>Top flow shows internet users sending requests through CloudFront with Shield protection and WAF web ACL filtering, then to an ALB and application origin. Bottom section shows WAF rule evaluation: incoming request is checked against rules in priority order resulting in allow, block, or count actions.</desc>
+
+        <!-- Background -->
+        <rect x="0" y="0" width="900" height="560" rx="12" fill="var(--card-bg, #1a1a2e)" stroke="var(--border, #333)" stroke-width="1.5"/>
+
+        <!-- Title -->
+        <text x="450" y="28" text-anchor="middle" fill="var(--heading, #e0e0e0)" font-size="14" font-weight="600">Protected Web Application Architecture</text>
+
+        <!-- ===== TOP: Request Flow ===== -->
+
+        <!-- Internet Users -->
+        <rect x="25" y="55" width="110" height="55" rx="8" fill="var(--card-bg, #1a1a2e)" stroke="var(--text-secondary, #aaa)" stroke-width="2"/>
+        <text x="80" y="78" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="11" font-weight="600">Internet</text>
+        <text x="80" y="95" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="9">Users &amp; Attackers</text>
+
+        <!-- Shield umbrella -->
+        <rect x="155" y="42" width="545" height="82" rx="10" fill="#f472b6" opacity="0.08" stroke="#f472b6" stroke-width="1.5" stroke-dasharray="6 4"/>
+        <text x="428" y="57" text-anchor="middle" fill="#f472b6" font-size="10" font-weight="600">AWS Shield (DDoS Protection &mdash; Layer 3/4)</text>
+
+        <!-- CloudFront -->
+        <rect x="175" y="62" width="130" height="50" rx="8" fill="var(--card-bg, #1a1a2e)" stroke="#34d399" stroke-width="2.5"/>
+        <text x="240" y="84" text-anchor="middle" fill="#34d399" font-size="11" font-weight="600">CloudFront</text>
+        <text x="240" y="100" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="9">Edge distribution</text>
+
+        <!-- Arrow: Users -> CloudFront -->
+        <line x1="135" y1="82" x2="175" y2="82" stroke="var(--text-secondary, #aaa)" stroke-width="2" marker-end="url(#sw-arrow)"/>
+
+        <!-- WAF web ACL -->
+        <rect x="340" y="62" width="130" height="50" rx="8" fill="var(--card-bg, #1a1a2e)" stroke="#60a5fa" stroke-width="2.5"/>
+        <text x="405" y="82" text-anchor="middle" fill="#60a5fa" font-size="11" font-weight="600">AWS WAF</text>
+        <text x="405" y="98" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="9">Web ACL (Layer 7)</text>
+
+        <!-- Arrow: CloudFront -> WAF -->
+        <line x1="305" y1="87" x2="340" y2="87" stroke="#34d399" stroke-width="2" marker-end="url(#sw-arrow)"/>
+        <text x="318" y="80" fill="var(--text-secondary, #aaa)" font-size="8">HTTP/S</text>
+
+        <!-- ALB -->
+        <rect x="510" y="62" width="100" height="50" rx="8" fill="var(--card-bg, #1a1a2e)" stroke="#f59e0b" stroke-width="2"/>
+        <text x="560" y="84" text-anchor="middle" fill="#f59e0b" font-size="11" font-weight="600">ALB</text>
+        <text x="560" y="100" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="9">Regional entry</text>
+
+        <!-- Arrow: WAF -> ALB -->
+        <line x1="470" y1="87" x2="510" y2="87" stroke="#60a5fa" stroke-width="2" marker-end="url(#sw-arrow)"/>
+        <text x="480" y="80" fill="#60a5fa" font-size="8">Allowed</text>
+
+        <!-- Blocked arrow (going down) -->
+        <line x1="405" y1="112" x2="405" y2="140" stroke="#ef4444" stroke-width="2" marker-end="url(#sw-arrow)"/>
+        <rect x="360" y="140" width="90" height="22" rx="4" fill="#ef4444" opacity="0.15"/>
+        <text x="405" y="155" text-anchor="middle" fill="#ef4444" font-size="10" font-weight="600">403 Blocked</text>
+
+        <!-- App origin -->
+        <rect x="650" y="55" width="130" height="65" rx="8" fill="var(--card-bg, #1a1a2e)" stroke="#a78bfa" stroke-width="2"/>
+        <text x="715" y="78" text-anchor="middle" fill="#a78bfa" font-size="11" font-weight="600">Application</text>
+        <text x="715" y="94" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="9">EC2 / ECS / Lambda</text>
+        <text x="715" y="110" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="8" font-style="italic">Auth + authorization</text>
+
+        <!-- Arrow: ALB -> App -->
+        <line x1="610" y1="87" x2="650" y2="87" stroke="#f59e0b" stroke-width="2" marker-end="url(#sw-arrow)"/>
+
+        <!-- Role annotations -->
+        <rect x="810" y="52" width="75" height="72" rx="6" fill="var(--card-bg, #1a1a2e)" stroke="var(--border, #444)" stroke-width="1"/>
+        <text x="848" y="70" text-anchor="middle" fill="#f472b6" font-size="8" font-weight="600">Shield</text>
+        <text x="848" y="82" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="7">DDoS volume</text>
+        <text x="848" y="98" text-anchor="middle" fill="#60a5fa" font-size="8" font-weight="600">WAF</text>
+        <text x="848" y="110" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="7">HTTP rules</text>
+
+        <!-- ===== BOTTOM: WAF Rule Evaluation ===== -->
+        <rect x="25" y="185" width="855" height="210" rx="10" fill="none" stroke="#60a5fa" stroke-width="1.5" stroke-dasharray="8 4"/>
+        <text x="40" y="205" fill="#60a5fa" font-size="12" font-weight="600">WAF Web ACL Rule Evaluation</text>
+
+        <!-- Incoming request -->
+        <rect x="40" y="220" width="105" height="45" rx="6" fill="var(--card-bg, #1a1a2e)" stroke="var(--text-secondary, #aaa)" stroke-width="2"/>
+        <text x="93" y="240" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="10" font-weight="600">Request</text>
+        <text x="93" y="255" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="8">HTTP/HTTPS</text>
+
+        <!-- Rule 1: IP block -->
+        <rect x="185" y="220" width="125" height="55" rx="6" fill="var(--card-bg, #1a1a2e)" stroke="#ef4444" stroke-width="2"/>
+        <text x="248" y="238" text-anchor="middle" fill="#ef4444" font-size="9" font-weight="600">Priority 1</text>
+        <text x="248" y="253" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="8">Block IP 203.0.113/24</text>
+        <text x="248" y="267" text-anchor="middle" fill="#ef4444" font-size="8">BLOCK (terminating)</text>
+
+        <!-- Arrow: Request -> Rule 1 -->
+        <line x1="145" y1="242" x2="185" y2="242" stroke="var(--text-secondary, #aaa)" stroke-width="1.5" marker-end="url(#sw-arrow)"/>
+
+        <!-- Rule 2: Managed rules -->
+        <rect x="345" y="220" width="125" height="55" rx="6" fill="var(--card-bg, #1a1a2e)" stroke="#f59e0b" stroke-width="2"/>
+        <text x="408" y="238" text-anchor="middle" fill="#f59e0b" font-size="9" font-weight="600">Priority 2</text>
+        <text x="408" y="253" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="8">Managed Rules (CRS)</text>
+        <text x="408" y="267" text-anchor="middle" fill="#ef4444" font-size="8">BLOCK (terminating)</text>
+
+        <!-- Arrow: Rule 1 -> Rule 2 -->
+        <line x1="310" y1="248" x2="345" y2="248" stroke="var(--text-secondary, #aaa)" stroke-width="1.5" marker-end="url(#sw-arrow)"/>
+        <text x="323" y="240" fill="var(--text-secondary, #aaa)" font-size="7">no match</text>
+
+        <!-- Rule 3: Rate limit -->
+        <rect x="505" y="220" width="125" height="55" rx="6" fill="var(--card-bg, #1a1a2e)" stroke="#f59e0b" stroke-width="2"/>
+        <text x="568" y="238" text-anchor="middle" fill="#f59e0b" font-size="9" font-weight="600">Priority 3</text>
+        <text x="568" y="253" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="8">Rate limit 2K/5min</text>
+        <text x="568" y="267" text-anchor="middle" fill="#ef4444" font-size="8">BLOCK (terminating)</text>
+
+        <!-- Arrow: Rule 2 -> Rule 3 -->
+        <line x1="470" y1="248" x2="505" y2="248" stroke="var(--text-secondary, #aaa)" stroke-width="1.5" marker-end="url(#sw-arrow)"/>
+        <text x="483" y="240" fill="var(--text-secondary, #aaa)" font-size="7">no match</text>
+
+        <!-- Rule 4: Count -->
+        <rect x="665" y="220" width="115" height="55" rx="6" fill="var(--card-bg, #1a1a2e)" stroke="#34d399" stroke-width="2"/>
+        <text x="723" y="238" text-anchor="middle" fill="#34d399" font-size="9" font-weight="600">Priority 4</text>
+        <text x="723" y="253" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="8">Count geo:XX</text>
+        <text x="723" y="267" text-anchor="middle" fill="#34d399" font-size="8">COUNT (continues)</text>
+
+        <!-- Arrow: Rule 3 -> Rule 4 -->
+        <line x1="630" y1="248" x2="665" y2="248" stroke="var(--text-secondary, #aaa)" stroke-width="1.5" marker-end="url(#sw-arrow)"/>
+        <text x="643" y="240" fill="var(--text-secondary, #aaa)" font-size="7">no match</text>
+
+        <!-- Default action -->
+        <rect x="810" y="225" width="58" height="42" rx="6" fill="#34d399" opacity="0.15" stroke="#34d399" stroke-width="2"/>
+        <text x="839" y="244" text-anchor="middle" fill="#34d399" font-size="10" font-weight="600">Allow</text>
+        <text x="839" y="258" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="7">Default</text>
+
+        <!-- Arrow: Rule 4 -> Default -->
+        <line x1="780" y1="248" x2="810" y2="248" stroke="var(--text-secondary, #aaa)" stroke-width="1.5" marker-end="url(#sw-arrow)"/>
+
+        <!-- Block exit arrows -->
+        <line x1="248" y1="275" x2="248" y2="310" stroke="#ef4444" stroke-width="1.5" marker-end="url(#sw-arrow)"/>
+        <text x="248" y="325" text-anchor="middle" fill="#ef4444" font-size="8">403 if matched</text>
+        <line x1="408" y1="275" x2="408" y2="310" stroke="#ef4444" stroke-width="1.5" marker-end="url(#sw-arrow)"/>
+        <text x="408" y="325" text-anchor="middle" fill="#ef4444" font-size="8">403 if matched</text>
+        <line x1="568" y1="275" x2="568" y2="310" stroke="#ef4444" stroke-width="1.5" marker-end="url(#sw-arrow)"/>
+        <text x="568" y="325" text-anchor="middle" fill="#ef4444" font-size="8">403 if exceeded</text>
+
+        <!-- Evaluation note -->
+        <text x="450" y="375" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="9" font-style="italic">First terminating match (Allow or Block) stops evaluation. Count is non-terminating &mdash; processing continues.</text>
+
+        <!-- ===== Legend ===== -->
+        <rect x="25" y="415" width="855" height="130" rx="8" fill="var(--card-bg, #1a1a2e)" stroke="var(--border, #444)" stroke-width="1"/>
+        <text x="40" y="438" fill="var(--text-secondary, #aaa)" font-size="10" font-weight="600">What Each Layer Protects Against:</text>
+
+        <rect x="40" y="450" width="16" height="16" rx="3" fill="#f472b6" opacity="0.3"/>
+        <text x="62" y="463" fill="#f472b6" font-size="10" font-weight="600">Shield</text>
+        <text x="105" y="463" fill="var(--text-secondary, #aaa)" font-size="9">&mdash; DDoS attacks (volumetric floods, SYN floods, reflection attacks). Protects infrastructure availability.</text>
+
+        <rect x="40" y="475" width="16" height="16" rx="3" fill="#60a5fa" opacity="0.3"/>
+        <text x="62" y="488" fill="#60a5fa" font-size="10" font-weight="600">WAF</text>
+        <text x="92" y="488" fill="var(--text-secondary, #aaa)" font-size="9">&mdash; Malicious HTTP requests (SQLi, XSS, bots, rate abuse). Filters application-layer traffic.</text>
+
+        <rect x="40" y="500" width="16" height="16" rx="3" fill="#34d399" opacity="0.3"/>
+        <text x="62" y="513" fill="#34d399" font-size="10" font-weight="600">CloudFront</text>
+        <text x="125" y="513" fill="var(--text-secondary, #aaa)" font-size="9">&mdash; Distributes traffic globally, absorbs surges at edge, integrates with Shield + WAF.</text>
+
+        <rect x="40" y="525" width="16" height="16" rx="3" fill="#a78bfa" opacity="0.3"/>
+        <text x="62" y="538" fill="#a78bfa" font-size="10" font-weight="600">Application</text>
+        <text x="125" y="538" fill="var(--text-secondary, #aaa)" font-size="9">&mdash; Authentication, authorization, input validation, secure coding. Still required even with Shield + WAF.</text>
+
+        <!-- Arrow marker -->
+        <defs>
+          <marker id="sw-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 Z" fill="var(--text-secondary, #aaa)"/>
+          </marker>
+        </defs>
+      </svg>
+
+      <p><strong>Top:</strong> Internet traffic hits CloudFront (global edge), where Shield provides automatic Layer 3/4 DDoS protection and WAF inspects HTTP requests against configured rules. Allowed traffic passes to the ALB and application origin, which still performs authentication and authorization. Blocked requests receive a 403 response at the WAF layer. <strong>Bottom:</strong> WAF rule evaluation processes rules in priority order. The first terminating match (Allow or Block) stops evaluation. Count records a match without stopping. If no terminating rule matches, the default action applies.</p>
+    </section>
+
+    <hr class="topic-divider">
+
+    <!-- SW SECTION 4: Exam Gotchas -->
+    <section class="topic-section" id="sw-gotchas">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain1)" stroke-width="2"><path d="M12 9v4m0 4h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+        20 Exam Gotchas
+      </h2>
+      <ol class="gotcha-list">
+        <li><strong>Shield Standard is automatic and free</strong> &mdash; it protects every AWS account on every public-facing resource (CloudFront, Route 53, ELB, EC2 public IPs). You do not enable it; there is no console toggle.</li>
+        <li><strong>Shield Advanced is a paid add-on ($3,000/month + data fees)</strong> &mdash; it adds Layer 7 DDoS detection, SRT (Shield Response Team) access, DDoS cost protection, and advanced metrics. Requires a 1-year commitment.</li>
+        <li><strong>Shield Advanced cost protection refunds scaling charges</strong> &mdash; if a DDoS attack causes your Auto Scaling, CloudFront, or ELB usage to spike, Shield Advanced can credit those charges back. Shield Standard cannot.</li>
+        <li><strong>WAF attaches to specific resources, not to VPCs or subnets</strong> &mdash; you associate a web ACL with CloudFront, ALB, API Gateway, AppSync, Cognito User Pool, App Runner, or Verified Access. It does not attach to NLB, CLB, or EC2 directly.</li>
+        <li><strong>WAF on CloudFront must use GLOBAL (us-east-1) scope</strong> &mdash; when you create a web ACL for CloudFront, its scope must be CloudFront (global). For ALB, API Gateway, and other regional resources, use REGIONAL scope in the same region as the resource.</li>
+        <li><strong>WAF does NOT attach to NLB</strong> &mdash; Network Load Balancers operate at Layer 4 (TCP/UDP). WAF operates at Layer 7 (HTTP/HTTPS). If you need WAF protection for TCP traffic, put CloudFront or an ALB in front.</li>
+        <li><strong>One web ACL per resource, but one web ACL can protect multiple resources</strong> &mdash; you cannot stack multiple web ACLs on the same ALB. If you need different rules, combine them into one web ACL.</li>
+        <li><strong>WAF rules evaluate in priority order (lowest number first)</strong> &mdash; once a terminating rule (Allow or Block) matches, evaluation stops. Count is non-terminating and continues to the next rule.</li>
+        <li><strong>Rate-based rules use a 5-minute sliding window</strong> &mdash; the threshold you set (minimum 100 requests) is evaluated over 5 minutes. Example: a limit of 2,000 means 2,000 requests per 5-minute window, not per second.</li>
+        <li><strong>WAF managed rule groups consume WCU (Web ACL Capacity Units)</strong> &mdash; each web ACL has a default 1,500 WCU limit. Large managed rule sets (e.g., AWS Managed Rules Core Rule Set) use significant WCU. Plan capacity before adding rules.</li>
+        <li><strong>Shield protects Layer 3/4; WAF protects Layer 7</strong> &mdash; a question about blocking SQL injection or XSS is WAF territory. A question about absorbing volumetric DDoS floods is Shield territory. Both work together but at different layers.</li>
+        <li><strong>Shield Advanced includes WAF at no extra WAF cost</strong> &mdash; for resources protected by Shield Advanced, you get WAF usage (web ACLs, rules, requests) included in the Shield Advanced subscription fee.</li>
+        <li><strong>AWS Firewall Manager requires AWS Organizations</strong> &mdash; Firewall Manager centrally deploys WAF rules, Shield Advanced protections, and security group policies across accounts. It only works with Organizations and requires a Firewall Manager administrator account.</li>
+        <li><strong>Firewall Manager ≠ WAF</strong> &mdash; Firewall Manager is a management and governance tool that deploys WAF, Shield, SG, and Network Firewall policies. It does not inspect traffic itself. The exam may test whether you know the difference.</li>
+        <li><strong>WAF logs go to CloudWatch Logs, S3, or Kinesis Data Firehose</strong> &mdash; WAF logging must be enabled per web ACL. Log names must start with <code>aws-waf-logs-</code>. Logs show which rules matched, which requests were blocked, and request headers.</li>
+        <li><strong>Shield Advanced health-based detection uses Route 53 health checks</strong> &mdash; associating Route 53 health checks with Shield Advanced-protected resources enables proactive engagement and faster, more accurate DDoS detection.</li>
+        <li><strong>WAF geo-match can block entire countries</strong> &mdash; use a geo-match condition to allow or block requests by country code. This is a common exam scenario for compliance (e.g., &ldquo;block traffic from country X&rdquo;).</li>
+        <li><strong>CloudFront + WAF is the recommended DDoS architecture</strong> &mdash; CloudFront distributes and absorbs traffic at edge locations, WAF filters malicious requests, and Shield Standard protects automatically. This layered approach appears frequently on the exam.</li>
+        <li><strong>WAF string match and regex rules inspect request components</strong> &mdash; you can inspect URI path, query string, headers, body, HTTP method, and single header values. Body inspection is limited to the first 8 KB (or 16/32/48/64 KB with extended options).</li>
+        <li><strong>Shield Advanced SRT requires IAM role access</strong> &mdash; the Shield Response Team needs an IAM role in your account to create and manage WAF rules on your behalf during an attack. This is set up during Shield Advanced onboarding.</li>
+      </ol>
+    </section>
+
+    <hr class="topic-divider">
+
+    <!-- SW SECTION 5: Practice Questions -->
+    <section class="topic-section" id="sw-practice">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain1)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3m.08 4h.01"/></svg>
+        Quick-Fire Practice
+      </h2>
+
+      <div class="practice-q">
+        <p class="q-text">Q1. A company hosts a public-facing web application behind an Application Load Balancer. The security team wants to block HTTP requests that contain SQL injection patterns and also limit any single IP address to no more than 1,000 requests per 5 minutes. Which combination of AWS services meets these requirements with the LEAST operational overhead?</p>
+        <ul class="q-options">
+          <li><span class="q-letter">A.</span> Deploy a network firewall in the VPC with intrusion-prevention rules and configure NACLs with rate-limiting deny entries.</li>
+          <li><span class="q-letter">B.</span> Associate an AWS WAF web ACL with the ALB. Add the AWS Managed Rules SQL database rule group and a rate-based rule with a threshold of 1,000.</li>
+          <li><span class="q-letter">C.</span> Enable AWS Shield Advanced on the ALB and configure the Shield Response Team to write custom Lambda functions that block SQL injection.</li>
+          <li><span class="q-letter">D.</span> Place an Amazon CloudFront distribution in front of the ALB and enable AWS Shield Standard, which automatically blocks SQL injection and rate-limits IPs.</li>
+        </ul>
+        <button class="reveal-btn">Show Answer</button>
+        <div class="answer-reveal">
+          <p><strong>Correct Answer: B</strong></p>
+          <p>AWS WAF attaches directly to an ALB and provides managed rule groups for SQL injection detection (AWS Managed Rules &mdash; SQL database rule set) plus rate-based rules that block IPs exceeding a threshold within a 5-minute window. This is a fully managed, low-overhead solution. A is wrong because NACLs cannot rate-limit. C is wrong because Shield Advanced protects against DDoS, not SQL injection patterns. D is wrong because Shield Standard provides Layer 3/4 DDoS protection only &mdash; it does not inspect HTTP content or rate-limit individual IPs.</p>
+        </div>
+      </div>
+
+      <div class="practice-q">
+        <p class="q-text">Q2. A global media company uses Amazon CloudFront to serve video content. During a recent DDoS attack, the company&rsquo;s AWS bill increased significantly due to CloudFront data-transfer charges caused by the attack traffic. Which AWS service feature would have helped the company receive a credit for the DDoS-related cost increase?</p>
+        <ul class="q-options">
+          <li><span class="q-letter">A.</span> AWS WAF rate-based rules with action set to Count</li>
+          <li><span class="q-letter">B.</span> AWS Shield Standard automatic protections</li>
+          <li><span class="q-letter">C.</span> AWS Shield Advanced DDoS cost protection</li>
+          <li><span class="q-letter">D.</span> Amazon CloudFront Origin Shield caching</li>
+        </ul>
+        <button class="reveal-btn">Show Answer</button>
+        <div class="answer-reveal">
+          <p><strong>Correct Answer: C</strong></p>
+          <p>Shield Advanced DDoS cost protection provides credits for scaling charges on CloudFront, ELB, Route 53, and Auto Scaling that result from a DDoS attack. Shield Standard (B) is free and automatic but does not include cost protection. WAF rate-based rules with Count action (A) only log matches without blocking &mdash; they would not prevent cost increases. CloudFront Origin Shield (D) reduces origin load but is a caching optimization, not a DDoS cost-mitigation feature.</p>
+        </div>
+      </div>
+
+      <div class="practice-q">
+        <p class="q-text">Q3. A solutions architect needs to deploy a centralized set of AWS WAF rules across 15 AWS accounts in an organization. The rules must automatically apply to every new Application Load Balancer created in any account. Which approach meets this requirement?</p>
+        <ul class="q-options">
+          <li><span class="q-letter">A.</span> Create an SCP that denies ALB creation unless a WAF web ACL is attached, then share the web ACL using AWS RAM.</li>
+          <li><span class="q-letter">B.</span> Use AWS CloudFormation StackSets to deploy the same WAF web ACL template to all accounts and set up an EventBridge rule to attach it to new ALBs.</li>
+          <li><span class="q-letter">C.</span> Enable AWS Shield Advanced in every account, which automatically creates and attaches WAF web ACLs to all ALBs.</li>
+          <li><span class="q-letter">D.</span> Configure AWS Firewall Manager with a WAF policy scoped to the organization. Firewall Manager automatically creates and attaches web ACLs to in-scope ALBs in all member accounts.</li>
+        </ul>
+        <button class="reveal-btn">Show Answer</button>
+        <div class="answer-reveal">
+          <p><strong>Correct Answer: D</strong></p>
+          <p>AWS Firewall Manager is purpose-built for centrally managing WAF rules across multiple accounts in an AWS Organization. A WAF policy in Firewall Manager automatically creates web ACLs and attaches them to in-scope resources (including new ALBs) in all member accounts. A is wrong because SCPs can deny actions but cannot force WAF attachment, and WAF web ACLs cannot be shared via RAM. B would work technically but requires significant custom automation and ongoing maintenance &mdash; not &ldquo;least operational overhead.&rdquo; C is wrong because Shield Advanced does not automatically create WAF rules.</p>
         </div>
       </div>
     </section>
