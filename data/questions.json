@@ -766,5 +766,47 @@
     ],
     "correctAnswer": 3,
     "explanation": "Aurora global database supports cross-Region promotion (B is wrong). Route 53 works with any endpoint (A is wrong). DNS was redirected successfully, so the app reaches the DR Region — hardcoded endpoints (C) are less likely. Authentication errors specifically indicate missing credentials: Secrets Manager secrets are Regional and must be replicated to the DR Region."
+  },
+  {
+    "id": "d2-eas-01",
+    "domain": "domain2",
+    "topic": "elb-auto-scaling",
+    "question": "A company serves a web application and a REST API from the same domain. The web application is at / and the API is at /api/*. Each runs on a separate fleet of EC2 instances. The company wants one load balancer to route requests to the correct backend. Which solution meets this requirement?",
+    "options": [
+      "Deploy a Network Load Balancer with two target groups. Configure TCP listeners to route /api/* requests to the API target group and all other requests to the web target group.",
+      "Deploy an Application Load Balancer with two target groups. Create a listener rule that routes requests with path /api/* to the API target group. Set the default action to forward to the web target group.",
+      "Deploy a Network Load Balancer and an Application Load Balancer. Use the NLB for the API and the ALB for the web application.",
+      "Deploy two Classic Load Balancers, one for each fleet, and use Route 53 weighted routing to split traffic between them."
+    ],
+    "correctAnswer": 1,
+    "explanation": "ALB operates at Layer 7 and can inspect HTTP request paths. A listener rule matching /api/* forwards API traffic to the API target group, while the default action handles everything else. NLB (option A) operates at Layer 4 and cannot inspect HTTP paths. Option C uses two load balancers unnecessarily. Option D uses legacy CLBs that lack path-based routing."
+  },
+  {
+    "id": "d2-eas-02",
+    "domain": "domain2",
+    "topic": "elb-auto-scaling",
+    "question": "A company runs a web application on EC2 instances behind an Application Load Balancer across two Availability Zones. Instances occasionally stop responding to HTTP requests due to application crashes, but the Auto Scaling group does not replace them. The instances pass EC2 status checks. What should a solutions architect do to ensure unhealthy instances are automatically replaced?",
+    "options": [
+      "Increase the number of instances in the Auto Scaling group to compensate for unhealthy instances.",
+      "Configure the Application Load Balancer to terminate and relaunch unhealthy instances directly.",
+      "Configure the Auto Scaling group to use Elastic Load Balancing health checks instead of EC2 status checks only.",
+      "Create a CloudWatch alarm on the UnHealthyHostCount metric and trigger a Lambda function to terminate unhealthy instances."
+    ],
+    "correctAnswer": 2,
+    "explanation": "By default, an ASG uses only EC2 status checks. An application crash that fails ALB health checks does not fail EC2 status checks, so the ASG does not replace it. Enabling ELB health checks on the ASG lets it detect application-level failures and replace instances. Option A does not fix unhealthy instances. Option B is incorrect — ALBs do not launch or terminate instances. Option D is unnecessarily complex."
+  },
+  {
+    "id": "d2-eas-03",
+    "domain": "domain2",
+    "topic": "elb-auto-scaling",
+    "question": "A media company experiences a predictable traffic surge every weekday at 9 AM when subscribers check the morning news. The company also sees occasional unpredictable spikes when breaking news events occur. The Auto Scaling group must have capacity ready before the 9 AM surge and react to unexpected spikes. Which scaling configuration meets both requirements?",
+    "options": [
+      "Use predictive scaling as the only scaling policy. It will learn the 9 AM pattern and react to breaking news events based on historical data.",
+      "Use scheduled scaling to increase capacity at 8:30 AM on weekdays. Add a target tracking scaling policy on ALBRequestCountPerTarget to handle unexpected demand.",
+      "Use target tracking scaling on CPU utilization as the only scaling policy. Set the target to 40% to leave headroom for spikes.",
+      "Set the Auto Scaling group minimum capacity to the peak level for the entire day so instances are always ready."
+    ],
+    "correctAnswer": 1,
+    "explanation": "Scheduled scaling ensures capacity is pre-provisioned before the predictable 9 AM rush. Target tracking on ALBRequestCountPerTarget handles unpredictable breaking-news spikes. Option A relies solely on predictive scaling, which cannot anticipate unprecedented events. Option C uses only reactive scaling, so the 9 AM surge hits before scale-out. Option D wastes resources by maintaining peak capacity 24/7."
   }
 ]

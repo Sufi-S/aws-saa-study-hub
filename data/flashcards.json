@@ -733,5 +733,105 @@
     "term": "DR Readiness: Beyond Database and DNS",
     "definition": "A complete DR plan must cover: database promotion, secrets replication, IAM roles/policies, VPC/networking, service quotas, certificate deployment, external API whitelists, and application startup procedures. DNS failover alone is not a DR solution.",
     "gotcha": "The most common DR drill failure: DNS switches but the app fails because secrets, quotas, or permissions weren't pre-staged. The exam tests whether you consider the full stack, not just compute and database."
+  },
+  {
+    "term": "Elastic Load Balancing (ELB)",
+    "definition": "An AWS service that automatically distributes incoming traffic across multiple targets (EC2 instances, containers, IPs, Lambda). ELB performs health checks and routes only to healthy targets. It does not launch or terminate instances — that is the Auto Scaling group's responsibility.",
+    "gotcha": "ELB distributes traffic; it does NOT create or replace instances. If all targets are unhealthy, ELB has nowhere to route — it does not provision replacements."
+  },
+  {
+    "term": "ALB vs NLB Decision Logic",
+    "definition": "Choose ALB when the requirement involves HTTP path routing, host routing, header inspection, WebSocket, or Lambda targets. Choose NLB when the requirement involves static/Elastic IPs, non-HTTP protocols (TCP, UDP), ultra-low latency, or preserving client source IP. Need both static IP and HTTP routing? Place NLB in front of ALB.",
+    "gotcha": "The exam uses specific keywords: 'path-based routing' or 'host-based routing' → ALB. 'Static IP,' 'Elastic IP,' 'firewall whitelist,' or 'TCP/UDP protocol' → NLB. Read the protocol and routing requirements before choosing."
+  },
+  {
+    "term": "Gateway Load Balancer (GWLB)",
+    "definition": "Operates at Layer 3 to deploy, scale, and manage fleets of third-party network virtual appliances (firewalls, IDS/IPS). Uses GENEVE encapsulation and Gateway Load Balancer endpoints. Not a substitute for ALB or NLB — solves a different problem (traffic inspection).",
+    "gotcha": "GWLB is for network appliance fleets, not application traffic. 'Traffic inspection,' 'network appliance,' or 'IDS/IPS fleet' in the exam → GWLB."
+  },
+  {
+    "term": "Listener",
+    "definition": "A process on a load balancer that checks for connection requests on a configured protocol and port (e.g., HTTPS on port 443). ALB listeners support rules that inspect HTTP attributes and route to different target groups. NLB listeners route by protocol and port only.",
+    "gotcha": "An ALB listener can have many rules routing to different target groups. An NLB listener cannot inspect HTTP content — it forwards based on port and protocol only."
+  },
+  {
+    "term": "Listener Rule",
+    "definition": "A condition on an ALB listener that determines which target group receives a request. Rules can match path patterns (/api/*), host headers (api.example.com), HTTP headers, query strings, and source IPs. Each rule has a priority, conditions, and an action.",
+    "gotcha": "Rules are evaluated in priority order. The default action catches anything that matches no rule. Listener rules are an ALB-only concept — NLB does not have them."
+  },
+  {
+    "term": "Target Group",
+    "definition": "A logical collection of targets (instances, IPs, Lambda functions) that a load balancer routes requests to. Each target group has its own health check configuration, protocol, port, and deregistration delay. Multiple target groups behind one ALB let you serve different services.",
+    "gotcha": "Target groups are per-service, not per-AZ. An ASG registers instances into a target group automatically. CLBs do not use target groups — targets are registered directly."
+  },
+  {
+    "term": "ELB Health Check",
+    "definition": "A periodic request the load balancer sends to each target to verify it can handle traffic. Configurable: protocol, port, path, interval, timeout, healthy/unhealthy thresholds. Unhealthy targets are removed from routing. A health check passing does not prove all application dependencies are working.",
+    "gotcha": "ELB health checks control traffic routing. ASG health checks control instance replacement. These are separate. A superficial health check (TCP ping) may miss application-level failures."
+  },
+  {
+    "term": "Cross-Zone Load Balancing",
+    "definition": "When enabled, each load balancer node distributes traffic across all registered targets in all AZs, not just its own AZ. Prevents uneven load when targets are unevenly distributed across AZs. ALB enables it by default; NLB, GWLB, and CLB disable it by default.",
+    "gotcha": "NLB cross-zone is OFF by default and incurs data transfer charges when enabled. If an NLB scenario has uneven targets across AZs, check whether cross-zone is enabled."
+  },
+  {
+    "term": "Deregistration Delay (Connection Draining)",
+    "definition": "The time the load balancer allows in-flight requests to complete before fully removing a target from the target group. Default is 300 seconds. During this period, the LB stops sending new requests but keeps existing connections open. Protects active requests during scale-in or deployment.",
+    "gotcha": "Deregistration delay is the load balancer's grace period. It is NOT the same as instance termination. The instance is still running during the delay. After it expires, the ASG proceeds with termination."
+  },
+  {
+    "term": "EC2 Auto Scaling Group (ASG)",
+    "definition": "A collection of EC2 instances managed as a logical unit. The ASG maintains a specified number of instances, replaces unhealthy ones, and adjusts capacity based on scaling policies. Distributes instances across configured AZs for resilience.",
+    "gotcha": "An ASG manages instance count, not traffic routing. Without a load balancer, clients have no way to reach ASG instances evenly. ASG + ELB together create self-healing, demand-responsive applications."
+  },
+  {
+    "term": "Minimum, Desired, Maximum Capacity",
+    "definition": "Minimum = floor (ASG never goes below). Desired = current target (ASG maintains this count). Maximum = ceiling (ASG never exceeds). Scaling policies adjust desired capacity within the min-max range. Setting min = desired = max creates a fixed fleet.",
+    "gotcha": "Maximum capacity is NOT automatically reached. It only limits how high scaling can go. Without a scaling trigger, the ASG stays at desired. The exam may give specific numbers to test whether you understand the constraints."
+  },
+  {
+    "term": "Launch Template",
+    "definition": "Defines the configuration for instances launched by an ASG: AMI, instance type, key pair, security groups, IAM instance profile, storage, user data. Supports versioning so you can update the template and roll out changes via instance refresh.",
+    "gotcha": "Updating a launch template does not automatically update running instances. Use instance refresh to replace existing instances with the new template version."
+  },
+  {
+    "term": "Target Tracking Scaling",
+    "definition": "A dynamic scaling policy that adjusts capacity to maintain a CloudWatch metric at a target value (e.g., keep average CPU at 50%). The ASG manages alarms automatically. Simplest and most commonly recommended scaling approach.",
+    "gotcha": "Target tracking does not use cooldowns — it uses instance warm-up instead. The metric must reflect actual application demand. CPU alone may be a poor signal for some workloads."
+  },
+  {
+    "term": "Step Scaling",
+    "definition": "A dynamic scaling policy that uses CloudWatch alarms with multiple thresholds to trigger different capacity adjustments. Example: CPU > 60% → add 1; CPU > 80% → add 3. More granular control than target tracking but requires more configuration.",
+    "gotcha": "Step scaling reacts proportionally to the alarm breach size. It does not use cooldowns (uses warm-up instead). Choose step scaling when you need different responses at different load levels."
+  },
+  {
+    "term": "Scheduled Scaling",
+    "definition": "Changes ASG capacity at specific times based on a known schedule (e.g., increase minimum to 8 at 8 AM weekdays, reduce to 2 at 8 PM). Ideal for predictable recurring traffic patterns.",
+    "gotcha": "Scheduled scaling alone does NOT handle unexpected spikes. Combine with dynamic scaling for complete coverage. The exam tests whether you recognize that predictable + unpredictable demands need different strategies."
+  },
+  {
+    "term": "Predictive Scaling",
+    "definition": "Uses machine learning to forecast demand from historical patterns and pre-provision capacity before the predicted load arrives. Complements dynamic scaling but does not replace it. Requires sufficient historical data for accurate forecasts.",
+    "gotcha": "Predictive scaling cannot anticipate unprecedented events (breaking news, viral content). It forecasts from history. If the exam says 'unpredictable demand,' predictive scaling alone is insufficient."
+  },
+  {
+    "term": "Health-Check Grace Period and Instance Warm-Up",
+    "definition": "Grace period: time the ASG waits before checking a new instance's health (default 300s via Console). Prevents the ASG from terminating instances that are still initializing. Warm-up: time during which a new instance's metrics are excluded from ASG scaling calculations.",
+    "gotcha": "Grace period too short → healthy instances terminated during startup (launch-terminate cycle). Warm-up too short → ASG scales based on unrepresentative metrics from initializing instances."
+  },
+  {
+    "term": "Instance Refresh",
+    "definition": "A rolling replacement mechanism for updating instances in an ASG after a launch template change. Terminates a batch of instances, launches replacements with the new template, waits for health checks, then repeats. Configurable minimum healthy percentage controls how many instances stay in service.",
+    "gotcha": "Instance refresh is the recommended way to deploy new AMIs or configuration changes across an ASG without downtime. It replaces instances in batches, not all at once."
+  },
+  {
+    "term": "Multi-AZ Auto Scaling",
+    "definition": "Configuring an ASG with subnets across multiple AZs so instances are distributed for resilience. If one AZ fails, the ASG launches replacements in healthy AZs. The load balancer routes traffic only to healthy targets in surviving AZs.",
+    "gotcha": "Multi-AZ ASG is not resilient if the surviving AZ lacks headroom. If you have 4 instances (2 per AZ) at 50% capacity, an AZ failure leaves 2 instances at 100% — overloaded. Plan minimum capacity for AZ-failure scenarios."
+  },
+  {
+    "term": "ELB vs Auto Scaling Responsibilities",
+    "definition": "ELB distributes incoming traffic to healthy targets and performs health checks to control routing. Auto Scaling manages instance count — launching, terminating, and replacing instances based on capacity settings and scaling policies. ELB does not create instances; ASG does not route traffic.",
+    "gotcha": "The exam often tests whether you know which service does what. 'Route traffic to healthy targets' → ELB. 'Replace unhealthy instances' → ASG. 'Adjust capacity based on demand' → ASG scaling policy."
   }
 ]

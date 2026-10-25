@@ -67,6 +67,11 @@
         <li><a href="#mar-diagram">Multi-AZ vs Multi-Region &mdash; Architecture Diagram</a></li>
         <li><a href="#mar-gotchas">Multi-AZ vs Multi-Region &mdash; Exam Gotchas</a></li>
         <li><a href="#mar-practice">Multi-AZ vs Multi-Region &mdash; Practice Questions</a></li>
+        <li><a href="#eas-learn"><strong>ELB &amp; Auto Scaling</strong> &mdash; Learn from Zero</a></li>
+        <li><a href="#eas-real-world">ELB &amp; Auto Scaling &mdash; Real-World Scenarios</a></li>
+        <li><a href="#eas-diagram">ELB &amp; Auto Scaling &mdash; Architecture Diagram</a></li>
+        <li><a href="#eas-gotchas">ELB &amp; Auto Scaling &mdash; Exam Gotchas</a></li>
+        <li><a href="#eas-practice">ELB &amp; Auto Scaling &mdash; Practice Questions</a></li>
       </ol>
     </nav>
 
@@ -1553,6 +1558,919 @@
           <p><strong>Memory rule:</strong> DR is more than database + DNS. Secrets, IAM, quotas, and external dependencies must all be pre-staged in the recovery Region.</p>
         </div>
       </div>
+    </section>
+
+    <!-- ============================================= -->
+    <!-- TOPIC 10: ELB & Auto Scaling                  -->
+    <!-- ============================================= -->
+
+    <hr class="topic-divider" style="margin-top:4rem;">
+    <div class="page-header" style="border-bottom:none;padding-bottom:0;margin-bottom:1.5rem;">
+      <h1 style="display:flex;align-items:center;gap:0.6rem;font-size:1.75rem;">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--domain2)" stroke-width="2"><path d="M16 16v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4"/><polyline points="14 2 20 2 20 8"/><line x1="20" y1="2" x2="10" y2="12"/><path d="M6 18h12"/></svg>
+        Elastic Load Balancing &amp; Auto Scaling
+      </h1>
+      <p>How architects distribute traffic, scale compute capacity, and build self-healing applications that respond to demand.</p>
+    </div>
+
+    <!-- EAS SECTION 1: Learn from Zero -->
+    <section class="topic-section" id="eas-learn">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain2)" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        Learn from Zero
+      </h2>
+
+      <h3>Part 1A &mdash; Load Balancing Fundamentals</h3>
+
+      <p><strong>Load balancing</strong> means distributing incoming network traffic across multiple servers so that no single server carries all the load. Without a load balancer, one EC2 instance handles every request &mdash; creating both a performance bottleneck and a single point of failure. If that instance crashes, the application is down.</p>
+
+      <p><strong>Why a single EC2 instance is a problem.</strong> One server has a fixed amount of CPU, memory, and network bandwidth. When requests exceed its capacity, response times degrade and requests start failing. Worse, any hardware, software, or AZ-level failure takes down the entire application. Load balancing eliminates both problems by spreading traffic across a fleet of instances.</p>
+
+      <div class="card" style="margin:1.5rem 0;">
+        <h4>Example: Online Shopping Application</h4>
+        <p>An online store receives thousands of requests per second during a sale. With a single EC2 instance, the server runs out of CPU during peak traffic and starts returning errors. With a load balancer in front of four instances across two AZs:</p>
+        <ul>
+          <li>The load balancer receives every request and forwards it to one of the four servers.</li>
+          <li>Each server handles roughly a quarter of the traffic.</li>
+          <li>If one server crashes, the load balancer detects the failure via health checks and routes traffic to the remaining three.</li>
+          <li>If an entire AZ goes down, the instances in the surviving AZ continue serving traffic.</li>
+        </ul>
+      </div>
+
+      <p><strong>Key components of load balancing:</strong></p>
+      <table>
+        <thead><tr><th>Concept</th><th>Definition</th><th>Example</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Target</strong></td><td>A destination that can receive traffic &mdash; an EC2 instance, container, IP address, or Lambda function</td><td>An EC2 instance running your web server on port 443</td></tr>
+          <tr><td><strong>Target group</strong></td><td>A logical collection of targets that the load balancer routes requests to. Each target group has its own health-check configuration</td><td>A target group containing four EC2 instances running the API service</td></tr>
+          <tr><td><strong>Listener</strong></td><td>A process that checks for connection requests on a configured protocol and port</td><td>An HTTPS listener on port 443 that accepts incoming requests</td></tr>
+          <tr><td><strong>Listener rule</strong></td><td>A condition that determines which target group receives a request. Rules can match host headers, URL paths, HTTP headers, and other request attributes</td><td>A rule that sends <code>/api/*</code> requests to the API target group</td></tr>
+          <tr><td><strong>Health check</strong></td><td>A periodic test the load balancer performs to determine whether a target is healthy enough to receive traffic</td><td>An HTTP GET to <code>/health</code> expecting a 200 response every 30 seconds</td></tr>
+        </tbody>
+      </table>
+
+      <p><strong>Health checks are essential.</strong> Without health checks, a load balancer would send traffic to crashed or unresponsive servers, causing user-visible failures. The load balancer periodically sends a request (the health check) to each target. If a target fails to respond correctly for a configured number of consecutive checks, it is marked unhealthy and the load balancer stops routing new requests to it.</p>
+
+      <p><strong>A load balancer does not automatically make the entire application highly available.</strong> The load balancer distributes traffic, but availability depends on the full stack:</p>
+      <ul>
+        <li><strong>Backend capacity</strong> &mdash; enough healthy targets must exist to handle the load.</li>
+        <li><strong>Data availability</strong> &mdash; if the database is single-AZ and it fails, every target returns errors even though the load balancer is healthy.</li>
+        <li><strong>Network routing</strong> &mdash; subnets, security groups, and NACLs must allow traffic to reach the targets.</li>
+        <li><strong>Health check accuracy</strong> &mdash; a superficial health check (ping) may not detect application-level failures.</li>
+        <li><strong>Application design</strong> &mdash; if one target holds session state locally and fails, that user&rsquo;s session is lost.</li>
+      </ul>
+
+      <p><strong>Connection draining (deregistration delay).</strong> When a target is removed from a target group (during deployment, scale-in, or failure), active requests may still be in progress. Connection draining gives those in-flight requests time to complete before the load balancer fully removes the target. Without it, ongoing requests are abruptly terminated. The default deregistration delay is 300 seconds. This is critical during rolling deployments and scale-in events.</p>
+
+      <p><strong>Connection to Topic 9.</strong> Load balancing is the traffic-distribution layer in the multi-AZ architecture discussed in Topic 9. A load balancer that spans two AZs, combined with targets distributed across both AZs, enables the application to survive an AZ failure. But the load balancer alone does not provide multi-AZ resilience &mdash; the targets, database, and all other dependencies must also be distributed.</p>
+
+      <hr style="border:none;border-top:1px dashed var(--border);margin:2rem 0;">
+
+      <h3>Part 1B &mdash; Elastic Load Balancing Types</h3>
+
+      <p>AWS offers four load balancer types. Each operates at a different network layer and serves different architectural purposes.</p>
+
+      <h4>Application Load Balancer (ALB)</h4>
+
+      <p>The ALB operates at <strong>Layer 7 (application layer)</strong> and understands HTTP and HTTPS traffic. It can inspect request content &mdash; URLs, headers, cookies, query strings &mdash; and make intelligent routing decisions.</p>
+
+      <p><strong>How ALB routes traffic:</strong></p>
+      <ul>
+        <li>A <strong>listener</strong> accepts traffic on a port (typically 80 or 443).</li>
+        <li><strong>Listener rules</strong> evaluate request attributes and route to the matching target group.</li>
+        <li><strong>Host-based routing</strong> &mdash; route based on the <code>Host</code> header (e.g., <code>api.example.com</code> &rarr; API targets, <code>www.example.com</code> &rarr; frontend targets).</li>
+        <li><strong>Path-based routing</strong> &mdash; route based on the URL path (e.g., <code>/api/*</code>, <code>/images/*</code>).</li>
+        <li><strong>Header and query-string routing</strong> &mdash; route based on HTTP headers or query parameters.</li>
+        <li>A <strong>default action</strong> handles requests that match no explicit rule.</li>
+      </ul>
+
+      <div class="card" style="margin:1.5rem 0;">
+        <h4>Example: One ALB, Three Backend Services</h4>
+        <p>A company runs a web application with three components. A single ALB handles all traffic:</p>
+        <ul>
+          <li><code>/api/*</code> &rarr; <strong>API target group</strong> (EC2 instances running the REST API)</li>
+          <li><code>/images/*</code> &rarr; <strong>Image service target group</strong> (EC2 instances optimized for media processing)</li>
+          <li>Everything else &rarr; <strong>Frontend target group</strong> (EC2 instances serving the React application)</li>
+        </ul>
+        <p>Each target group has its own health check, scaling, and instance configuration. The ALB replaces what would otherwise require three separate load balancers.</p>
+      </div>
+
+      <p><strong>ALB capabilities:</strong></p>
+      <ul>
+        <li><strong>Target types:</strong> EC2 instances, IP addresses, Lambda functions, containers (ECS/EKS).</li>
+        <li><strong>TLS termination:</strong> HTTPS listeners decrypt TLS using certificates managed by AWS Certificate Manager (ACM), forwarding decrypted HTTP to backend targets.</li>
+        <li><strong>Sticky sessions:</strong> Route a user&rsquo;s requests to the same target using application-based or duration-based cookies.</li>
+        <li><strong>WebSocket support.</strong></li>
+        <li><strong>HTTP/2 support.</strong></li>
+        <li><strong>Authentication integration</strong> with OIDC and Amazon Cognito.</li>
+      </ul>
+
+      <p><strong>Why ALB is the default for web applications.</strong> If your traffic is HTTP/HTTPS and you need routing based on URL path, hostname, headers, or query strings, ALB is typically the right choice. An NLB cannot inspect HTTP content and cannot perform path-based or host-based routing.</p>
+
+      <h4>Network Load Balancer (NLB)</h4>
+
+      <p>The NLB operates at <strong>Layer 4 (transport layer)</strong> and handles TCP, UDP, and TLS traffic. It does not inspect HTTP content &mdash; it distributes network connections to targets based on protocol and port.</p>
+
+      <p><strong>NLB characteristics:</strong></p>
+      <ul>
+        <li><strong>High performance and low latency</strong> &mdash; designed for millions of requests per second with ultra-low latencies.</li>
+        <li><strong>Static IP addresses</strong> &mdash; each NLB node in an AZ gets a static IP. You can also assign an Elastic IP to each AZ. This is critical when clients or firewalls must whitelist specific IP addresses.</li>
+        <li><strong>Preserves source IP</strong> &mdash; targets see the client&rsquo;s original IP address (for TCP and TLS).</li>
+        <li><strong>TLS termination</strong> &mdash; NLB can terminate TLS and forward decrypted traffic, or pass TLS traffic through to targets.</li>
+        <li><strong>Target types:</strong> EC2 instances, IP addresses, ALBs (NLB in front of ALB pattern).</li>
+        <li><strong>Zonal behavior</strong> &mdash; by default, each NLB node routes to targets only in its own AZ. Cross-zone load balancing distributes across all AZs but must be explicitly enabled.</li>
+      </ul>
+
+      <p><strong>When to choose NLB over ALB:</strong></p>
+      <ul>
+        <li>Non-HTTP protocols (TCP, UDP, gaming, IoT, financial protocols).</li>
+        <li>The client requires a static IP address or Elastic IP for firewall allowlisting.</li>
+        <li>Extreme performance requirements (millions of concurrent connections).</li>
+        <li>You need to preserve the client&rsquo;s source IP without proxy protocol workarounds.</li>
+      </ul>
+
+      <p>NLB is <em>not</em> a better version of ALB. It cannot route by URL path, hostname, or HTTP headers. If you need application-layer routing, NLB is the wrong choice.</p>
+
+      <h4>Gateway Load Balancer (GWLB)</h4>
+
+      <p>The GWLB operates at <strong>Layer 3 (network layer)</strong> and is designed for deploying, scaling, and managing fleets of third-party network virtual appliances &mdash; firewalls, intrusion detection systems, deep packet inspection tools.</p>
+
+      <p><strong>How it works:</strong></p>
+      <ul>
+        <li>Traffic is routed to GWLB via <strong>Gateway Load Balancer endpoints</strong> (GWLBE) in your VPC.</li>
+        <li>GWLB distributes traffic across a fleet of appliance instances for inspection.</li>
+        <li>After inspection, traffic is returned to the original path.</li>
+        <li>Uses the GENEVE protocol to encapsulate traffic.</li>
+      </ul>
+
+      <p><strong>When to choose GWLB:</strong> Centralized traffic inspection, a fleet of third-party security appliances, or architectures where all traffic must pass through a network appliance before reaching the application. GWLB is not a substitute for ALB or NLB &mdash; it solves a different architectural problem.</p>
+
+      <p>For SAA-C03, know <em>what</em> GWLB does (appliance fleet scaling and inspection) and <em>when</em> it is used (network security and traffic inspection), not deep implementation details.</p>
+
+      <h4>Classic Load Balancer (CLB)</h4>
+
+      <p>The CLB is the <strong>original AWS load balancer</strong>, predating ALB, NLB, and GWLB. It operates at both Layer 4 and Layer 7 but with a simpler, less flexible feature model.</p>
+      <ul>
+        <li>Does not support target groups, listener rules, host-based routing, or path-based routing.</li>
+        <li>Targets are registered directly to the CLB rather than organized into target groups.</li>
+        <li>Does not support WebSocket, HTTP/2 natively, or Lambda targets.</li>
+        <li>Considered <strong>legacy</strong> &mdash; AWS recommends migrating to ALB or NLB for new deployments.</li>
+      </ul>
+
+      <p><strong>Why it still appears:</strong> Existing legacy applications may still use CLBs. The exam may mention CLB to test whether you recognize it as a previous-generation service or to compare it with modern options.</p>
+
+      <h4>Load Balancer Comparison</h4>
+
+      <table>
+        <thead><tr><th>Characteristic</th><th>ALB</th><th>NLB</th><th>GWLB</th><th>CLB</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Primary purpose</strong></td><td>HTTP/HTTPS application routing</td><td>High-performance TCP/UDP/TLS distribution</td><td>Network appliance fleet scaling</td><td>Legacy load balancing</td></tr>
+          <tr><td><strong>OSI layer</strong></td><td>Layer 7</td><td>Layer 4</td><td>Layer 3</td><td>Layer 4 &amp; 7</td></tr>
+          <tr><td><strong>Protocols</strong></td><td>HTTP, HTTPS, gRPC</td><td>TCP, UDP, TLS</td><td>IP (GENEVE encapsulation)</td><td>HTTP, HTTPS, TCP, SSL</td></tr>
+          <tr><td><strong>Routing</strong></td><td>Host, path, header, query string</td><td>Port and protocol only</td><td>To appliance fleet</td><td>Basic round-robin</td></tr>
+          <tr><td><strong>Target types</strong></td><td>Instances, IPs, Lambda, containers</td><td>Instances, IPs, ALBs</td><td>Instances, IPs</td><td>Instances only</td></tr>
+          <tr><td><strong>Health checks</strong></td><td>HTTP/HTTPS with path, codes</td><td>TCP, HTTP, HTTPS</td><td>TCP, HTTP, HTTPS</td><td>TCP, HTTP</td></tr>
+          <tr><td><strong>Static IP</strong></td><td>No (use Global Accelerator for static IPs)</td><td>Yes &mdash; static IP per AZ, supports Elastic IPs</td><td>No</td><td>No</td></tr>
+          <tr><td><strong>Cross-zone LB</strong></td><td>Enabled by default</td><td>Disabled by default</td><td>Disabled by default</td><td>Disabled by default</td></tr>
+          <tr><td><strong>Use cases</strong></td><td>Web apps, microservices, REST APIs</td><td>Low-latency TCP, gaming, IoT, static IP needs</td><td>Firewall fleets, IDS/IPS, inspection</td><td>Legacy applications only</td></tr>
+          <tr><td><strong>Key limitation</strong></td><td>No static IP, HTTP/HTTPS only</td><td>No HTTP-level routing</td><td>Not for direct application traffic</td><td>No target groups, no advanced routing</td></tr>
+          <tr><td><strong>SAA-C03 clue</strong></td><td>&ldquo;Path-based routing,&rdquo; &ldquo;host-based routing,&rdquo; &ldquo;HTTP headers&rdquo;</td><td>&ldquo;Static IP,&rdquo; &ldquo;Elastic IP,&rdquo; &ldquo;TCP,&rdquo; &ldquo;UDP,&rdquo; &ldquo;ultra-low latency&rdquo;</td><td>&ldquo;Network appliance,&rdquo; &ldquo;traffic inspection,&rdquo; &ldquo;IDS/IPS&rdquo;</td><td>&ldquo;Existing classic,&rdquo; &ldquo;previous-generation&rdquo;</td></tr>
+        </tbody>
+      </table>
+
+      <p><strong>Decision logic:</strong> Start with ALB for HTTP/HTTPS applications. Switch to NLB when the requirement mentions non-HTTP protocols, static IPs, Elastic IPs, or extreme performance. Choose GWLB when the architecture involves network appliance fleets for inspection. Choose CLB only when the scenario specifically involves an existing legacy deployment.</p>
+
+      <hr style="border:none;border-top:1px dashed var(--border);margin:2rem 0;">
+
+      <h3>Part 1C &mdash; Target Groups, Listeners, Health Checks, and TLS</h3>
+
+      <p><strong>Listeners</strong></p>
+      <ul>
+        <li>A listener is a process that checks for connection requests using a configured protocol and port (e.g., HTTPS on port 443).</li>
+        <li>Each load balancer has at least one listener.</li>
+        <li>ALB listeners support rules that inspect HTTP request attributes and route to different target groups. Each rule has a priority, conditions, and an action (forward to a target group, redirect, return fixed response).</li>
+        <li>NLB listeners route based on protocol and port only &mdash; no request inspection.</li>
+        <li>A default action handles requests that match no other rule.</li>
+      </ul>
+
+      <p><strong>Target groups</strong></p>
+      <ul>
+        <li>Targets are grouped so the load balancer can route different types of requests to different backend services.</li>
+        <li>Each target group defines: target type (instance, IP, Lambda), protocol, port, health-check settings, and deregistration delay.</li>
+        <li>New targets are <strong>registered</strong> with the group (manually or by an Auto Scaling group).</li>
+        <li>Separate target groups let you run distinct services behind one load balancer: the API on one group, the frontend on another, each with independent scaling and health checks.</li>
+      </ul>
+
+      <p><strong>Health checks</strong></p>
+      <ul>
+        <li>The load balancer periodically sends a request to each target to verify it can handle traffic.</li>
+        <li>Configurable parameters: protocol, port, path (e.g., <code>/health</code>), expected response codes, check interval, timeout, healthy threshold, unhealthy threshold.</li>
+        <li>If a target fails the unhealthy threshold (e.g., three consecutive failed checks), the load balancer marks it unhealthy and stops routing new requests to it.</li>
+        <li>A target marked unhealthy can become healthy again if it passes the healthy threshold.</li>
+        <li><strong>A health check is not proof that the entire application works.</strong> A <code>/health</code> endpoint that returns 200 does not prove the database is reachable, caches are populated, or downstream APIs are available. Design health-check endpoints to verify meaningful application readiness.</li>
+      </ul>
+
+      <p><strong>Load-balancer health checks vs. Auto Scaling health checks.</strong> The load balancer decides whether to <em>route traffic</em> to a target. An Auto Scaling group decides whether to <em>replace</em> an instance. These are separate decisions:</p>
+      <table>
+        <thead><tr><th>Responsibility</th><th>ELB health check</th><th>ASG health check</th></tr></thead>
+        <tbody>
+          <tr><td>Purpose</td><td>Route or stop routing traffic</td><td>Terminate and replace unhealthy instances</td></tr>
+          <tr><td>Default type</td><td>HTTP/TCP check on target</td><td>EC2 status check (system &amp; instance status)</td></tr>
+          <tr><td>Optional</td><td>&mdash;</td><td>Can be configured to also use ELB health-check status</td></tr>
+          <tr><td>Consequence of failure</td><td>Target removed from rotation</td><td>Instance terminated and replaced</td></tr>
+        </tbody>
+      </table>
+      <p>If an ASG uses only EC2 status checks, an instance could fail its ELB health check (application not responding) but the ASG would not replace it because the EC2 status check still passes. Configure the ASG to use ELB health checks when instances are registered with a load balancer.</p>
+
+      <p><strong>TLS</strong></p>
+      <ul>
+        <li>HTTPS listeners on ALB and TLS listeners on NLB can <strong>terminate TLS</strong> &mdash; decrypt incoming encrypted traffic using a certificate.</li>
+        <li>Certificates are managed through <strong>AWS Certificate Manager (ACM)</strong>, which provides free public certificates and handles renewal automatically.</li>
+        <li><strong>Client &rarr; Load Balancer:</strong> Encrypted with TLS (HTTPS or TLS listener).</li>
+        <li><strong>Load Balancer &rarr; Target:</strong> Can be HTTP (unencrypted) or HTTPS (re-encrypted). The security of the backend connection is a separate architectural decision.</li>
+        <li>For compliance, some organizations require end-to-end encryption (TLS to the load balancer, then TLS again to the target).</li>
+        <li>NLB can alternatively <strong>pass TLS through</strong> without terminating &mdash; the target handles decryption directly.</li>
+      </ul>
+
+      <hr style="border:none;border-top:1px dashed var(--border);margin:2rem 0;">
+
+      <h3>Part 1D &mdash; Cross-Zone Load Balancing and Availability</h3>
+
+      <p><strong>What cross-zone load balancing means.</strong> A load balancer has nodes in each AZ where it is configured. Without cross-zone load balancing, each node distributes traffic only to targets in its own AZ. With cross-zone enabled, each node distributes across all registered targets in all AZs.</p>
+
+      <p><strong>Why it matters.</strong> If targets are unevenly distributed (e.g., 4 instances in AZ-A, 2 in AZ-B), without cross-zone balancing each AZ node gets 50% of traffic. This means AZ-B&rsquo;s 2 instances each handle 25% of total traffic, while AZ-A&rsquo;s 4 instances each handle 12.5%. This creates an uneven load.</p>
+
+      <div class="card" style="margin:1.5rem 0;">
+        <h4>Worked Example: Uneven Target Distribution</h4>
+        <table>
+          <thead><tr><th></th><th>AZ-A (4 instances)</th><th>AZ-B (2 instances)</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Cross-zone OFF</strong></td><td>Each instance gets 12.5% of traffic</td><td>Each instance gets 25% of traffic</td></tr>
+            <tr><td><strong>Cross-zone ON</strong></td><td>Each instance gets ~16.7% of traffic</td><td>Each instance gets ~16.7% of traffic</td></tr>
+          </tbody>
+        </table>
+        <p>With cross-zone on, traffic is evenly distributed regardless of which AZ has more targets. This prevents overloading AZ-B&rsquo;s smaller fleet.</p>
+      </div>
+
+      <p><strong>Defaults by load balancer type:</strong></p>
+      <ul>
+        <li><strong>ALB:</strong> Cross-zone load balancing is enabled by default (can be disabled at the target-group level).</li>
+        <li><strong>NLB:</strong> Cross-zone load balancing is disabled by default. Must be explicitly enabled. Cross-zone traffic incurs data transfer charges.</li>
+        <li><strong>GWLB:</strong> Disabled by default.</li>
+        <li><strong>CLB:</strong> Disabled by default.</li>
+      </ul>
+
+      <p><strong>AZ failure scenario.</strong> If AZ-A fails and all targets there become unhealthy, the load balancer routes all traffic to AZ-B&rsquo;s targets. Those remaining targets must have enough capacity to absorb the full load. Multi-AZ distribution is only useful if each surviving AZ can handle 100% of the traffic during a failure.</p>
+
+      <p><strong>What the load balancer cannot do.</strong> The load balancer distributes traffic, but it cannot fix an unavailable database, a full disk, an expired certificate, or an application-wide bug. If every target is unhealthy due to a shared dependency failure, the load balancer has nowhere to route traffic.</p>
+
+      <hr style="border:none;border-top:1px dashed var(--border);margin:2rem 0;">
+
+      <h3>Part 1E &mdash; Amazon EC2 Auto Scaling Fundamentals</h3>
+
+      <p><strong>Amazon EC2 Auto Scaling</strong> automatically adjusts the number of EC2 instances in your fleet based on demand, health, and configuration. It provides both <strong>elasticity</strong> (scaling to match demand) and <strong>resilience</strong> (replacing failed instances).</p>
+
+      <p><strong>Vertical vs. horizontal scaling:</strong></p>
+      <table>
+        <thead><tr><th>Type</th><th>How it works</th><th>Limitation</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Vertical (scale up/down)</strong></td><td>Change the instance type to one with more or fewer resources</td><td>Requires downtime; hard upper limit on instance size; single point of failure remains</td></tr>
+          <tr><td><strong>Horizontal (scale out/in)</strong></td><td>Add or remove instances from the fleet</td><td>Application must support multiple instances (stateless design preferred); slightly more complex</td></tr>
+        </tbody>
+      </table>
+      <p>Horizontal scaling is the standard approach for resilient web architectures because it adds both capacity and redundancy without an upper bound tied to instance size.</p>
+
+      <p><strong>Auto Scaling group (ASG).</strong> An ASG is a collection of EC2 instances managed as a logical unit. The ASG maintains a specified number of instances and can scale the count based on demand.</p>
+
+      <p><strong>Capacity settings:</strong></p>
+      <table>
+        <thead><tr><th>Setting</th><th>Meaning</th><th>Constraint</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Minimum capacity</strong></td><td>The floor &mdash; the ASG never reduces below this count</td><td>Set to the minimum number of instances needed for availability (e.g., 2 for multi-AZ)</td></tr>
+          <tr><td><strong>Desired capacity</strong></td><td>The current target &mdash; the ASG tries to maintain exactly this many healthy instances</td><td>Must be &ge; minimum and &le; maximum</td></tr>
+          <tr><td><strong>Maximum capacity</strong></td><td>The ceiling &mdash; the ASG never exceeds this count, even under heavy load</td><td>Protects against runaway scaling and unexpected costs</td></tr>
+        </tbody>
+      </table>
+
+      <div class="card" style="margin:1.5rem 0;">
+        <h4>Example: Capacity Settings</h4>
+        <p><strong>Min: 2 &nbsp;|&nbsp; Desired: 4 &nbsp;|&nbsp; Max: 10</strong></p>
+        <ul>
+          <li>The ASG launches 4 instances at creation.</li>
+          <li>If one instance fails, the ASG terminates it and launches a replacement to maintain 4.</li>
+          <li>A scaling policy detects high CPU and increases desired to 7 &mdash; 3 new instances are launched.</li>
+          <li>Traffic drops &mdash; the policy reduces desired to 3. The ASG terminates 4 instances.</li>
+          <li>The ASG never goes below 2 (minimum) or above 10 (maximum), regardless of the scaling signal.</li>
+        </ul>
+        <p><strong>Critical:</strong> Maximum = 10 does not mean the ASG will automatically reach 10 instances. Scaling to 10 only happens if a scaling policy or manual action requests it. Without a trigger, the ASG stays at its desired capacity.</p>
+      </div>
+
+      <p><strong>AZ distribution.</strong> An ASG distributes instances across the AZs in its configured subnets. If configured for two AZs, the ASG tries to balance instances evenly. This means an AZ failure only loses roughly half the fleet, and the ASG launches replacements in the healthy AZ.</p>
+
+      <p><strong>Launch templates.</strong> A launch template defines everything needed to create an instance: AMI ID, instance type, key pair, security groups, IAM instance profile, storage configuration, user data (startup script), and network settings. The ASG uses the launch template to create identical instances. This is why instances launched by an ASG should be <strong>reproducibly configured</strong> &mdash; each new instance must start the application correctly without manual intervention.</p>
+
+      <p><strong>ASG and load balancer integration.</strong> An ASG can be configured to automatically register new instances with a target group. When the ASG launches an instance, the instance is registered; when it terminates one, the instance is deregistered. This creates a self-healing loop: the load balancer routes traffic, the ASG maintains capacity, and health checks connect both systems.</p>
+
+      <hr style="border:none;border-top:1px dashed var(--border);margin:2rem 0;">
+
+      <h3>Part 1F &mdash; EC2 Auto Scaling Policies</h3>
+
+      <p>Scaling policies tell the ASG <em>when</em> and <em>how much</em> to change capacity.</p>
+
+      <h4>Dynamic Scaling</h4>
+
+      <p>Dynamic scaling adjusts capacity in response to real-time changes in demand, using CloudWatch metrics.</p>
+
+      <p><strong>Target tracking scaling</strong></p>
+      <ul>
+        <li>You specify a target value for a metric (e.g., &ldquo;keep average CPU utilization at 50%&rdquo;).</li>
+        <li>The ASG automatically adjusts the number of instances to maintain that target, similar to a thermostat.</li>
+        <li>Scales out when the metric exceeds the target; scales in when it drops below.</li>
+        <li>Typically the best starting point for most workloads due to its simplicity.</li>
+        <li>Common metrics: <code>ASGAverageCPUUtilization</code>, <code>ALBRequestCountPerTarget</code>, custom CloudWatch metrics.</li>
+      </ul>
+
+      <p><strong>Step scaling</strong></p>
+      <ul>
+        <li>Uses CloudWatch alarms with multiple thresholds that trigger different capacity adjustments.</li>
+        <li>Example: CPU &gt; 60% &rarr; add 1 instance; CPU &gt; 80% &rarr; add 3 instances.</li>
+        <li>More control than target tracking but requires more configuration.</li>
+        <li>Useful when you need different responses at different alarm levels.</li>
+      </ul>
+
+      <p><strong>Simple scaling</strong></p>
+      <ul>
+        <li>A single CloudWatch alarm triggers a single scaling adjustment.</li>
+        <li>After scaling, a <strong>cooldown period</strong> prevents additional scaling actions until the system stabilizes.</li>
+        <li>Less responsive than step scaling because it waits during cooldown.</li>
+        <li>Generally superseded by target tracking and step scaling.</li>
+      </ul>
+
+      <p><strong>Choosing the right metric.</strong> CPU utilization is a common default, but it is not always the best signal. A web server might have low CPU but be overloaded by concurrent connections. A data processing service might have high CPU that is normal, not a sign of overload. The best scaling metric reflects what actually constrains your application&rsquo;s ability to serve users &mdash; requests per target, queue depth, or a custom application metric.</p>
+
+      <h4>Scheduled Scaling</h4>
+      <ul>
+        <li>Changes capacity at specific times based on a known schedule.</li>
+        <li>Example: increase minimum to 8 instances every weekday at 8 AM, reduce to 2 at 8 PM.</li>
+        <li>Ideal for <strong>predictable recurring patterns</strong>: business hours, marketing campaigns, batch processing windows.</li>
+        <li>Scheduled scaling alone does not respond to unexpected spikes. Combine it with dynamic scaling for complete coverage.</li>
+      </ul>
+
+      <h4>Predictive Scaling</h4>
+      <ul>
+        <li>Uses machine learning to analyze historical traffic patterns and forecast future demand.</li>
+        <li>Pre-provisions capacity <em>before</em> the predicted demand arrives, reducing the lag of reactive scaling.</li>
+        <li>Works best with <strong>recurring, cyclical workloads</strong> where historical data is a reliable guide.</li>
+        <li>Does not replace dynamic scaling &mdash; it complements it. Unpredictable bursts still need reactive policies.</li>
+        <li>Effectiveness depends on how well historical patterns predict future demand. A new application with no history has nothing to learn from.</li>
+      </ul>
+
+      <table>
+        <thead><tr><th>Policy type</th><th>Trigger</th><th>Best for</th><th>Limitation</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Target tracking</strong></td><td>Real-time metric vs. target</td><td>Most workloads (start here)</td><td>Less control over step sizes</td></tr>
+          <tr><td><strong>Step scaling</strong></td><td>CloudWatch alarm thresholds</td><td>Graduated responses at different load levels</td><td>More configuration required</td></tr>
+          <tr><td><strong>Simple scaling</strong></td><td>Single alarm + cooldown</td><td>Basic scaling (legacy)</td><td>Cooldown delays responsiveness</td></tr>
+          <tr><td><strong>Scheduled</strong></td><td>Time-based schedule</td><td>Predictable recurring patterns</td><td>Cannot react to unexpected demand</td></tr>
+          <tr><td><strong>Predictive</strong></td><td>ML forecast from history</td><td>Recurring patterns with history</td><td>Needs sufficient historical data</td></tr>
+        </tbody>
+      </table>
+
+      <hr style="border:none;border-top:1px dashed var(--border);margin:2rem 0;">
+
+      <h3>Part 1G &mdash; Auto Scaling Configuration and Lifecycle</h3>
+
+      <p><strong>Launch templates and ASGs.</strong> A launch template is the blueprint; the ASG is the manager. When the ASG decides to scale out, it uses the launch template to create a new instance with the correct configuration. Updating the launch template (e.g., new AMI) creates a new version &mdash; the ASG can be updated to use the new version for future launches.</p>
+
+      <p><strong>Instance warm-up.</strong> A newly launched instance needs time to start the application, load caches, and reach steady state. During warm-up, the instance&rsquo;s metrics are not yet representative. If the ASG uses the new instance&rsquo;s initially low CPU for scaling decisions, it might launch even more instances unnecessarily. Warm-up periods tell the ASG to exclude new instances from scaling metric calculations until they are ready.</p>
+
+      <p><strong>Health-check grace period.</strong> When an instance launches, the application may take minutes to initialize. If the ASG checks health immediately, it might terminate a perfectly good instance that simply has not finished starting. The health-check grace period gives the application time to pass health checks before the ASG starts evaluating its health. A common mistake: setting the grace period too short, causing a cycle of launch &rarr; terminate &rarr; launch.</p>
+
+      <p><strong>Lifecycle hooks.</strong> Hooks pause an instance during launch or termination to allow custom actions:</p>
+      <ul>
+        <li><strong>Launch hook:</strong> Instance enters <code>Pending:Wait</code>. Use it to install software, pull configuration, register with external systems, run integration tests, then signal completion.</li>
+        <li><strong>Termination hook:</strong> Instance enters <code>Terminating:Wait</code>. Use it to push logs, deregister from services, drain connections, then signal completion.</li>
+      </ul>
+
+      <p><strong>Instance refresh.</strong> When you update a launch template (new AMI, configuration change), existing instances still run the old version. Instance refresh replaces instances in a rolling fashion: terminate a batch, launch replacements with the new template, wait for health checks, then proceed to the next batch. This is how you deploy new application versions across an ASG without downtime.</p>
+
+      <p><strong>Deregistration delay and connection draining.</strong> When an instance is being terminated or deregistered from a target group:</p>
+      <ol>
+        <li>The load balancer stops sending <em>new</em> requests to the instance.</li>
+        <li>Existing in-flight requests continue for the deregistration delay period (default 300 seconds).</li>
+        <li>After the delay expires, remaining connections are closed.</li>
+      </ol>
+      <p>This is the load balancer&rsquo;s responsibility. The ASG does not manage connection draining &mdash; it tells the load balancer to deregister the instance, and the load balancer handles the graceful removal.</p>
+
+      <p><strong>Termination policies.</strong> When the ASG needs to scale in (reduce capacity), it chooses which instances to terminate. The default policy prioritizes the AZ with the most instances (to maintain balance), then selects the instance with the oldest launch configuration or template. Other policies include: oldest instance, newest instance, or closest to the next billing hour.</p>
+
+      <p><strong>Launching does not mean ready.</strong> An instance can be &ldquo;running&rdquo; in EC2 terms but not yet serving application traffic. The application must start, pass health checks, warm up, and be registered with the target group before it absorbs real load. This initialization time affects how quickly Auto Scaling can respond to a spike.</p>
+
+      <hr style="border:none;border-top:1px dashed var(--border);margin:2rem 0;">
+
+      <h3>Part 1H &mdash; Auto Scaling and High Availability</h3>
+
+      <p>ELB and EC2 Auto Scaling are complementary services that together create self-healing, demand-responsive applications. Neither is sufficient alone.</p>
+
+      <p><strong>How they work together:</strong></p>
+      <p>Internet users &rarr; Load Balancer &rarr; ASG instances in multiple AZs &rarr; Database / Backend services</p>
+      <ul>
+        <li><strong>ELB distributes traffic</strong> to healthy targets across AZs.</li>
+        <li><strong>ELB health checks</strong> detect unhealthy targets and remove them from routing.</li>
+        <li><strong>The ASG maintains capacity</strong> by launching instances to match the desired count.</li>
+        <li><strong>The ASG replaces unhealthy instances</strong> when configured to use ELB health checks.</li>
+        <li><strong>Scaling policies</strong> adjust capacity based on demand metrics.</li>
+      </ul>
+
+      <p><strong>AZ failure scenario:</strong></p>
+      <ol>
+        <li>AZ-A fails. All instances in AZ-A become unhealthy.</li>
+        <li>The load balancer stops routing traffic to AZ-A targets.</li>
+        <li>AZ-B targets receive all traffic &mdash; they must have enough capacity.</li>
+        <li>The ASG detects the unhealthy instances and launches replacements in AZ-B.</li>
+        <li>Scaling policies may trigger additional instances if load increases beyond AZ-B&rsquo;s current capacity.</li>
+      </ol>
+      <p><strong>Critical:</strong> If AZ-B had exactly enough capacity for half the traffic, it cannot absorb the full load. Always provision enough headroom in the surviving AZ, or ensure scaling policies can respond quickly enough.</p>
+
+      <p><strong>High availability vs. elasticity.</strong> These are different properties:</p>
+      <table>
+        <thead><tr><th>Property</th><th>Meaning</th><th>Achieved by</th></tr></thead>
+        <tbody>
+          <tr><td><strong>High availability</strong></td><td>System remains operational during component failures</td><td>Multi-AZ distribution, health checks, automatic replacement</td></tr>
+          <tr><td><strong>Elasticity</strong></td><td>System adjusts capacity to match demand</td><td>Scaling policies, metric-driven capacity changes</td></tr>
+        </tbody>
+      </table>
+      <p>An application can be highly available without scaling (fixed fleet across AZs) or elastic without being highly available (scaling within a single AZ). Best practice combines both.</p>
+
+      <p><strong>Stateless vs. stateful.</strong> Horizontal scaling works best when instances are <strong>stateless</strong> &mdash; any instance can handle any request because session data is stored externally (ElastiCache, DynamoDB, or cookies). Stateful instances (local session storage) create problems: if the instance terminates, the user&rsquo;s session is lost. Sticky sessions can partially mitigate this but re-introduce a single-point-of-failure problem for the stuck sessions.</p>
+
+      <p><strong>What Auto Scaling does NOT do:</strong></p>
+      <ul>
+        <li>It does not scale the database. If the database is the bottleneck, more EC2 instances will not help.</li>
+        <li>It does not route traffic. That is the load balancer&rsquo;s job.</li>
+        <li>It does not guarantee instant capacity. Instances take time to launch and initialize.</li>
+        <li>It does not replace networking, security, or data-tier resilience. The ASG manages compute capacity only.</li>
+      </ul>
+
+      <hr style="border:none;border-top:1px dashed var(--border);margin:2rem 0;">
+
+      <h3>Part 1I &mdash; Load Balancing and Scaling Architecture Decisions</h3>
+
+      <p>Choosing the right combination depends on the specific requirements. The table below maps common requirements to the appropriate service or configuration.</p>
+
+      <table>
+        <thead><tr><th>Requirement</th><th>Recommended approach</th><th>Why</th></tr></thead>
+        <tbody>
+          <tr><td>HTTP path/host routing to multiple services</td><td>ALB with listener rules and multiple target groups</td><td>ALB is the only ELB type that can route by HTTP content</td></tr>
+          <tr><td>Static IP or Elastic IP for client whitelisting</td><td>NLB</td><td>NLB provides a static IP per AZ; ALB does not</td></tr>
+          <tr><td>Non-HTTP protocol (TCP, UDP, gaming)</td><td>NLB</td><td>ALB only supports HTTP/HTTPS/gRPC</td></tr>
+          <tr><td>Network appliance fleet (firewall, IDS)</td><td>GWLB</td><td>Purpose-built for transparent inline appliance scaling</td></tr>
+          <tr><td>Maintain minimum instance count for availability</td><td>ASG with minimum capacity &ge; 2 across 2+ AZs</td><td>Ensures at least one instance per AZ survives a failure</td></tr>
+          <tr><td>Respond to traffic demand automatically</td><td>ASG with target tracking scaling</td><td>Simplest dynamic scaling; adjusts to maintain a target metric</td></tr>
+          <tr><td>Pre-scale for known daily peaks</td><td>Scheduled scaling + dynamic scaling</td><td>Scheduled pre-provisions; dynamic handles surprises</td></tr>
+          <tr><td>Pre-scale using historical patterns</td><td>Predictive scaling + dynamic scaling</td><td>ML-based forecast provisions before demand arrives</td></tr>
+          <tr><td>Fixed fleet, no scaling</td><td>ASG with min = desired = max</td><td>ASG still replaces unhealthy instances even without scaling</td></tr>
+          <tr><td>Replace instances without downtime</td><td>Instance refresh with minimum healthy percentage</td><td>Rolling replacement ensures capacity during updates</td></tr>
+          <tr><td>Avoid sticky sessions</td><td>Externalize state to ElastiCache/DynamoDB</td><td>Any instance can serve any request; clean horizontal scaling</td></tr>
+          <tr><td>ELB health &rarr; instance replacement</td><td>Enable ELB health checks on the ASG</td><td>Without this, ASG only uses EC2 status checks</td></tr>
+          <tr><td>Uneven target distribution across AZs</td><td>Enable cross-zone load balancing (especially NLB)</td><td>Prevents overloading the AZ with fewer targets</td></tr>
+        </tbody>
+      </table>
+
+      <p><strong>Scaling compute does not scale the database.</strong> If a relational database is the bottleneck, adding more application instances sends more connections to the same database, making it worse. Read replicas, caching, and database scaling (covered in later topics) must be addressed separately.</p>
+
+      <p><strong>Scaling speed matters.</strong> An ASG can take several minutes to launch and initialize new instances. If your application needs to handle sudden bursts, consider: keeping a higher minimum capacity, using predictive or scheduled scaling to pre-provision, or using AWS Lambda for burst-absorbing components.</p>
+
+    </section>
+
+    <hr class="topic-divider">
+
+    <!-- EAS SECTION 2: Real-World Scenarios -->
+    <section class="topic-section" id="eas-real-world">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain2)" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        When Real Architects Actually Use This
+      </h2>
+
+      <div class="scenario-card">
+        <h3>Scenario A &mdash; HTTP Application With Multiple Backend Services</h3>
+        <p><strong>Business requirement:</strong> A company runs a website at <code>www.example.com</code> and an API at <code>www.example.com/api/*</code>. Frontend and API are separate services deployed on different EC2 fleets. The team wants one load balancer.</p>
+        <p><strong>Architecture:</strong></p>
+        <ul>
+          <li>One <strong>ALB</strong> with an HTTPS listener on port 443.</li>
+          <li>Listener rule 1: path <code>/api/*</code> &rarr; API target group (4 EC2 instances).</li>
+          <li>Listener rule 2: path <code>/images/*</code> &rarr; image service target group (2 instances).</li>
+          <li>Default action &rarr; frontend target group (4 instances).</li>
+          <li>Each target group has its own health check (e.g., <code>/api/health</code>, <code>/images/health</code>, <code>/</code>).</li>
+        </ul>
+        <p><strong>Why ALB:</strong> Only ALB can route by URL path and host header. NLB operates at Layer 4 and cannot inspect HTTP content. Using three separate load balancers would triple cost and DNS complexity.</p>
+        <p><strong>Exam clue:</strong> &ldquo;Path-based routing,&rdquo; &ldquo;route /api and / to different targets,&rdquo; &ldquo;single load balancer for multiple services&rdquo; &rarr; ALB with listener rules.</p>
+      </div>
+
+      <div class="scenario-card">
+        <h3>Scenario B &mdash; Low-Latency TCP Service With Static IP Requirements</h3>
+        <p><strong>Business requirement:</strong> A financial services company exposes a TCP-based trading protocol on port 9000. Partner firms must whitelist specific IP addresses in their firewalls. The service needs ultra-low latency.</p>
+        <p><strong>Architecture:</strong></p>
+        <ul>
+          <li>One <strong>NLB</strong> with a TCP listener on port 9000.</li>
+          <li>Elastic IP addresses assigned to the NLB in each AZ &mdash; partners whitelist these IPs.</li>
+          <li>Target group with EC2 instances running the trading service.</li>
+          <li>Cross-zone load balancing enabled to distribute evenly across AZs.</li>
+        </ul>
+        <p><strong>Why NLB:</strong> NLB provides static IPs and Elastic IP support per AZ. ALB uses dynamically changing IP addresses behind a DNS name &mdash; unsuitable for firewall whitelisting. NLB also preserves the client source IP and provides lower latency than ALB for non-HTTP protocols.</p>
+        <p><strong>Exam clue:</strong> &ldquo;Static IP,&rdquo; &ldquo;Elastic IP,&rdquo; &ldquo;firewall whitelist,&rdquo; &ldquo;TCP protocol,&rdquo; &ldquo;low latency&rdquo; &rarr; NLB.</p>
+      </div>
+
+      <div class="scenario-card">
+        <h3>Scenario C &mdash; Automatically Replace Unhealthy Instances</h3>
+        <p><strong>Business requirement:</strong> An application runs 6 EC2 instances behind an ALB across two AZs. If an instance stops responding, it should be removed from traffic immediately and replaced with a new, healthy instance automatically.</p>
+        <p><strong>Architecture:</strong></p>
+        <ul>
+          <li>ALB performs HTTP health checks on each target every 30 seconds.</li>
+          <li>If a target fails 3 consecutive checks, the ALB marks it unhealthy and stops routing traffic to it.</li>
+          <li>The ASG is configured with <strong>ELB health checks</strong> (not just EC2 status checks).</li>
+          <li>The ASG detects the ELB-unhealthy instance, terminates it, and launches a replacement from the launch template.</li>
+          <li>The new instance is registered with the ALB target group and begins receiving traffic after passing health checks.</li>
+        </ul>
+        <p><strong>Why ELB health checks on the ASG matter:</strong> Without this configuration, the ASG uses only EC2 status checks. An instance could have a crashed application (failing ALB health checks) but a healthy EC2 status check &mdash; the ASG would never replace it.</p>
+        <p><strong>Exam clue:</strong> &ldquo;Automatically replace unhealthy instances,&rdquo; &ldquo;self-healing&rdquo; &rarr; ASG with ELB health checks enabled.</p>
+      </div>
+
+      <div class="scenario-card">
+        <h3>Scenario D &mdash; Traffic Spikes During Business Hours</h3>
+        <p><strong>Business requirement:</strong> A SaaS application sees heavy usage from 8 AM to 6 PM on weekdays, with occasional unpredictable spikes during product launches.</p>
+        <p><strong>Architecture:</strong></p>
+        <ul>
+          <li><strong>Scheduled scaling:</strong> Increase minimum capacity to 8 instances at 7:30 AM weekdays; decrease to 3 at 7 PM.</li>
+          <li><strong>Target tracking scaling:</strong> Maintain <code>ALBRequestCountPerTarget</code> at 1000 requests per target. If requests per target exceed the target, the ASG scales out; if they drop, it scales in.</li>
+          <li>Minimum: 3 &nbsp;|&nbsp; Desired: varies &nbsp;|&nbsp; Maximum: 20.</li>
+        </ul>
+        <p><strong>Why both:</strong> Scheduled scaling ensures capacity is ready before the morning rush (no cold-start delay). Target tracking handles unpredictable spikes during the day. Neither alone covers both patterns.</p>
+        <p><strong>Exam clue:</strong> &ldquo;Predictable daily pattern + unexpected spikes&rdquo; &rarr; scheduled scaling + dynamic scaling combined.</p>
+      </div>
+
+      <div class="scenario-card">
+        <h3>Scenario E &mdash; Protect an Application During an AZ Disruption</h3>
+        <p><strong>Business requirement:</strong> An application must remain available if one of two AZs fails. Current deployment: 4 instances (2 per AZ) behind an ALB.</p>
+        <p><strong>Architecture:</strong></p>
+        <ul>
+          <li>ALB spans both AZs with cross-zone load balancing.</li>
+          <li>ASG configured across both AZs with minimum: 4, desired: 4, maximum: 8.</li>
+          <li>Target tracking scaling on CPU utilization at 60%.</li>
+        </ul>
+        <p><strong>The problem:</strong> If AZ-A fails, only 2 instances remain in AZ-B. Those 2 instances now handle 100% of traffic. If each instance was already at 50% capacity, they are now at 100% &mdash; overloaded.</p>
+        <p><strong>Solution options:</strong></p>
+        <ul>
+          <li>Increase minimum to 6 (3 per AZ) so the surviving AZ can absorb full load.</li>
+          <li>Set maximum high enough that the ASG can scale out quickly in AZ-B.</li>
+          <li>Use a scaling metric that triggers before instances become saturated.</li>
+        </ul>
+        <p><strong>Key lesson:</strong> Multi-AZ is not resilient if the surviving AZ lacks headroom. The minimum capacity must account for AZ failure scenarios.</p>
+        <p><strong>Exam clue:</strong> &ldquo;Remain available during AZ failure&rdquo; with specific instance counts &rarr; calculate whether the surviving AZ has enough capacity.</p>
+      </div>
+
+      <div class="scenario-card">
+        <h3>Scenario F &mdash; Safely Deploy a New Application Version</h3>
+        <p><strong>Business requirement:</strong> A company needs to deploy a new AMI to all instances in an ASG without causing user-visible errors.</p>
+        <p><strong>Architecture:</strong></p>
+        <ul>
+          <li>Create a new <strong>launch template version</strong> with the updated AMI.</li>
+          <li>Update the ASG to use the new template version.</li>
+          <li>Start an <strong>instance refresh</strong> with a minimum healthy percentage of 90% and a warm-up period of 120 seconds.</li>
+          <li>The ASG terminates a batch of instances, deregistering them from the ALB with a <strong>deregistration delay</strong> to drain in-flight requests.</li>
+          <li>New instances launch with the new AMI, pass health checks, and enter the target group.</li>
+          <li>The process repeats until all instances run the new version.</li>
+        </ul>
+        <p><strong>Why this works:</strong> The minimum healthy percentage ensures the application retains enough capacity during the rollout. Deregistration delay protects in-flight requests. The warm-up period prevents premature scaling decisions based on new instances.</p>
+        <p><strong>Exam clue:</strong> &ldquo;Update instances without downtime,&rdquo; &ldquo;rolling deployment&rdquo; &rarr; launch template update + instance refresh.</p>
+      </div>
+
+      <div class="scenario-card">
+        <h3>Scenario G &mdash; Handle Unpredictable Application Demand</h3>
+        <p><strong>Business requirement:</strong> A social media application experiences viral-driven traffic spikes that are impossible to predict. The application must scale to handle 10x normal load within minutes.</p>
+        <p><strong>Architecture:</strong></p>
+        <ul>
+          <li>ASG with target tracking on <code>ALBRequestCountPerTarget</code> &mdash; more responsive than CPU for request-driven workloads.</li>
+          <li>Minimum: 4 &nbsp;|&nbsp; Maximum: 40.</li>
+          <li>Launch template uses a pre-baked AMI with the application already installed (reduces initialization time).</li>
+          <li>Warm-up period set to match actual application startup time.</li>
+        </ul>
+        <p><strong>Limitations to acknowledge:</strong></p>
+        <ul>
+          <li>EC2 instances take 2&ndash;5 minutes to launch and initialize. Extremely sudden spikes may hit before new capacity arrives.</li>
+          <li>Service quotas (instance limits) must be pre-increased to support 40 instances.</li>
+          <li>The database must also handle the increased connection count &mdash; 10x compute without database scaling creates a new bottleneck.</li>
+        </ul>
+        <p><strong>Exam clue:</strong> &ldquo;Unpredictable demand,&rdquo; &ldquo;react to traffic spikes&rdquo; &rarr; dynamic scaling with appropriate metric and sufficient maximum capacity.</p>
+      </div>
+
+      <div class="scenario-card">
+        <h3>Scenario H &mdash; Choose ALB or NLB for a New Service</h3>
+        <p><strong>Business requirement:</strong> A company launches a new service. The architecture team must choose between ALB and NLB.</p>
+        <p><strong>Decision framework:</strong></p>
+        <table>
+          <thead><tr><th>Requirement</th><th>Choose</th><th>Why</th></tr></thead>
+          <tbody>
+            <tr><td>Route by URL path or hostname</td><td>ALB</td><td>NLB cannot inspect HTTP content</td></tr>
+            <tr><td>Multiple services behind one LB</td><td>ALB</td><td>Listener rules route to different target groups</td></tr>
+            <tr><td>Static IP for client whitelisting</td><td>NLB</td><td>ALB has dynamic IPs behind DNS</td></tr>
+            <tr><td>Non-HTTP protocol (TCP, UDP)</td><td>NLB</td><td>ALB is HTTP/HTTPS only</td></tr>
+            <tr><td>Millions of concurrent connections</td><td>NLB</td><td>Designed for extreme throughput</td></tr>
+            <tr><td>WebSocket or HTTP/2</td><td>ALB</td><td>Native support</td></tr>
+            <tr><td>Need both static IP and HTTP routing</td><td>NLB in front of ALB</td><td>NLB provides the static IP; ALB provides the routing</td></tr>
+          </tbody>
+        </table>
+        <p><strong>Exam clue:</strong> Read the scenario carefully for protocol type, routing needs, and IP requirements. These three factors determine the answer.</p>
+      </div>
+
+      <div class="scenario-card">
+        <h3>Scenario I &mdash; Gracefully Scale In an Application</h3>
+        <p><strong>Business requirement:</strong> Traffic drops at night. The team wants to reduce capacity from 8 to 3 instances without interrupting active user requests.</p>
+        <p><strong>Architecture:</strong></p>
+        <ul>
+          <li>The ASG&rsquo;s scaling policy reduces desired capacity to 3.</li>
+          <li>The ASG selects 5 instances for termination using the configured termination policy (default: AZ balance, then oldest launch template).</li>
+          <li>Before termination, each instance is <strong>deregistered</strong> from the ALB target group.</li>
+          <li>The ALB stops sending new requests but allows in-flight requests to complete during the <strong>deregistration delay</strong> (default 300 seconds).</li>
+          <li>After the delay, connections are closed and the ASG terminates the instance.</li>
+          <li>If lifecycle hooks are configured, the instance enters <code>Terminating:Wait</code> for additional cleanup (push logs, deregister from service discovery).</li>
+        </ul>
+        <p><strong>Key lesson:</strong> Deregistration delay is the load balancer&rsquo;s mechanism. Lifecycle hooks are the ASG&rsquo;s mechanism. Both contribute to graceful scale-in, but they serve different purposes.</p>
+        <p><strong>Exam clue:</strong> &ldquo;Scale in without interrupting active requests,&rdquo; &ldquo;graceful shutdown&rdquo; &rarr; deregistration delay + lifecycle hooks.</p>
+      </div>
+
+    </section>
+
+    <hr class="topic-divider">
+
+    <!-- EAS SECTION 3: Architecture Diagram -->
+    <section class="topic-section" id="eas-diagram">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain2)" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+        ELB &amp; Auto Scaling Architecture
+      </h2>
+
+      <svg role="img" aria-label="Diagram showing an Auto Scaling web application across two Availability Zones with an Elastic Load Balancer distributing traffic, CloudWatch metrics driving scaling decisions, and a comparison inset of ALB, NLB, and GWLB" viewBox="0 0 920 680" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:920px;height:auto;margin:1.5rem auto;display:block;font-family:inherit;">
+        <title>ELB and Auto Scaling Multi-AZ Architecture</title>
+        <desc>Internet users send requests to an Elastic Load Balancer, which distributes traffic to EC2 instances managed by an Auto Scaling group across two Availability Zones. CloudWatch monitors metrics and triggers scaling policies that adjust the ASG desired capacity. A comparison inset shows ALB handling HTTP path routing, NLB handling TCP with static IP, and GWLB routing to appliance fleets.</desc>
+
+        <defs>
+          <marker id="eas-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 Z" fill="var(--text-secondary, #aaa)"/>
+          </marker>
+          <marker id="eas-arrow-green" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 Z" fill="#22c55e"/>
+          </marker>
+          <marker id="eas-arrow-orange" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 Z" fill="#f59e0b"/>
+          </marker>
+          <marker id="eas-arrow-cyan" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 Z" fill="#06b6d4"/>
+          </marker>
+          <marker id="eas-arrow-red" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 Z" fill="#ef4444"/>
+          </marker>
+        </defs>
+
+        <!-- Background -->
+        <rect x="0" y="0" width="920" height="680" rx="12" fill="var(--card-bg, #1a1a2e)" stroke="var(--border, #333)" stroke-width="1.5"/>
+
+        <!-- Title -->
+        <text x="460" y="30" text-anchor="middle" fill="var(--text-primary, #e0e0e0)" font-size="15" font-weight="bold">ELB &amp; Auto Scaling — Multi-AZ Architecture</text>
+
+        <!-- Internet Users -->
+        <rect x="370" y="45" width="180" height="36" rx="18" fill="none" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="5 3"/>
+        <text x="460" y="68" text-anchor="middle" fill="#a78bfa" font-size="12" font-weight="bold">Internet Users</text>
+
+        <!-- Arrow: Users to ELB -->
+        <line x1="460" y1="81" x2="460" y2="108" stroke="var(--text-secondary, #aaa)" stroke-width="1.5" marker-end="url(#eas-arrow)"/>
+
+        <!-- Elastic Load Balancer -->
+        <rect x="350" y="110" width="220" height="44" rx="8" fill="rgba(96,165,250,0.12)" stroke="#60a5fa" stroke-width="1.5"/>
+        <text x="460" y="128" text-anchor="middle" fill="#60a5fa" font-size="12" font-weight="bold">Elastic Load Balancer</text>
+        <text x="460" y="144" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="10">Distributes traffic &amp; health checks</text>
+
+        <!-- VPC Region Box -->
+        <rect x="40" y="170" width="550" height="310" rx="10" fill="none" stroke="var(--border, #333)" stroke-width="1" stroke-dasharray="6 3"/>
+        <text x="55" y="190" fill="var(--text-secondary, #aaa)" font-size="11" font-weight="bold">VPC — us-east-1</text>
+
+        <!-- AZ-A Box -->
+        <rect x="60" y="200" width="250" height="260" rx="8" fill="rgba(34,197,94,0.06)" stroke="#22c55e" stroke-width="1" stroke-dasharray="4 2"/>
+        <text x="185" y="220" text-anchor="middle" fill="#22c55e" font-size="11" font-weight="bold">Availability Zone A</text>
+
+        <!-- AZ-A Instances -->
+        <rect x="85" y="235" width="90" height="50" rx="6" fill="rgba(96,165,250,0.10)" stroke="#60a5fa" stroke-width="1"/>
+        <text x="130" y="256" text-anchor="middle" fill="#60a5fa" font-size="10" font-weight="bold">EC2</text>
+        <text x="130" y="272" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="9">Instance 1</text>
+
+        <rect x="195" y="235" width="90" height="50" rx="6" fill="rgba(96,165,250,0.10)" stroke="#60a5fa" stroke-width="1"/>
+        <text x="240" y="256" text-anchor="middle" fill="#60a5fa" font-size="10" font-weight="bold">EC2</text>
+        <text x="240" y="272" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="9">Instance 2</text>
+
+        <!-- AZ-A health check icon -->
+        <text x="90" y="308" fill="#22c55e" font-size="10">&#x2714; Healthy</text>
+        <text x="200" y="308" fill="#22c55e" font-size="10">&#x2714; Healthy</text>
+
+        <!-- AZ-A scale-out instance (dashed = launching) -->
+        <rect x="120" y="330" width="130" height="40" rx="6" fill="none" stroke="#f59e0b" stroke-width="1.2" stroke-dasharray="5 3"/>
+        <text x="185" y="347" text-anchor="middle" fill="#f59e0b" font-size="9" font-weight="bold">EC2 — Launching</text>
+        <text x="185" y="360" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="8">(scale-out event)</text>
+
+        <!-- Arrow: scale out -->
+        <line x1="185" y1="420" x2="185" y2="375" stroke="#f59e0b" stroke-width="1.2" stroke-dasharray="4 2" marker-end="url(#eas-arrow-orange)"/>
+        <text x="185" y="435" text-anchor="middle" fill="#f59e0b" font-size="9">Scale Out</text>
+
+        <!-- AZ-B Box -->
+        <rect x="330" y="200" width="250" height="260" rx="8" fill="rgba(6,182,212,0.06)" stroke="#06b6d4" stroke-width="1" stroke-dasharray="4 2"/>
+        <text x="455" y="220" text-anchor="middle" fill="#06b6d4" font-size="11" font-weight="bold">Availability Zone B</text>
+
+        <!-- AZ-B Instances -->
+        <rect x="355" y="235" width="90" height="50" rx="6" fill="rgba(96,165,250,0.10)" stroke="#60a5fa" stroke-width="1"/>
+        <text x="400" y="256" text-anchor="middle" fill="#60a5fa" font-size="10" font-weight="bold">EC2</text>
+        <text x="400" y="272" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="9">Instance 3</text>
+
+        <rect x="465" y="235" width="90" height="50" rx="6" fill="rgba(96,165,250,0.10)" stroke="#60a5fa" stroke-width="1"/>
+        <text x="510" y="256" text-anchor="middle" fill="#ef4444" font-size="10" font-weight="bold">EC2</text>
+        <text x="510" y="272" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="9">Instance 4</text>
+
+        <!-- AZ-B health checks -->
+        <text x="360" y="308" fill="#22c55e" font-size="10">&#x2714; Healthy</text>
+        <text x="470" y="308" fill="#ef4444" font-size="10">&#x2718; Unhealthy</text>
+
+        <!-- Unhealthy replacement arrow -->
+        <rect x="445" y="335" width="100" height="35" rx="6" fill="none" stroke="#ef4444" stroke-width="1.2" stroke-dasharray="5 3"/>
+        <text x="495" y="350" text-anchor="middle" fill="#ef4444" font-size="9" font-weight="bold">Replacing...</text>
+        <text x="495" y="362" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="8">(ASG detected)</text>
+
+        <line x1="510" y1="308" x2="510" y2="330" stroke="#ef4444" stroke-width="1.2" stroke-dasharray="4 2" marker-end="url(#eas-arrow-red)"/>
+
+        <!-- Arrows from ELB to AZ instances -->
+        <line x1="420" y1="154" x2="185" y2="232" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#eas-arrow-cyan)"/>
+        <line x1="500" y1="154" x2="455" y2="232" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#eas-arrow-cyan)"/>
+
+        <!-- X on line to unhealthy instance -->
+        <line x1="505" y1="154" x2="510" y2="232" stroke="#ef4444" stroke-width="1" stroke-dasharray="4 2"/>
+        <text x="520" y="195" fill="#ef4444" font-size="12" font-weight="bold">&#x2718;</text>
+
+        <!-- ASG bracket -->
+        <rect x="50" y="195" width="540" height="275" rx="10" fill="none" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="8 4"/>
+        <text x="320" y="482" text-anchor="middle" fill="#f59e0b" font-size="11" font-weight="bold">Auto Scaling Group — Min: 2 | Desired: 4 | Max: 10</text>
+
+        <!-- CloudWatch Box -->
+        <rect x="640" y="170" width="250" height="130" rx="10" fill="rgba(168,85,247,0.08)" stroke="#a855f7" stroke-width="1.2"/>
+        <text x="765" y="195" text-anchor="middle" fill="#a855f7" font-size="12" font-weight="bold">Amazon CloudWatch</text>
+        <text x="765" y="215" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="10">CPU: 72% &#x25B2;</text>
+        <text x="765" y="233" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="10">Requests/target: 1,250</text>
+        <text x="765" y="255" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="10">Target: 1,000 req/target</text>
+        <rect x="690" y="266" width="150" height="24" rx="5" fill="rgba(245,158,11,0.15)" stroke="#f59e0b" stroke-width="1"/>
+        <text x="765" y="283" text-anchor="middle" fill="#f59e0b" font-size="10" font-weight="bold">&#x26A0; Alarm: Scale Out</text>
+
+        <!-- Arrow: CloudWatch to ASG -->
+        <line x1="640" y1="280" x2="595" y2="380" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#eas-arrow-orange)"/>
+        <text x="640" y="345" fill="#f59e0b" font-size="9" transform="rotate(-30 640 345)">Scaling signal</text>
+
+        <!-- Arrow: ASG to CloudWatch (metrics) -->
+        <line x1="595" y1="250" x2="638" y2="220" stroke="#a855f7" stroke-width="1.2" stroke-dasharray="4 2" marker-end="url(#eas-arrow)"/>
+        <text x="610" y="222" fill="#a855f7" font-size="8">Metrics</text>
+
+        <!-- Health check types legend -->
+        <rect x="640" y="320" width="250" height="80" rx="8" fill="rgba(34,197,94,0.06)" stroke="var(--border, #333)" stroke-width="1"/>
+        <text x="765" y="340" text-anchor="middle" fill="var(--text-primary, #e0e0e0)" font-size="10" font-weight="bold">Health Check Types</text>
+        <text x="660" y="358" fill="#60a5fa" font-size="9">&#x25CF; ELB Health Check</text>
+        <text x="660" y="373" fill="var(--text-secondary, #aaa)" font-size="8">&nbsp;&nbsp;Routes or stops routing traffic</text>
+        <text x="660" y="390" fill="#f59e0b" font-size="9">&#x25CF; ASG Health Check</text>
+        <text x="660" y="405" fill="var(--text-secondary, #aaa)" font-size="8">&nbsp;&nbsp;Terminates &amp; replaces instances</text>
+
+        <!-- ELB Comparison Inset -->
+        <rect x="620" y="430" width="280" height="230" rx="10" fill="rgba(96,165,250,0.06)" stroke="var(--border, #333)" stroke-width="1.2"/>
+        <text x="760" y="455" text-anchor="middle" fill="var(--text-primary, #e0e0e0)" font-size="11" font-weight="bold">Load Balancer Comparison</text>
+
+        <!-- ALB -->
+        <rect x="640" y="470" width="240" height="48" rx="6" fill="rgba(96,165,250,0.10)" stroke="#60a5fa" stroke-width="1"/>
+        <text x="660" y="490" fill="#60a5fa" font-size="10" font-weight="bold">ALB — Layer 7</text>
+        <text x="660" y="506" fill="var(--text-secondary, #aaa)" font-size="9">HTTP/HTTPS &#x2022; Path &amp; host routing</text>
+
+        <!-- NLB -->
+        <rect x="640" y="528" width="240" height="48" rx="6" fill="rgba(6,182,212,0.10)" stroke="#06b6d4" stroke-width="1"/>
+        <text x="660" y="548" fill="#06b6d4" font-size="10" font-weight="bold">NLB — Layer 4</text>
+        <text x="660" y="564" fill="var(--text-secondary, #aaa)" font-size="9">TCP/UDP/TLS &#x2022; Static IP &#x2022; Low latency</text>
+
+        <!-- GWLB -->
+        <rect x="640" y="586" width="240" height="48" rx="6" fill="rgba(168,85,247,0.10)" stroke="#a855f7" stroke-width="1"/>
+        <text x="660" y="606" fill="#a855f7" font-size="10" font-weight="bold">GWLB — Layer 3</text>
+        <text x="660" y="622" fill="var(--text-secondary, #aaa)" font-size="9">Network appliances &#x2022; Traffic inspection</text>
+
+        <!-- Bottom annotation -->
+        <text x="320" y="510" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="10" font-style="italic">ELB routes traffic &#x2022; ASG controls capacity &#x2022; CloudWatch triggers scaling</text>
+
+        <!-- Legend -->
+        <rect x="40" y="530" width="540" height="130" rx="8" fill="none" stroke="var(--border, #333)" stroke-width="1"/>
+        <text x="60" y="552" fill="var(--text-primary, #e0e0e0)" font-size="10" font-weight="bold">How it works:</text>
+        <text x="60" y="572" fill="#60a5fa" font-size="9">1. ELB receives all incoming requests and distributes them to healthy targets across AZs.</text>
+        <text x="60" y="589" fill="#22c55e" font-size="9">2. ELB health checks detect unhealthy targets (Instance 4) and stop routing traffic to them.</text>
+        <text x="60" y="606" fill="#ef4444" font-size="9">3. ASG detects unhealthy instance via ELB health check and launches a replacement.</text>
+        <text x="60" y="623" fill="#a855f7" font-size="9">4. CloudWatch metrics show requests/target exceeds the target — triggers a scale-out alarm.</text>
+        <text x="60" y="640" fill="#f59e0b" font-size="9">5. ASG responds to scaling signal: launches a new instance in AZ-A (shown as dashed box).</text>
+        <text x="60" y="657" fill="var(--text-secondary, #aaa)" font-size="9">6. New instances pass health checks, register with the target group, and begin receiving traffic.</text>
+      </svg>
+
+      <p><strong>Key takeaway:</strong> The load balancer and Auto Scaling group have separate responsibilities. The ELB distributes traffic and removes unhealthy targets from rotation. The ASG maintains instance count, replaces failed instances, and adjusts capacity based on scaling signals from CloudWatch. Neither service does the other&rsquo;s job.</p>
+
+    </section>
+
+    <hr class="topic-divider">
+
+    <!-- EAS SECTION 4: Exam Gotchas -->
+    <section class="topic-section" id="eas-gotchas">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain2)" stroke-width="2"><path d="M12 9v4m0 4h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+        22 Exam Gotchas
+      </h2>
+
+      <ol class="gotcha-list">
+        <li><strong>ALB is not NLB</strong> &mdash; ALB operates at Layer 7 (HTTP/HTTPS) and can route by path, host, and headers. NLB operates at Layer 4 (TCP/UDP) and routes by port and protocol only. If the scenario mentions &ldquo;path-based routing&rdquo; or &ldquo;host-based routing,&rdquo; the answer is ALB, not NLB.</li>
+        <li><strong>NLB is required for static IP and Elastic IP</strong> &mdash; ALB does not provide static IP addresses. If clients or firewalls must whitelist specific IP addresses, or the scenario mentions &ldquo;Elastic IP on the load balancer,&rdquo; the answer is NLB. ALB has dynamically changing IPs behind a DNS name.</li>
+        <li><strong>ALB is required for HTTP routing</strong> &mdash; NLB cannot inspect HTTP headers, paths, or host headers. If the scenario requires routing <code>/api</code> to one service and <code>/web</code> to another, NLB cannot do it.</li>
+        <li><strong>GWLB is not an application load balancer</strong> &mdash; GWLB is for network appliance fleets (firewalls, IDS/IPS). If the scenario mentions &ldquo;traffic inspection,&rdquo; &ldquo;network appliance,&rdquo; or &ldquo;third-party security appliance,&rdquo; the answer involves GWLB. It does not serve application traffic directly.</li>
+        <li><strong>ELB does not launch EC2 instances</strong> &mdash; the load balancer distributes traffic and checks health. It does not create, terminate, or replace instances. That is the Auto Scaling group&rsquo;s responsibility. An ELB with no healthy targets serves errors; it does not provision replacements.</li>
+        <li><strong>ASG does not route traffic</strong> &mdash; the Auto Scaling group manages instance count. It does not receive incoming requests or distribute them. Without a load balancer (or DNS-based routing), clients have no way to reach ASG instances evenly.</li>
+        <li><strong>ELB health checks &ne; ASG health checks</strong> &mdash; ELB health checks determine whether to <em>route traffic</em> to a target. ASG health checks determine whether to <em>replace</em> an instance. By default the ASG uses EC2 status checks only. You must explicitly configure the ASG to use ELB health checks so that application-level failures trigger instance replacement.</li>
+        <li><strong>ASG subnets must span AZs</strong> &mdash; if the ASG is configured with subnets in only one AZ, all instances launch in that AZ. An AZ failure takes down the entire fleet. Always configure ASG subnets across at least two AZs for production workloads.</li>
+        <li><strong>Multiple instances across AZs does not guarantee sufficient capacity</strong> &mdash; if you have 4 instances (2 per AZ) and each runs at 50% capacity, an AZ failure leaves 2 instances at 100%. They cannot absorb additional traffic. The minimum capacity must account for the loss of an AZ.</li>
+        <li><strong>Minimum &ne; desired &ne; maximum</strong> &mdash; minimum is the floor, desired is the current target, maximum is the ceiling. Scaling policies change desired. The ASG never goes below minimum or above maximum. Setting all three equal creates a fixed fleet with no scaling.</li>
+        <li><strong>Maximum capacity is not automatically reached</strong> &mdash; the ASG only scales to maximum if a scaling policy or manual action requests it. Maximum = 20 does not mean 20 instances are running. Without a trigger, the ASG stays at desired capacity.</li>
+        <li><strong>CPU is not always the right scaling metric</strong> &mdash; a web server might have low CPU but be bottlenecked on connections. A data processing service might have high CPU that is normal. The best metric reflects what actually constrains the application: requests per target, queue depth, or a custom metric. The exam sometimes specifies the workload to test metric selection.</li>
+        <li><strong>Target tracking &ne; step &ne; scheduled &ne; predictive</strong> &mdash; target tracking maintains a metric target (thermostat). Step scaling uses multiple alarm thresholds. Scheduled scaling changes capacity at set times. Predictive scaling uses ML forecasts. The exam tests whether you match the strategy to the demand pattern.</li>
+        <li><strong>Scheduled scaling does not handle unexpected traffic</strong> &mdash; scheduled scaling pre-provisions capacity for known patterns. If an unexpected spike occurs outside the schedule, scheduled scaling alone does nothing. Combine it with dynamic scaling for complete coverage.</li>
+        <li><strong>Predictive scaling cannot perfectly forecast demand</strong> &mdash; predictive scaling works best with recurring, cyclical patterns where historical data is reliable. A new application or an unprecedented event has no useful history. The exam may test whether you rely solely on predictive scaling for unpredictable workloads (incorrect).</li>
+        <li><strong>New instances are not immediately ready</strong> &mdash; launching an EC2 instance takes minutes. The application then needs to start, load configuration, warm caches, and pass health checks. The time from &ldquo;scale-out decision&rdquo; to &ldquo;instance serving production traffic&rdquo; is measured in minutes, not seconds. Extremely sudden spikes may hit before new capacity arrives.</li>
+        <li><strong>Health-check grace period and warm-up matter</strong> &mdash; without a grace period, the ASG may terminate an instance that simply has not finished starting. Without warm-up, the ASG may make scaling decisions based on a new instance&rsquo;s unrepresentative metrics. Setting these too short causes launch-terminate cycles. Setting them too long delays failure detection.</li>
+        <li><strong>Deregistration delay is not the same as termination</strong> &mdash; deregistration delay is the load balancer&rsquo;s grace period for in-flight requests (default 300s). The instance is still running during this period. After the delay, the ASG proceeds with termination. Confusing these causes answers that skip connection draining.</li>
+        <li><strong>Sticky sessions do not solve all state problems</strong> &mdash; sticky sessions route a user to the same target, but if that target fails, the session is lost. Sticky sessions also create uneven load distribution. Externalizing state (ElastiCache, DynamoDB) is the resilient approach. The exam may offer sticky sessions as a distractor.</li>
+        <li><strong>Cross-zone load balancing defaults differ by ELB type</strong> &mdash; ALB enables it by default. NLB, GWLB, and CLB disable it by default. If targets are unevenly distributed across AZs and cross-zone is off, some targets get disproportionate traffic. The exam tests awareness of these defaults, especially for NLB.</li>
+        <li><strong>Scaling EC2 does not scale the database</strong> &mdash; adding more application instances increases connections to the database. If the database is the bottleneck, more EC2 instances make it worse. Database scaling (read replicas, caching, connection pooling) must be addressed separately. The exam tests whether you identify the real bottleneck.</li>
+        <li><strong>Service quotas and capacity limits exist</strong> &mdash; an ASG cannot launch instances beyond your account&rsquo;s EC2 service quota. If the maximum is 50 but the account limit is 20, scaling stops at 20. Insufficient capacity in an AZ may also prevent launches. The exam rarely tests specific quota numbers but may present scenarios where scaling fails due to account limits.</li>
+      </ol>
+
+    </section>
+
+    <hr class="topic-divider">
+
+    <!-- EAS SECTION 5: Practice Questions -->
+    <section class="topic-section" id="eas-practice">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain2)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3m.08 4h.01"/></svg>
+        Quick-Fire Practice
+      </h2>
+
+      <div class="practice-q">
+        <p class="q-text">Q1. A company serves a web application and a REST API from the same domain. The web application is at <code>/</code> and the API is at <code>/api/*</code>. Each runs on a separate fleet of EC2 instances. The company wants one load balancer to route requests to the correct backend. Which solution meets this requirement?</p>
+        <ul class="q-options">
+          <li><span class="q-letter">A.</span> Deploy a Network Load Balancer with two target groups. Configure TCP listeners to route /api/* requests to the API target group and all other requests to the web target group.</li>
+          <li><span class="q-letter">B.</span> Deploy an Application Load Balancer with two target groups. Create a listener rule that routes requests with path /api/* to the API target group. Set the default action to forward to the web target group.</li>
+          <li><span class="q-letter">C.</span> Deploy a Network Load Balancer and an Application Load Balancer. Use the NLB for the API and the ALB for the web application.</li>
+          <li><span class="q-letter">D.</span> Deploy two Classic Load Balancers, one for each fleet, and use Route 53 weighted routing to split traffic between them.</li>
+        </ul>
+        <button class="reveal-btn">Show Answer</button>
+        <div class="answer-reveal">
+          <p><strong>Correct Answer: B</strong></p>
+          <p>ALB operates at Layer 7 and can inspect HTTP request paths. A listener rule matching <code>/api/*</code> forwards API traffic to the API target group, while the default action handles everything else. A (NLB) cannot inspect HTTP paths &mdash; it operates at Layer 4 and routes by protocol and port only. C uses two load balancers, which adds cost and DNS complexity when one ALB can handle both. D uses legacy CLBs, which do not support path-based routing or target groups.</p>
+          <p><strong>Memory rule:</strong> Path-based routing = ALB. NLB cannot see URL paths.</p>
+        </div>
+      </div>
+
+      <div class="practice-q">
+        <p class="q-text">Q2. A company runs a web application on EC2 instances behind an Application Load Balancer across two Availability Zones. Instances occasionally stop responding to HTTP requests due to application crashes, but the Auto Scaling group does not replace them. The instances pass EC2 status checks. What should a solutions architect do to ensure unhealthy instances are automatically replaced?</p>
+        <ul class="q-options">
+          <li><span class="q-letter">A.</span> Increase the number of instances in the Auto Scaling group to compensate for unhealthy instances.</li>
+          <li><span class="q-letter">B.</span> Configure the Application Load Balancer to terminate and relaunch unhealthy instances directly.</li>
+          <li><span class="q-letter">C.</span> Configure the Auto Scaling group to use Elastic Load Balancing health checks instead of EC2 status checks only.</li>
+          <li><span class="q-letter">D.</span> Create a CloudWatch alarm on the UnHealthyHostCount metric and trigger a Lambda function to terminate unhealthy instances.</li>
+        </ul>
+        <button class="reveal-btn">Show Answer</button>
+        <div class="answer-reveal">
+          <p><strong>Correct Answer: C</strong></p>
+          <p>By default, an ASG uses only EC2 status checks, which verify hardware and system-level health. An application crash that fails the ALB health check does not fail the EC2 status check, so the ASG does not replace the instance. Enabling ELB health checks on the ASG lets it detect instances that fail application-level health checks and replace them automatically. A adds instances but does not fix the unhealthy ones. B is incorrect &mdash; ALBs do not launch or terminate instances. D works but is unnecessarily complex when the ASG has a built-in option for this.</p>
+          <p><strong>Memory rule:</strong> ASG default = EC2 status checks only. Enable ELB health checks on the ASG to replace application-level failures.</p>
+        </div>
+      </div>
+
+      <div class="practice-q">
+        <p class="q-text">Q3. A media company experiences a predictable traffic surge every weekday at 9 AM when subscribers check the morning news. The company also sees occasional unpredictable spikes when breaking news events occur. The Auto Scaling group must have capacity ready before the 9 AM surge and react to unexpected spikes. Which scaling configuration meets both requirements?</p>
+        <ul class="q-options">
+          <li><span class="q-letter">A.</span> Use predictive scaling as the only scaling policy. It will learn the 9 AM pattern and react to breaking news events based on historical data.</li>
+          <li><span class="q-letter">B.</span> Use scheduled scaling to increase capacity at 8:30 AM on weekdays. Add a target tracking scaling policy on ALBRequestCountPerTarget to handle unexpected demand.</li>
+          <li><span class="q-letter">C.</span> Use target tracking scaling on CPU utilization as the only scaling policy. Set the target to 40% to leave headroom for spikes.</li>
+          <li><span class="q-letter">D.</span> Set the Auto Scaling group minimum capacity to the peak level for the entire day so instances are always ready.</li>
+        </ul>
+        <button class="reveal-btn">Show Answer</button>
+        <div class="answer-reveal">
+          <p><strong>Correct Answer: B</strong></p>
+          <p>Scheduled scaling ensures capacity is pre-provisioned before the predictable 9 AM rush, eliminating the delay of reactive scaling. Target tracking on <code>ALBRequestCountPerTarget</code> handles unpredictable breaking-news spikes by adjusting capacity based on actual request load. A relies solely on predictive scaling, which cannot anticipate unprecedented breaking news events &mdash; it forecasts from history, not from real-time signals. C uses only reactive scaling, which means the 9 AM surge hits before capacity scales out. D wastes resources by running peak capacity 24/7 instead of scaling to match demand.</p>
+          <p><strong>Memory rule:</strong> Known pattern = scheduled scaling. Unknown spikes = dynamic scaling. Best practice combines both.</p>
+        </div>
+      </div>
+
     </section>
 
   </div>
