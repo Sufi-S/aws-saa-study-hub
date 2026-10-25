@@ -598,5 +598,47 @@
     ],
     "correctAnswer": 0,
     "explanation": "Retrieving a secret requires two layers of authorization: secretsmanager:GetSecretValue on the secret AND kms:Decrypt on the KMS key. Application B has only the KMS permission. Without the service-level permission, the API call is denied before KMS is even involved. kms:GenerateDataKey (B) is for encryption, not decryption. Region issues (C) are not indicated. IAM policies can grant Secrets Manager access with customer managed keys (D) — a resource policy is not mandatory."
+  },
+  {
+    "id": "d1-vpe-01",
+    "domain": "domain1",
+    "topic": "vpc-endpoints-privatelink",
+    "question": "A company runs data-processing EC2 instances in private subnets. These instances upload large files to S3 in the same Region. The company wants to avoid routing S3 traffic through the NAT gateway to reduce costs and keep traffic private. The solution must not require application code changes. Which approach meets these requirements at the LOWEST cost?",
+    "options": [
+      "Create an S3 interface endpoint with private DNS enabled in the private subnets.",
+      "Create an S3 gateway endpoint and associate it with the private subnet route tables.",
+      "Move the EC2 instances to a public subnet with an internet gateway.",
+      "Create a VPC peering connection to the S3 service VPC."
+    ],
+    "correctAnswer": 1,
+    "explanation": "An S3 gateway endpoint adds a prefix-list route directing S3 traffic through the endpoint instead of the NAT gateway. It is free (no hourly or per-GB charges) and keeps traffic on the AWS backbone. Interface endpoints (A) work but have per-hour and per-GB charges. Moving to public subnets (C) exposes instances to the internet. VPC peering to S3 (D) is impossible — S3 is a public service, not a VPC."
+  },
+  {
+    "id": "d1-vpe-02",
+    "domain": "domain1",
+    "topic": "vpc-endpoints-privatelink",
+    "question": "An application in a private subnet must privately access AWS STS and KMS APIs without any traffic traversing the public internet. The application uses the standard AWS SDK with default hostnames. Which solution provides private access with MINIMAL application changes?",
+    "options": [
+      "Create gateway endpoints for STS and KMS and associate them with the private subnet route tables.",
+      "Create interface endpoints for STS and KMS with private DNS enabled. Allow inbound HTTPS in the endpoint security groups.",
+      "Create an S3 gateway endpoint that also covers STS and KMS traffic.",
+      "Hard-code the endpoint-specific DNS names for STS and KMS in the application configuration."
+    ],
+    "correctAnswer": 1,
+    "explanation": "Interface endpoints with private DNS resolve standard hostnames to endpoint ENI private IPs transparently — no code changes needed. Gateway endpoints (A) support only S3 and DynamoDB, not STS or KMS. S3 gateway endpoints (C) do not cover other services. Hard-coded DNS names (D) require unnecessary application changes when private DNS handles resolution automatically."
+  },
+  {
+    "id": "d1-vpe-03",
+    "domain": "domain1",
+    "topic": "vpc-endpoints-privatelink",
+    "question": "Company A runs a compliance API in VPC-A. Company B needs to call this API from VPC-B in a different account. Company A requires that Company B can access ONLY the compliance API — no other VPC-A resources. Both VPCs use 10.0.0.0/16. Which architecture meets these requirements?",
+    "options": [
+      "Create a VPC peering connection between VPC-A and VPC-B and restrict access with security groups.",
+      "Deploy the API behind a public ALB. Company B accesses it over the internet with TLS.",
+      "Create a Transit Gateway and attach both VPCs with restrictive TGW route tables.",
+      "Deploy the API behind an NLB, create an endpoint service, add Company B as an allowed principal, and have Company B create an interface endpoint via PrivateLink."
+    ],
+    "correctAnswer": 3,
+    "explanation": "PrivateLink exposes only the NLB targets (compliance API), not the entire VPC. It works with overlapping CIDRs because the consumer connects to an endpoint ENI in their own VPC. VPC peering (A) fails with overlapping CIDRs and exposes the whole VPC. A public ALB (B) exposes the API to the internet. Transit Gateway (C) also fails with overlapping CIDRs and provides broader access than needed."
   }
 ]

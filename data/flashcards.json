@@ -428,5 +428,80 @@
     "term": "Least-Privilege Secret Retrieval",
     "definition": "Grant access to specific secret ARNs or parameter paths — never Resource:'*'. Separate read permissions (GetSecretValue) from management permissions (CreateSecret, DeleteSecret). Use conditions (IP, VPC endpoint, tags) for additional restriction.",
     "gotcha": "An overly broad policy like secretsmanager:GetSecretValue on Resource:'*' lets the application read EVERY secret in the account. One compromised application = all secrets exposed. Always scope to specific ARNs."
+  },
+  {
+    "term": "VPC Endpoint",
+    "definition": "A virtual device enabling private communication between a VPC and a supported service. Removes the need for NAT gateways, VPNs, or internet gateways for supported service traffic. Three types: gateway, interface, and Gateway Load Balancer.",
+    "gotcha": "An endpoint provides network connectivity, NOT authorization. IAM policies, resource policies, and endpoint policies must all permit the request. Creating an endpoint does not grant any IAM permissions."
+  },
+  {
+    "term": "Gateway Endpoint",
+    "definition": "A route-table-based endpoint for Amazon S3 and DynamoDB. Creates a prefix-list route in associated route tables. No ENIs, no security groups, no hourly charge. Traffic follows the more-specific prefix-list route instead of the default route.",
+    "gotcha": "Gateway endpoints are NOT PrivateLink. They support only S3 and DynamoDB. They do not create ENIs. If the subnet's route table is not associated with the endpoint, that subnet's traffic will not use the endpoint."
+  },
+  {
+    "term": "Interface Endpoint (PrivateLink)",
+    "definition": "An elastic network interface (ENI) with a private IP in your subnet that provides private connectivity to a supported service via AWS PrivateLink. Supports 100+ services. Security groups control traffic to the ENI. Private DNS resolves standard hostnames to the ENI's IP.",
+    "gotcha": "Interface endpoints charge per hour per AZ (~$0.01/hr) plus per GB (~$0.01/GB). Forgetting to allow inbound HTTPS (port 443) in the endpoint security group is the #1 troubleshooting issue."
+  },
+  {
+    "term": "AWS PrivateLink",
+    "definition": "Technology that provides private connectivity between VPCs and services using interface endpoints. Traffic stays on the AWS backbone. Supports provider-consumer architecture where a provider publishes an endpoint service backed by an NLB, and consumers create interface endpoints.",
+    "gotcha": "PrivateLink exposes only the NLB targets — NOT the provider's entire VPC. It works with overlapping CIDRs (VPC peering does not). It is unidirectional: consumer → provider. PrivateLink ≠ VPC peering."
+  },
+  {
+    "term": "Gateway Load Balancer Endpoint",
+    "definition": "Routes traffic to network virtual appliances (firewalls, IDS/IPS) managed by a Gateway Load Balancer. Uses route table entries. Architecturally distinct from S3/DynamoDB gateway endpoints and from interface endpoints.",
+    "gotcha": "GWLB endpoints are for inline traffic inspection, not for AWS service access. Don't confuse them with S3 gateway endpoints or interface endpoints — all three are different endpoint types with different purposes."
+  },
+  {
+    "term": "S3 Gateway Endpoint Route",
+    "definition": "A route table entry with the S3 prefix list (pl-xxxxxxxx) as destination and the gateway endpoint as target. S3 traffic matches this more-specific route instead of the default 0.0.0.0/0 route to the NAT gateway.",
+    "gotcha": "The route is added only to route tables you explicitly associate with the endpoint. Subnets using unassociated route tables will NOT use the endpoint — their S3 traffic still goes through NAT."
+  },
+  {
+    "term": "Endpoint Network Interface",
+    "definition": "A requester-managed ENI created by an interface endpoint in each selected subnet. Has a private IP from the subnet's CIDR. Serves as the entry point for traffic destined to the endpoint service.",
+    "gotcha": "Only interface endpoints create ENIs. Gateway endpoints do not. Place ENIs in all AZs where your applications run to avoid cross-AZ charges and ensure availability."
+  },
+  {
+    "term": "Private DNS (VPC Endpoint)",
+    "definition": "When enabled on an interface endpoint, the standard service hostname (e.g., sts.us-east-1.amazonaws.com) resolves to the endpoint ENI's private IP within the VPC. Applications use the same hostname — no code changes needed.",
+    "gotcha": "Requires VPC DNS hostnames AND DNS resolution to be enabled. If either is off, private DNS won't work and the app must use the endpoint-specific DNS name (vpce-xxx.service.region.vpce.amazonaws.com)."
+  },
+  {
+    "term": "VPC Endpoint Policy",
+    "definition": "An IAM resource policy attached to a VPC endpoint that restricts which principals, actions, or resources can be accessed through that endpoint. Default policy allows all access. Works alongside IAM and resource policies — does not replace them.",
+    "gotcha": "Endpoint policy + IAM policy + resource policy all must allow the request. The endpoint policy is an additional restriction, not a standalone authorization. Not all services support endpoint policies."
+  },
+  {
+    "term": "Endpoint Security Group",
+    "definition": "A security group attached to an interface endpoint's ENI. Controls inbound/outbound traffic to the endpoint. Must allow inbound HTTPS (port 443) from application subnets or security groups.",
+    "gotcha": "Security groups apply ONLY to interface endpoint ENIs, not to gateway endpoints (which have no ENIs). Forgetting port 443 inbound on the endpoint SG is the most common interface endpoint troubleshooting issue."
+  },
+  {
+    "term": "Endpoint Service (PrivateLink Provider)",
+    "definition": "A resource created by a service provider that makes their service available to consumers via PrivateLink. Backed by a Network Load Balancer. The provider controls access via allowed principals and optional manual connection acceptance.",
+    "gotcha": "The provider must explicitly add the consumer's AWS principal as an allowed principal. If manual acceptance is enabled, the provider must also accept each connection request. Without both, the consumer's endpoint stays in PendingAcceptance."
+  },
+  {
+    "term": "PrivateLink vs VPC Peering",
+    "definition": "PrivateLink: expose one service, unidirectional, works with overlapping CIDRs, consumer sees only NLB targets. VPC Peering: connect entire VPCs, bidirectional, no overlapping CIDRs, not transitive. Choose based on scope of access needed.",
+    "gotcha": "If the exam says 'expose one service without broad network access' → PrivateLink. 'Full VPC-to-VPC connectivity' → peering. 'Overlapping CIDRs' → peering is impossible, PrivateLink works."
+  },
+  {
+    "term": "VPC Endpoint vs NAT Gateway",
+    "definition": "Endpoints: private, service-specific connectivity (traffic stays on AWS backbone). NAT: general outbound internet access (traffic exits VPC). S3 gateway endpoint replaces NAT for S3 traffic (free). NAT still needed for non-AWS internet traffic.",
+    "gotcha": "Replacing S3 NAT traffic with a gateway endpoint saves NAT data-processing costs, but does NOT eliminate the NAT gateway if other traffic needs internet access. They solve different problems."
+  },
+  {
+    "term": "Endpoint Connectivity vs IAM Authorization",
+    "definition": "An endpoint provides the network path (connectivity). IAM policies, resource policies, and endpoint policies provide authorization. Both are required — a working endpoint with no IAM permissions returns Access Denied.",
+    "gotcha": "If an application reaches S3 through an endpoint but gets 403 Forbidden, the endpoint is working (connectivity) but the IAM or bucket policy is wrong (authorization). Don't troubleshoot the endpoint — troubleshoot permissions."
+  },
+  {
+    "term": "aws:SourceVpce Condition Key",
+    "definition": "An S3 bucket policy condition key that matches the VPC endpoint ID through which the request arrived. Used to restrict bucket access to requests arriving through a specific endpoint, enforcing private-only access patterns.",
+    "gotcha": "Using aws:SourceVpce to deny non-endpoint access can lock you out of the bucket from the console, CLI, and CloudFormation. Always include an escape clause for a break-glass role. Condition key support varies by service."
   }
 ]

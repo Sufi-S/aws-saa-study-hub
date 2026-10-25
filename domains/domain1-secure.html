@@ -82,6 +82,11 @@
         <li><a href="#sm-diagram">Secrets Manager vs Parameter Store &mdash; Architecture Diagram</a></li>
         <li><a href="#sm-gotchas">Secrets Manager vs Parameter Store &mdash; Exam Gotchas</a></li>
         <li><a href="#sm-practice">Secrets Manager vs Parameter Store &mdash; Practice Questions</a></li>
+        <li><a href="#vpe-learn"><strong>VPC Endpoints &amp; PrivateLink</strong> &mdash; Learn from Zero</a></li>
+        <li><a href="#vpe-real-world">VPC Endpoints &amp; PrivateLink &mdash; Real-World Scenarios</a></li>
+        <li><a href="#vpe-diagram">VPC Endpoints &amp; PrivateLink &mdash; Architecture Diagram</a></li>
+        <li><a href="#vpe-gotchas">VPC Endpoints &amp; PrivateLink &mdash; Exam Gotchas</a></li>
+        <li><a href="#vpe-practice">VPC Endpoints &amp; PrivateLink &mdash; Practice Questions</a></li>
       </ol>
     </nav>
 
@@ -3189,6 +3194,864 @@ Rule#   Type    Port    Source          Action
             </ul>
             <p><strong>Key exam clue:</strong> "Has KMS Decrypt but gets Access Denied on secret retrieval" = missing <code>secretsmanager:GetSecretValue</code> in IAM policy.</p>
             <p><strong>Takeaway:</strong> Two locks, two keys. Service permission (Secrets Manager) + encryption permission (KMS) must both be present. Having one without the other results in Access Denied.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================= -->
+    <!-- TOPIC 6: VPC Endpoints & AWS PrivateLink      -->
+    <!-- ============================================= -->
+
+    <hr class="topic-divider" style="margin-top:4rem;">
+
+    <div class="page-header" style="border-bottom:none;padding-bottom:0;margin-bottom:1.5rem;">
+      <h1 style="display:flex;align-items:center;gap:0.6rem;font-size:1.75rem;">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="var(--domain1)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><circle cx="12" cy="13" r="2"/><line x1="12" y1="11" x2="12" y2="8"/></svg>
+        VPC Endpoints &amp; AWS PrivateLink
+      </h1>
+      <p>Private connectivity to AWS services and third-party applications &mdash; gateway endpoints, interface endpoints, PrivateLink architecture, and endpoint security.</p>
+    </div>
+
+    <!-- VPE SECTION 1: Learn from Zero -->
+    <section class="topic-section" id="vpe-learn">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain1)" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        Learn from Zero
+      </h2>
+
+      <!-- Part 1A: VPC Networking Fundamentals -->
+      <h3>VPC Networking Fundamentals</h3>
+      <p>An <strong>Amazon VPC</strong> (Virtual Private Cloud) is your isolated network inside AWS. Within a VPC you create <strong>subnets</strong> &mdash; segments of IP address space that reside in a single Availability Zone. Each subnet has a <strong>route table</strong> that determines where network traffic is directed. Every resource in a subnet has a <strong>network interface</strong> with a <strong>private IP address</strong>.</p>
+
+      <p>Subnets are classified by their connectivity:</p>
+      <ul>
+        <li><strong>Public subnets</strong> have a route to an <strong>internet gateway (IGW)</strong>, allowing resources with public IPs to communicate directly with the internet.</li>
+        <li><strong>Private subnets</strong> have no direct internet route. Resources here are shielded from inbound internet traffic.</li>
+      </ul>
+
+      <p>Most AWS services &mdash; S3, DynamoDB, STS, CloudWatch, and many others &mdash; expose <strong>public service endpoints</strong> (e.g., <code>s3.amazonaws.com</code>). These are reachable over the internet. When an application in a <strong>private subnet</strong> needs to call one of these services, it traditionally routes traffic through a <strong>NAT gateway</strong> in a public subnet, which forwards the request to the public endpoint and returns the response.</p>
+
+      <div class="key-concept">
+        <strong>The problem:</strong> Using a NAT gateway for AWS service traffic means your private subnet&rsquo;s requests traverse the public internet path. This introduces NAT gateway data-processing costs, creates a bandwidth bottleneck, and sends traffic outside the AWS network when a private path exists. <strong>VPC endpoints</strong> solve this by providing a direct, private connection between your VPC and supported AWS services &mdash; traffic stays on the AWS backbone.
+      </div>
+
+      <p><strong>Example:</strong> Suppose an EC2 instance in a private subnet needs to upload files to S3. Without an endpoint, the traffic flows: EC2 &rarr; private subnet route table &rarr; NAT gateway &rarr; internet gateway &rarr; S3 public endpoint. With an <strong>S3 gateway endpoint</strong>, the traffic flows: EC2 &rarr; private subnet route table &rarr; S3 gateway endpoint &rarr; S3 &mdash; entirely within the AWS network.</p>
+
+      <p><strong>Critical distinction:</strong> A VPC endpoint provides <strong>network reachability</strong> to a service. It does not grant <strong>authorization</strong> to access data. Even with an endpoint, an application still needs IAM permissions, and resource policies (like S3 bucket policies) still apply. A route to S3 does not mean you can read any bucket &mdash; those are separate controls:</p>
+      <ul>
+        <li><strong>Routing</strong> &mdash; how traffic reaches the service (route tables, endpoints, NAT).</li>
+        <li><strong>DNS</strong> &mdash; how the service hostname resolves to an IP address.</li>
+        <li><strong>Network filtering</strong> &mdash; security groups and NACLs that allow or block traffic.</li>
+        <li><strong>Authorization</strong> &mdash; IAM policies, resource policies, and endpoint policies that determine whether the request is permitted.</li>
+      </ul>
+
+      <!-- Part 1B: What Are VPC Endpoints? -->
+      <h3>What Are VPC Endpoints?</h3>
+      <p>A <strong>VPC endpoint</strong> is a virtual device that enables private communication between your VPC and a supported service. Endpoints are horizontally scaled and highly available. They remove the need for a NAT gateway, VPN, or internet gateway for traffic to supported services.</p>
+
+      <p>VPC endpoints can reduce data-processing costs (no NAT gateway charges for endpoint traffic), improve security posture (traffic does not traverse the public internet), and simplify network architecture for private workloads.</p>
+
+      <p>There are three major endpoint categories relevant for the SAA-C03 exam:</p>
+      <ol>
+        <li><strong>Gateway endpoints</strong> &mdash; route-table-based endpoints for Amazon S3 and DynamoDB. Free to use.</li>
+        <li><strong>Interface endpoints</strong> &mdash; elastic network interfaces (ENIs) with private IPs, powered by <strong>AWS PrivateLink</strong>. Used for most other AWS services and custom endpoint services.</li>
+        <li><strong>Gateway Load Balancer endpoints</strong> &mdash; direct traffic to network virtual appliances (firewalls, IDS/IPS) using Gateway Load Balancer.</li>
+      </ol>
+
+      <p>These three types work differently. Gateway endpoints add a route to your route table. Interface endpoints create ENIs in your subnets. Gateway Load Balancer endpoints route traffic through inspection appliances. Do not assume they are interchangeable.</p>
+
+      <div class="key-concept">
+        <strong>Important:</strong> Creating an endpoint does not guarantee your application will use it. The application must resolve DNS correctly, the route table must direct traffic through the endpoint, and security groups, NACLs, endpoint policies, and IAM policies must all permit the request. Each control solves a different problem.
+      </div>
+
+      <!-- Part 1C: Gateway Endpoints -->
+      <h3>Gateway Endpoints</h3>
+      <p>A <strong>gateway endpoint</strong> is a target you add to your route table to direct traffic destined for a supported AWS service through a private path. Gateway endpoints are available for <strong>Amazon S3</strong> and <strong>Amazon DynamoDB</strong>.</p>
+
+      <h4>How Gateway Endpoints Work</h4>
+      <p>When you create an S3 gateway endpoint, AWS adds a route to the route tables you select. The route&rsquo;s destination is the <strong>AWS-managed prefix list</strong> for S3 in that Region (e.g., <code>pl-63a5400a</code> for <code>com.amazonaws.us-east-1.s3</code>), and the target is the gateway endpoint ID (<code>vpce-xxxxxxxx</code>). Any traffic from subnets using that route table, destined for S3 IP addresses, follows the endpoint route instead of the default route (which would go to the NAT gateway or IGW).</p>
+
+      <div class="key-concept">
+        <strong>Illustrative route table (private subnet):</strong><br>
+        <code>10.0.0.0/16</code> &rarr; <code>local</code> (VPC internal traffic)<br>
+        <code>pl-63a5400a</code> (S3 prefix list) &rarr; <code>vpce-abc123</code> (S3 gateway endpoint)<br>
+        <code>0.0.0.0/0</code> &rarr; <code>nat-xyz789</code> (NAT gateway for other internet traffic)<br><br>
+        S3 traffic matches the more specific prefix-list route and goes through the gateway endpoint. All other internet-bound traffic still uses the NAT gateway.
+      </div>
+
+      <h4>Key Characteristics</h4>
+      <ul>
+        <li><strong>Route-table based</strong> &mdash; you must associate the endpoint with the route tables of subnets that need it. A subnet whose route table does not contain the endpoint route will not use the endpoint.</li>
+        <li><strong>No ENIs</strong> &mdash; gateway endpoints do not create endpoint network interfaces in your subnets. They are not interface endpoints.</li>
+        <li><strong>No additional charge</strong> &mdash; gateway endpoints for S3 and DynamoDB have no hourly or data-processing charges.</li>
+        <li><strong>Same Region only</strong> &mdash; gateway endpoints connect to the service in the same Region as the VPC.</li>
+        <li><strong>Not PrivateLink</strong> &mdash; gateway endpoints are <em>not</em> AWS PrivateLink interface endpoints. This is a common exam confusion.</li>
+      </ul>
+
+      <h4>Endpoint Policies</h4>
+      <p>Gateway endpoints support <strong>endpoint policies</strong> &mdash; IAM resource policies attached to the endpoint that restrict which principals, actions, or resources can be accessed through the endpoint. The default policy allows all access. You can tighten it to allow only specific S3 buckets, for example.</p>
+      <p>The endpoint policy works alongside IAM identity policies and S3 bucket policies. All must allow the request. The endpoint policy does not replace IAM authorization &mdash; it adds an additional restriction at the network level.</p>
+
+      <h4>Cross-Account and Limitations</h4>
+      <p>A gateway endpoint can be used to access S3 buckets in other accounts, provided IAM and bucket policies permit it. The endpoint itself does not cross account boundaries &mdash; it lives in your VPC. The authorization for cross-account access is handled by IAM and resource policies, not by the endpoint.</p>
+
+      <!-- Part 1D: Interface Endpoints -->
+      <h3>Interface Endpoints (AWS PrivateLink)</h3>
+      <p>An <strong>interface endpoint</strong> is an elastic network interface (ENI) with a private IP address that serves as an entry point for traffic destined to a supported service. Interface endpoints are powered by <strong>AWS PrivateLink</strong>.</p>
+
+      <h4>How Interface Endpoints Work</h4>
+      <p>When you create an interface endpoint for a service (e.g., <code>com.amazonaws.us-east-1.sts</code>), AWS creates an <strong>endpoint network interface</strong> in each subnet you select. Each ENI gets a private IP address from the subnet&rsquo;s CIDR range. Your application connects to the service through these private IP addresses instead of the service&rsquo;s public endpoint.</p>
+
+      <h4>Private DNS</h4>
+      <p>Most interface endpoints support <strong>private DNS</strong>. When enabled, the standard service hostname (e.g., <code>sts.us-east-1.amazonaws.com</code>) resolves to the endpoint&rsquo;s private IP addresses within your VPC. This means applications do not need any code changes &mdash; they use the same hostname they always have, but DNS routes them through the endpoint.</p>
+      <p>Without private DNS, you must use the endpoint-specific DNS name (e.g., <code>vpce-abc123-xyz.sts.us-east-1.vpce.amazonaws.com</code>), which requires application configuration changes.</p>
+
+      <div class="key-concept">
+        <strong>Private DNS requires:</strong> The VPC must have <strong>DNS hostnames</strong> and <strong>DNS resolution</strong> enabled. If either is disabled, private DNS for the endpoint will not work, and the application must use the endpoint-specific hostname.
+      </div>
+
+      <h4>Security Groups</h4>
+      <p>You can associate <strong>security groups</strong> with interface endpoint ENIs. These control which traffic can reach the endpoint. Typically, you allow inbound HTTPS (port 443) from your application subnets or security groups. If the security group does not allow the traffic, the request never reaches the service.</p>
+
+      <h4>Subnet Selection and Availability Zones</h4>
+      <p>You choose which subnets (and therefore Availability Zones) receive endpoint ENIs. For resilience, place endpoint ENIs in multiple AZs. If your application runs in AZ-a and AZ-b, create the endpoint in subnets in both AZs. If an endpoint ENI is not present in the application&rsquo;s AZ, traffic may cross AZs (incurring cross-AZ data transfer charges) or fail depending on DNS resolution.</p>
+
+      <h4>Endpoint Policies and Authorization</h4>
+      <p>Interface endpoints support endpoint policies where the service permits them. The endpoint policy restricts which actions and resources can be accessed through the endpoint. As with gateway endpoints, the endpoint policy works alongside IAM policies &mdash; it does not replace them.</p>
+      <p>The interface endpoint is a <strong>private network entry point</strong>, not a permission grant. Creating the endpoint does not authorize any principal to use the service. IAM policies on the calling role and any applicable resource policies must still allow the request.</p>
+
+      <h4>Concrete Example</h4>
+      <p>An EC2 instance in a private subnet needs to call AWS STS to assume a role. Without an endpoint, the <code>sts.us-east-1.amazonaws.com</code> request goes through the NAT gateway. With an STS interface endpoint (private DNS enabled), the same hostname resolves to the endpoint ENI&rsquo;s private IP, and the traffic stays entirely within the VPC. The EC2 instance&rsquo;s IAM role must still have <code>sts:AssumeRole</code> permission &mdash; the endpoint provides connectivity, not authorization.</p>
+
+      <!-- Part 1E: AWS PrivateLink -->
+      <h3>AWS PrivateLink</h3>
+      <p><strong>AWS PrivateLink</strong> is the technology that powers interface endpoints. It provides private connectivity between VPCs, supported AWS services, and on-premises networks without exposing traffic to the public internet. PrivateLink connections stay on the AWS backbone.</p>
+
+      <h4>The Producer-Consumer Architecture</h4>
+      <p>PrivateLink uses a <strong>provider-consumer</strong> model:</p>
+      <ul>
+        <li><strong>Service provider</strong> &mdash; creates an <strong>endpoint service</strong> backed by a <strong>Network Load Balancer (NLB)</strong>. The NLB receives traffic from consumers and routes it to the provider&rsquo;s backend targets (EC2 instances, containers, etc.).</li>
+        <li><strong>Service consumer</strong> &mdash; creates an <strong>interface endpoint</strong> in their VPC that connects to the provider&rsquo;s endpoint service. The endpoint ENIs in the consumer&rsquo;s VPC receive private IPs, and the consumer&rsquo;s applications connect to these private IPs.</li>
+      </ul>
+
+      <p><strong>Example:</strong> Company A runs a payment processing API and wants to expose it privately to Company B without giving Company B access to Company A&rsquo;s entire VPC:</p>
+      <ol>
+        <li>Company A deploys the payment API behind an <strong>NLB</strong> in their VPC.</li>
+        <li>Company A creates an <strong>endpoint service</strong> and configures <strong>allowed principals</strong> (Company B&rsquo;s account).</li>
+        <li>Company B creates an <strong>interface endpoint</strong> in their VPC pointing to Company A&rsquo;s endpoint service.</li>
+        <li>Company A <strong>accepts the connection</strong> (if manual acceptance is enabled).</li>
+        <li>Company B&rsquo;s applications connect to the endpoint ENI&rsquo;s private IP to reach the payment API. Traffic flows: Company B&rsquo;s VPC &rarr; endpoint ENI &rarr; PrivateLink &rarr; NLB &rarr; Company A&rsquo;s backend.</li>
+      </ol>
+
+      <h4>Why PrivateLink Over VPC Peering?</h4>
+      <ul>
+        <li><strong>PrivateLink exposes a specific service</strong> &mdash; the consumer can only reach the NLB targets. The provider&rsquo;s entire VPC is not accessible.</li>
+        <li><strong>VPC peering connects entire VPCs</strong> &mdash; any resource in one VPC can potentially reach any resource in the other (subject to route tables and security groups). This is broader than needed when the goal is a single service.</li>
+        <li><strong>PrivateLink works with overlapping CIDRs</strong> &mdash; VPC peering does not.</li>
+        <li><strong>Transit Gateway</strong> provides hub-and-spoke VPC connectivity, also broader than PrivateLink for single-service access.</li>
+      </ul>
+
+      <p>A working PrivateLink connection does not eliminate the need for application-level authentication and authorization. The provider&rsquo;s API should still validate requests, authenticate callers, and enforce its own access controls.</p>
+
+      <!-- Part 1F: Gateway Load Balancer Endpoints -->
+      <h3>Gateway Load Balancer Endpoints</h3>
+      <p>A <strong>Gateway Load Balancer (GWLB) endpoint</strong> routes traffic to a fleet of network virtual appliances (firewalls, intrusion detection systems, deep packet inspection tools) managed by a <strong>Gateway Load Balancer</strong>.</p>
+      <ul>
+        <li>Traffic is directed to the GWLB endpoint via <strong>route table entries</strong>, similar to gateway endpoints but for a different purpose.</li>
+        <li>The GWLB distributes traffic across the virtual appliance fleet, which inspects or filters the traffic before forwarding it.</li>
+        <li>This is architecturally distinct from S3/DynamoDB gateway endpoints (which connect to AWS services) and from interface endpoints (which provide PrivateLink connectivity).</li>
+      </ul>
+      <p>GWLB endpoints are relevant when an organization requires <strong>inline traffic inspection</strong> &mdash; for example, all traffic entering or leaving a VPC must pass through a centralized firewall appliance. For the SAA-C03 exam, focus on understanding their purpose (traffic inspection via virtual appliances) rather than implementation details.</p>
+
+      <!-- Part 1G: Endpoint Security and Authorization -->
+      <h3>Endpoint Security and Authorization</h3>
+      <p>Private endpoint connectivity involves multiple security controls. Each solves a different problem:</p>
+
+      <table class="comparison-table" style="width:100%;margin:1rem 0;">
+        <thead>
+          <tr><th>Control</th><th>What It Does</th><th>Applies To</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Route table</strong></td><td>Determines the network path traffic takes</td><td>Gateway endpoints (prefix-list route), GWLB endpoints</td></tr>
+          <tr><td><strong>DNS</strong></td><td>Resolves service hostnames to endpoint private IPs</td><td>Interface endpoints (private DNS)</td></tr>
+          <tr><td><strong>Security groups</strong></td><td>Filters traffic at the endpoint ENI level</td><td>Interface endpoints, GWLB endpoints (not gateway endpoints)</td></tr>
+          <tr><td><strong>NACLs</strong></td><td>Filters traffic at the subnet level (stateless)</td><td>All traffic entering/leaving the subnet</td></tr>
+          <tr><td><strong>Endpoint policy</strong></td><td>Restricts which principals, actions, or resources can use the endpoint</td><td>Gateway and interface endpoints (where supported)</td></tr>
+          <tr><td><strong>IAM identity policy</strong></td><td>Grants the calling principal permission to perform actions</td><td>All AWS API calls</td></tr>
+          <tr><td><strong>Resource policy</strong></td><td>Controls access to the resource (e.g., S3 bucket policy)</td><td>Service-specific resources</td></tr>
+          <tr><td><strong>Private DNS</strong></td><td>Makes the standard service hostname resolve through the endpoint</td><td>Interface endpoints with private DNS enabled</td></tr>
+        </tbody>
+      </table>
+
+      <h4>Worked Example: EC2 &rarr; S3 via Gateway Endpoint</h4>
+      <p>An EC2 instance with role <code>AppRole</code> needs to read objects from <code>my-data-bucket</code> through an S3 gateway endpoint:</p>
+      <ol>
+        <li><strong>Route table:</strong> The subnet&rsquo;s route table includes the S3 prefix-list route pointing to the gateway endpoint. S3 traffic follows this route.</li>
+        <li><strong>Endpoint:</strong> The gateway endpoint makes private S3 connectivity available. Traffic stays on the AWS network.</li>
+        <li><strong>Endpoint policy:</strong> Optionally restricts requests to only <code>my-data-bucket</code>. If the policy does not allow the bucket, the request is denied at the endpoint level.</li>
+        <li><strong>IAM policy:</strong> <code>AppRole</code> must have <code>s3:GetObject</code> on <code>arn:aws:s3:::my-data-bucket/*</code>. Without this, the request is denied regardless of the endpoint.</li>
+        <li><strong>Bucket policy:</strong> The bucket policy must not deny the request. It can optionally use the condition key <code>aws:SourceVpce</code> to restrict access to only requests arriving through a specific endpoint.</li>
+      </ol>
+
+      <div class="key-concept">
+        <strong>Condition keys:</strong> S3 bucket policies support <code>aws:SourceVpce</code> (the specific endpoint ID) and <code>aws:SourceVpc</code> (the VPC ID). These let you restrict bucket access to traffic arriving through a particular endpoint or from a particular VPC. Always test policies carefully &mdash; an overly restrictive condition can block legitimate administrative access. Condition key support varies by service.
+      </div>
+
+      <!-- Part 1H: Comparison Table -->
+      <h3>VPC Endpoints vs Other Connectivity Options</h3>
+
+      <table class="comparison-table" style="width:100%;margin:1rem 0;font-size:0.92em;">
+        <thead>
+          <tr><th>Option</th><th>Purpose</th><th>Traffic Path</th><th>Public Internet?</th><th>Key Benefit</th><th>Key Limitation</th><th>Typical Use</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Gateway endpoint</strong></td>
+            <td>Private access to S3, DynamoDB</td>
+            <td>Route table &rarr; endpoint &rarr; service</td>
+            <td>No</td>
+            <td>Free, no NAT needed for S3/DDB</td>
+            <td>S3 and DynamoDB only; same Region</td>
+            <td>Private S3 access from private subnets</td>
+          </tr>
+          <tr>
+            <td><strong>Interface endpoint</strong></td>
+            <td>Private access to 100+ AWS services and custom services</td>
+            <td>ENI private IP &rarr; PrivateLink &rarr; service</td>
+            <td>No</td>
+            <td>Broad service support; private DNS</td>
+            <td>Per-hour + per-GB charge; per-AZ ENI</td>
+            <td>Private API calls (STS, KMS, ECR, etc.)</td>
+          </tr>
+          <tr>
+            <td><strong>GWLB endpoint</strong></td>
+            <td>Route traffic through virtual appliances</td>
+            <td>Route table &rarr; GWLB endpoint &rarr; appliance fleet</td>
+            <td>No</td>
+            <td>Inline inspection at scale</td>
+            <td>Requires Gateway Load Balancer + appliances</td>
+            <td>Centralized firewall / IDS</td>
+          </tr>
+          <tr>
+            <td><strong>NAT gateway</strong></td>
+            <td>Outbound internet access for private subnets</td>
+            <td>Route table &rarr; NAT GW &rarr; IGW &rarr; internet</td>
+            <td>Yes</td>
+            <td>General internet access from private subnets</td>
+            <td>Per-hour + per-GB charges; traffic exits VPC</td>
+            <td>Private subnets reaching non-AWS APIs</td>
+          </tr>
+          <tr>
+            <td><strong>Internet gateway</strong></td>
+            <td>Bidirectional internet connectivity</td>
+            <td>Route table &rarr; IGW &rarr; internet</td>
+            <td>Yes</td>
+            <td>Public-facing workloads</td>
+            <td>Exposes resources to inbound internet traffic</td>
+            <td>Public web servers, ALBs</td>
+          </tr>
+          <tr>
+            <td><strong>VPC peering</strong></td>
+            <td>Direct VPC-to-VPC connectivity</td>
+            <td>Route table &rarr; peering connection &rarr; peer VPC</td>
+            <td>No</td>
+            <td>Full VPC-to-VPC access; low latency</td>
+            <td>No overlapping CIDRs; not transitive</td>
+            <td>Two VPCs needing broad mutual access</td>
+          </tr>
+          <tr>
+            <td><strong>Transit Gateway</strong></td>
+            <td>Hub-and-spoke multi-VPC/on-prem connectivity</td>
+            <td>Route table &rarr; TGW &rarr; destination VPC/VPN</td>
+            <td>No (unless routed to IGW)</td>
+            <td>Centralized routing for many VPCs</td>
+            <td>Hourly + per-GB charges; more complex</td>
+            <td>Enterprise multi-VPC networking</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>NAT gateways and VPC endpoints solve different problems. A NAT gateway provides general outbound internet access for private subnets. VPC endpoints provide private service-specific connectivity. Replacing S3 NAT traffic with an S3 gateway endpoint eliminates that portion of NAT costs, but does not eliminate the NAT gateway if other traffic still needs internet access.</p>
+
+      <!-- Part 1I: Practical Limitations and Architecture Decisions -->
+      <h3>Practical Limitations and Architecture Decisions</h3>
+      <ul>
+        <li><strong>Service availability:</strong> Not every AWS service supports every endpoint type in every Region. Verify before designing. S3 supports both gateway and interface endpoints (the interface endpoint is useful for cross-Region or on-premises access patterns).</li>
+        <li><strong>Endpoint costs:</strong> Gateway endpoints are free. Interface endpoints charge per hour per AZ (~$0.01/hour) plus per GB of data processed (~$0.01/GB). For high-throughput services, these costs add up.</li>
+        <li><strong>Subnet and AZ placement:</strong> Interface endpoint ENIs should be placed in the same AZs as your workloads to avoid cross-AZ charges and ensure availability.</li>
+        <li><strong>Security groups:</strong> Interface endpoint ENIs require security groups that allow the expected traffic (usually HTTPS/443 inbound from your app subnets). Forgetting this is a common troubleshooting issue.</li>
+        <li><strong>Endpoint policies:</strong> Should follow least privilege. The default policy allows all access, which may be overly permissive for sensitive environments.</li>
+        <li><strong>Private DNS:</strong> Requires VPC DNS hostnames and DNS resolution to be enabled. Without these, private DNS will not work and applications must use endpoint-specific hostnames.</li>
+        <li><strong>NAT gateway is still needed:</strong> VPC endpoints handle only supported AWS service traffic. If your application also calls external APIs, downloads packages from the internet, or accesses non-supported services, you still need a NAT gateway for that traffic.</li>
+        <li><strong>Private endpoint &ne; isolated networking:</strong> An endpoint provides private connectivity to one service. It does not isolate your VPC from all external access. DNS, routing, security group, NACL, and authorization mistakes can still create security gaps.</li>
+      </ul>
+
+    </section>
+
+    <hr class="topic-divider">
+
+    <!-- VPE SECTION 2: Real-World Scenarios -->
+    <section class="topic-section" id="vpe-real-world">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain1)" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        When Real Architects Actually Use This
+      </h2>
+
+      <!-- Scenario A -->
+      <div class="scenario">
+        <h4>Scenario A: Private EC2 Access to Amazon S3</h4>
+        <p><strong>Requirement:</strong> A company runs data-processing EC2 instances in private subnets. These instances upload and download large datasets from S3. The security team wants to avoid routing S3 traffic through the NAT gateway to reduce costs and keep traffic off the public internet.</p>
+        <p><strong>Recommended architecture:</strong> Create an <strong>S3 gateway endpoint</strong> and associate it with the private subnet route tables.</p>
+        <p><strong>How it works:</strong> The route table gets a prefix-list entry for S3 pointing to the gateway endpoint. All S3 API traffic from those subnets takes the endpoint route instead of the NAT gateway. The EC2 instances&rsquo; code does not change &mdash; they still call <code>s3.amazonaws.com</code>.</p>
+        <p><strong>Access control:</strong> The EC2 instance profile role must have the appropriate S3 permissions (e.g., <code>s3:PutObject</code>, <code>s3:GetObject</code>). An endpoint policy can restrict the endpoint to specific buckets. S3 bucket policies still apply.</p>
+        <p><strong>Trade-offs:</strong> Gateway endpoints are free, so cost savings are immediate. However, the endpoint only covers S3 traffic &mdash; if the instances also access the internet (e.g., downloading OS packages), the NAT gateway is still needed for that traffic.</p>
+        <p><strong>Why not an interface endpoint?</strong> S3 interface endpoints have per-hour and per-GB charges. The gateway endpoint is free and sufficient for same-Region S3 access from within the VPC. S3 interface endpoints are useful for on-premises access or cross-Region patterns.</p>
+      </div>
+
+      <!-- Scenario B -->
+      <div class="scenario">
+        <h4>Scenario B: Private Access to AWS APIs (STS, KMS, CloudWatch)</h4>
+        <p><strong>Requirement:</strong> An application in a private subnet calls STS to assume roles, KMS to decrypt data, and CloudWatch to push metrics. The company wants all API traffic to stay within the AWS network.</p>
+        <p><strong>Recommended architecture:</strong> Create <strong>interface endpoints</strong> for STS, KMS, and CloudWatch Monitoring (each powered by PrivateLink). Enable <strong>private DNS</strong> so the standard service hostnames resolve to endpoint ENI private IPs.</p>
+        <p><strong>How it works:</strong> The application calls <code>sts.us-east-1.amazonaws.com</code> as usual. Private DNS resolves this to the endpoint ENI&rsquo;s private IP. Traffic goes directly to the service without leaving the VPC.</p>
+        <p><strong>Security:</strong> Each endpoint&rsquo;s security group must allow inbound HTTPS (port 443) from the application security group or subnet CIDR. The IAM role must still have the appropriate permissions for each service.</p>
+        <p><strong>Cost trade-off:</strong> Interface endpoints cost approximately $0.01/hour per AZ per endpoint, plus $0.01/GB of data processed. Three endpoints in two AZs = ~$0.06/hour = ~$43/month. This is justified when security requirements prohibit public internet access or when NAT gateway data-processing costs for API traffic exceed the endpoint costs.</p>
+        <p><strong>Why not a NAT gateway?</strong> A NAT gateway also provides connectivity, but traffic exits the VPC and traverses the public internet path. Interface endpoints keep traffic private and avoid NAT gateway data-processing charges for supported service traffic.</p>
+      </div>
+
+      <!-- Scenario C -->
+      <div class="scenario">
+        <h4>Scenario C: Exposing an Internal API to Another VPC via PrivateLink</h4>
+        <p><strong>Requirement:</strong> Company A runs a payment processing API. Company B needs to call this API from their VPC. Company A does not want to expose its entire VPC or create a VPC peering connection.</p>
+        <p><strong>Recommended architecture:</strong> <strong>AWS PrivateLink</strong> with an endpoint service.</p>
+        <p><strong>How it works:</strong></p>
+        <ol>
+          <li>Company A deploys the API behind a <strong>Network Load Balancer (NLB)</strong>.</li>
+          <li>Company A creates an <strong>endpoint service</strong> referencing the NLB and adds Company B&rsquo;s AWS account as an <strong>allowed principal</strong>.</li>
+          <li>Company B creates an <strong>interface endpoint</strong> in their VPC for Company A&rsquo;s endpoint service name.</li>
+          <li>Company A accepts the connection (if manual acceptance is configured).</li>
+          <li>Company B calls the endpoint ENI&rsquo;s private IP or DNS name to reach the payment API.</li>
+        </ol>
+        <p><strong>Why PrivateLink over VPC peering?</strong> VPC peering connects entire VPCs &mdash; Company B could potentially reach any resource in Company A&rsquo;s VPC, which is far broader than needed. PrivateLink exposes only the NLB targets. It also works with overlapping CIDR ranges, which peering does not support.</p>
+        <p><strong>Why not Transit Gateway?</strong> TGW provides hub-and-spoke connectivity across multiple VPCs. It is overpowered for exposing a single service and would give Company B broader network access than intended.</p>
+      </div>
+
+      <!-- Scenario D -->
+      <div class="scenario">
+        <h4>Scenario D: Avoiding Public Exposure of AWS Service Access</h4>
+        <p><strong>Requirement:</strong> A security team mandates that workloads in private subnets must not use public service endpoints for any AWS API call that has a supported private endpoint option.</p>
+        <p><strong>Recommended approach:</strong></p>
+        <ol>
+          <li>Create <strong>interface endpoints</strong> for each required AWS service (STS, KMS, ECR, CloudWatch Logs, etc.).</li>
+          <li>Enable <strong>private DNS</strong> so standard hostnames resolve through the endpoints.</li>
+          <li>Configure <strong>endpoint policies</strong> following least privilege.</li>
+          <li>Use an <strong>S3 gateway endpoint</strong> for S3 traffic (free) and a <strong>DynamoDB gateway endpoint</strong> if needed.</li>
+          <li>Verify that all route tables and security groups are correctly configured.</li>
+        </ol>
+        <p><strong>Important caveat:</strong> Creating endpoints does not automatically prevent public access to a service. If the VPC still has a NAT gateway or internet gateway, traffic <em>could</em> reach the public endpoint through those paths if DNS does not resolve to the endpoint or if the route table does not direct traffic through the endpoint. Enforce private-only access by removing the NAT/IGW path for supported traffic, or by using S3 bucket policies with <code>aws:SourceVpce</code> conditions to deny non-endpoint requests.</p>
+      </div>
+
+      <!-- Scenario E -->
+      <div class="scenario">
+        <h4>Scenario E: Enforcing S3 Access Through a Specific Endpoint</h4>
+        <p><strong>Requirement:</strong> A company wants its compliance data bucket accessible only through the VPC&rsquo;s S3 gateway endpoint, preventing access from the console, CLI outside the VPC, or any other network path.</p>
+        <p><strong>Recommended approach:</strong> Add a <strong>bucket policy condition</strong> using <code>aws:SourceVpce</code>:</p>
+        <div class="key-concept">
+          <strong>Example bucket policy condition:</strong><br>
+          <code>"Condition": { "StringNotEquals": { "aws:SourceVpce": "vpce-abc123" } }</code><br>
+          This denies all requests that do not arrive through the specified endpoint.
+        </div>
+        <p><strong>Critical warning:</strong> This policy blocks access from everywhere except the endpoint &mdash; including the AWS console, CloudFormation, the account root user (unless they route through the VPC), and emergency administrative access. Before enforcing, always:</p>
+        <ul>
+          <li>Test with a permissive policy first (audit mode using <code>aws:SourceVpce</code> in CloudTrail logs).</li>
+          <li>Include an escape clause allowing the account root or a break-glass role to modify the bucket policy if the endpoint is deleted or misconfigured.</li>
+          <li>Understand that locking yourself out of a bucket policy requires contacting AWS Support.</li>
+        </ul>
+      </div>
+
+      <!-- Scenario F -->
+      <div class="scenario">
+        <h4>Scenario F: Private Access from Multiple Subnets and AZs</h4>
+        <p><strong>Requirement:</strong> An application spans three private subnets across three Availability Zones. It needs private access to ECR (to pull container images) and CloudWatch Logs (to ship logs).</p>
+        <p><strong>Recommended approach:</strong> Create interface endpoints for <code>com.amazonaws.region.ecr.dkr</code>, <code>com.amazonaws.region.ecr.api</code>, and <code>com.amazonaws.region.logs</code>. Select subnets in all three AZs. Enable private DNS.</p>
+        <p><strong>Why all three AZs?</strong> Endpoint ENIs serve traffic for their AZ. If an application in AZ-c has no local endpoint ENI, its DNS resolution may direct traffic to an ENI in another AZ, incurring cross-AZ data transfer charges (~$0.01/GB each way) and adding latency. For resilience, if the AZ with the endpoint ENI has an issue, applications in other AZs may lose connectivity.</p>
+        <p><strong>Cost consideration:</strong> Three endpoints &times; three AZs = 9 ENIs. At ~$0.01/hour per ENI, that is ~$0.09/hour or ~$65/month. Balance this against NAT gateway costs, security requirements, and availability needs.</p>
+        <p><strong>Gateway endpoint note:</strong> For S3 and DynamoDB, gateway endpoints do not have per-AZ placement requirements because they operate at the route-table level rather than through subnet ENIs.</p>
+      </div>
+
+      <!-- Scenario G -->
+      <div class="scenario">
+        <h4>Scenario G: Choosing Between PrivateLink and VPC Peering</h4>
+        <p><strong>Requirement:</strong> A shared-services team runs a logging platform in VPC-A. Application teams in VPC-B need to send logs to the logging platform.</p>
+        <p><strong>Analysis:</strong></p>
+        <table class="comparison-table" style="width:100%;margin:0.5rem 0;">
+          <thead><tr><th>Factor</th><th>PrivateLink</th><th>VPC Peering</th></tr></thead>
+          <tbody>
+            <tr><td>Scope of access</td><td>Only the logging service (NLB targets)</td><td>Entire VPC-A network is reachable</td></tr>
+            <tr><td>Overlapping CIDRs</td><td>Supported</td><td>Not supported</td></tr>
+            <tr><td>Direction</td><td>Unidirectional (consumer &rarr; provider)</td><td>Bidirectional</td></tr>
+            <tr><td>Transitive routing</td><td>Not applicable</td><td>Not transitive</td></tr>
+            <tr><td>Setup complexity</td><td>NLB + endpoint service + endpoint</td><td>Peering connection + route table updates</td></tr>
+          </tbody>
+        </table>
+        <p><strong>Recommendation:</strong> If the only need is sending logs to the logging service, PrivateLink provides tighter access control and works even if CIDRs overlap. If the teams also need broad mutual access (e.g., querying dashboards, accessing admin tools in VPC-A), VPC peering may be simpler.</p>
+      </div>
+
+      <!-- Scenario H -->
+      <div class="scenario">
+        <h4>Scenario H: Troubleshooting a Failed Private Endpoint</h4>
+        <p><strong>Situation:</strong> An EC2 instance in a private subnet cannot reach KMS through a newly created interface endpoint. <code>aws kms list-keys</code> times out.</p>
+        <p><strong>Systematic troubleshooting:</strong></p>
+        <ol>
+          <li><strong>Endpoint state:</strong> Is the endpoint in <code>Available</code> state? (<code>aws ec2 describe-vpc-endpoints</code>)</li>
+          <li><strong>Service and Region:</strong> Is the endpoint for the correct service name in the correct Region? (e.g., <code>com.amazonaws.us-east-1.kms</code>)</li>
+          <li><strong>Endpoint subnets:</strong> Is the endpoint ENI in the same AZ as the EC2 instance? Check that the subnet was selected during endpoint creation.</li>
+          <li><strong>DNS resolution:</strong> Does <code>nslookup kms.us-east-1.amazonaws.com</code> resolve to a private IP (endpoint ENI) or a public IP? If public &rarr; private DNS is not working.</li>
+          <li><strong>Private DNS prerequisites:</strong> Are VPC DNS hostnames and DNS resolution enabled? Both are required.</li>
+          <li><strong>Endpoint security group:</strong> Does the security group on the endpoint ENI allow inbound TCP 443 from the EC2 instance&rsquo;s security group or subnet CIDR?</li>
+          <li><strong>NACLs:</strong> Do the subnet NACLs allow HTTPS traffic and return traffic (ephemeral ports) between the application subnet and the endpoint subnet?</li>
+          <li><strong>Endpoint policy:</strong> Does the endpoint policy allow KMS actions? The default allows everything, but a custom policy may be too restrictive.</li>
+          <li><strong>IAM permissions:</strong> Does the EC2 role have the required KMS permissions?</li>
+          <li><strong>Resource policies:</strong> For services with resource policies (like KMS key policies), do they permit the request?</li>
+        </ol>
+        <p>Work through the checklist in order. Most failures are DNS (private DNS not enabled), security groups (endpoint ENI missing an inbound rule), or subnet mismatch (endpoint not in the application&rsquo;s AZ).</p>
+      </div>
+    </section>
+
+    <hr class="topic-divider">
+
+    <!-- VPE SECTION 3: Architecture Diagram -->
+    <section class="topic-section" id="vpe-diagram">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain1)" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+        Gateway Endpoint vs Interface Endpoint Architecture
+      </h2>
+
+      <svg role="img" aria-label="Diagram comparing gateway endpoint routing to S3 with interface endpoint PrivateLink connectivity to AWS services and custom endpoint services" viewBox="0 0 920 620" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:920px;height:auto;margin:1.5rem auto;display:block;font-family:inherit;">
+        <title>Gateway Endpoint vs Interface Endpoint (PrivateLink) Architecture</title>
+        <desc>Left side shows a private EC2 instance routing S3 traffic through a gateway endpoint via route table prefix list. Right side shows a private EC2 instance connecting through an interface endpoint ENI with private IP via AWS PrivateLink to a supported AWS service, and a provider VPC exposing a service through an NLB and endpoint service to a consumer interface endpoint.</desc>
+
+        <!-- Background -->
+        <rect x="0" y="0" width="920" height="620" rx="12" fill="var(--card-bg, #1a1a2e)" stroke="var(--border, #333)" stroke-width="1.5"/>
+
+        <!-- Title -->
+        <text x="460" y="30" text-anchor="middle" fill="var(--heading, #e0e0e0)" font-size="14" font-weight="600">Gateway Endpoint vs Interface Endpoint (PrivateLink)</text>
+
+        <!-- Divider line -->
+        <line x1="460" y1="45" x2="460" y2="535" stroke="var(--border, #444)" stroke-width="1" stroke-dasharray="6 4"/>
+        <text x="230" y="58" text-anchor="middle" fill="#34d399" font-size="12" font-weight="600">Gateway Endpoint (S3)</text>
+        <text x="690" y="58" text-anchor="middle" fill="#60a5fa" font-size="12" font-weight="600">Interface Endpoint (PrivateLink)</text>
+
+        <!-- ===== LEFT SIDE: Gateway Endpoint ===== -->
+
+        <!-- VPC boundary -->
+        <rect x="20" y="70" width="420" height="310" rx="10" fill="none" stroke="var(--border, #555)" stroke-width="1.5" stroke-dasharray="8 4"/>
+        <text x="35" y="88" fill="var(--text-secondary, #aaa)" font-size="10">Consumer VPC (10.0.0.0/16)</text>
+
+        <!-- Private subnet -->
+        <rect x="35" y="100" width="180" height="120" rx="8" fill="none" stroke="var(--border, #555)" stroke-width="1"/>
+        <text x="45" y="118" fill="var(--text-secondary, #aaa)" font-size="9">Private Subnet (AZ-a)</text>
+
+        <!-- EC2 instance -->
+        <rect x="55" y="130" width="140" height="50" rx="6" fill="var(--card-bg, #1a1a2e)" stroke="#60a5fa" stroke-width="2"/>
+        <text x="125" y="152" text-anchor="middle" fill="#60a5fa" font-size="11" font-weight="600">EC2 App</text>
+        <text x="125" y="168" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="9">IAM Role attached</text>
+
+        <!-- Route table -->
+        <rect x="250" y="105" width="175" height="100" rx="8" fill="var(--card-bg, #1a1a2e)" stroke="#f59e0b" stroke-width="2"/>
+        <text x="337" y="124" text-anchor="middle" fill="#f59e0b" font-size="11" font-weight="600">Route Table</text>
+        <text x="260" y="143" fill="var(--text-secondary, #aaa)" font-size="9">10.0.0.0/16 &rarr; local</text>
+        <text x="260" y="158" fill="#34d399" font-size="9" font-weight="600">pl-s3 &rarr; vpce-gw</text>
+        <text x="260" y="173" fill="var(--text-secondary, #aaa)" font-size="9">0.0.0.0/0 &rarr; nat-gw</text>
+        <text x="260" y="195" fill="var(--text-secondary, #aaa)" font-size="8" font-style="italic">S3 prefix list matches first</text>
+
+        <!-- Arrow: EC2 -> Route table -->
+        <line x1="195" y1="155" x2="250" y2="155" stroke="#34d399" stroke-width="2" marker-end="url(#vpe-arrow)"/>
+
+        <!-- Gateway endpoint -->
+        <rect x="265" y="240" width="160" height="60" rx="8" fill="var(--card-bg, #1a1a2e)" stroke="#34d399" stroke-width="2.5"/>
+        <text x="345" y="265" text-anchor="middle" fill="#34d399" font-size="11" font-weight="600">S3 Gateway Endpoint</text>
+        <text x="345" y="280" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="9">vpce-gw (no ENI, no charge)</text>
+
+        <!-- Arrow: Route table -> Gateway endpoint -->
+        <line x1="337" y1="205" x2="337" y2="240" stroke="#34d399" stroke-width="2" marker-end="url(#vpe-arrow)"/>
+        <text x="347" y="225" fill="#34d399" font-size="8">prefix-list route</text>
+
+        <!-- S3 service -->
+        <rect x="135" y="340" width="140" height="55" rx="8" fill="var(--card-bg, #1a1a2e)" stroke="#34d399" stroke-width="2.5"/>
+        <text x="205" y="363" text-anchor="middle" fill="#34d399" font-size="12" font-weight="600">Amazon S3</text>
+        <text x="205" y="380" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="9">+ Endpoint policy + Bucket policy</text>
+
+        <!-- Arrow: Gateway endpoint -> S3 -->
+        <line x1="310" y1="300" x2="260" y2="340" stroke="#34d399" stroke-width="2" marker-end="url(#vpe-arrow)"/>
+        <text x="295" y="325" fill="#34d399" font-size="8">private path</text>
+
+        <!-- Free label -->
+        <rect x="35" y="350" width="60" height="22" rx="4" fill="#34d399" opacity="0.15"/>
+        <text x="65" y="365" text-anchor="middle" fill="#34d399" font-size="10" font-weight="600">FREE</text>
+
+        <!-- ===== RIGHT SIDE: Interface Endpoint ===== -->
+
+        <!-- Consumer VPC boundary -->
+        <rect x="480" y="70" width="420" height="230" rx="10" fill="none" stroke="var(--border, #555)" stroke-width="1.5" stroke-dasharray="8 4"/>
+        <text x="495" y="88" fill="var(--text-secondary, #aaa)" font-size="10">Consumer VPC</text>
+
+        <!-- Private subnet right -->
+        <rect x="495" y="100" width="160" height="100" rx="8" fill="none" stroke="var(--border, #555)" stroke-width="1"/>
+        <text x="505" y="118" fill="var(--text-secondary, #aaa)" font-size="9">Private Subnet (AZ-a)</text>
+
+        <!-- EC2 instance right -->
+        <rect x="510" y="130" width="130" height="50" rx="6" fill="var(--card-bg, #1a1a2e)" stroke="#60a5fa" stroke-width="2"/>
+        <text x="575" y="152" text-anchor="middle" fill="#60a5fa" font-size="11" font-weight="600">EC2 App</text>
+        <text x="575" y="168" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="9">IAM Role attached</text>
+
+        <!-- Endpoint ENI -->
+        <rect x="690" y="110" width="130" height="65" rx="8" fill="var(--card-bg, #1a1a2e)" stroke="#60a5fa" stroke-width="2.5"/>
+        <text x="755" y="133" text-anchor="middle" fill="#60a5fa" font-size="10" font-weight="600">Endpoint ENI</text>
+        <text x="755" y="148" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="9">Private IP: 10.0.1.47</text>
+        <text x="755" y="163" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="9">SG: allow 443 inbound</text>
+
+        <!-- Arrow: EC2 -> ENI -->
+        <line x1="640" y1="150" x2="690" y2="145" stroke="#60a5fa" stroke-width="2" marker-end="url(#vpe-arrow)"/>
+        <text x="655" y="138" fill="#60a5fa" font-size="8">HTTPS/443</text>
+
+        <!-- Private DNS note -->
+        <rect x="670" y="185" width="170" height="30" rx="5" fill="var(--card-bg, #1a1a2e)" stroke="var(--border, #444)" stroke-width="1"/>
+        <text x="755" y="204" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="8">Private DNS: sts.region.amazonaws.com</text>
+        <text x="755" y="213" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="8">&rarr; resolves to 10.0.1.47</text>
+
+        <!-- PrivateLink tunnel -->
+        <rect x="640" y="235" width="200" height="30" rx="5" fill="#60a5fa" opacity="0.12"/>
+        <text x="740" y="255" text-anchor="middle" fill="#60a5fa" font-size="10" font-weight="600">AWS PrivateLink</text>
+
+        <!-- AWS Service -->
+        <rect x="670" y="280" width="160" height="50" rx="8" fill="var(--card-bg, #1a1a2e)" stroke="#60a5fa" stroke-width="2.5"/>
+        <text x="750" y="303" text-anchor="middle" fill="#60a5fa" font-size="12" font-weight="600">AWS Service (STS)</text>
+        <text x="750" y="318" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="9">+ Endpoint policy + IAM</text>
+
+        <!-- Arrow: ENI -> PrivateLink -> Service -->
+        <line x1="755" y1="175" x2="755" y2="235" stroke="#60a5fa" stroke-width="2" marker-end="url(#vpe-arrow)"/>
+        <line x1="755" y1="265" x2="755" y2="280" stroke="#60a5fa" stroke-width="2" marker-end="url(#vpe-arrow)"/>
+
+        <!-- ===== BOTTOM: PrivateLink Provider Pattern ===== -->
+        <rect x="480" y="360" width="420" height="160" rx="10" fill="none" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="8 4"/>
+        <text x="495" y="378" fill="#a78bfa" font-size="10" font-weight="600">PrivateLink: Provider-Consumer Pattern</text>
+
+        <!-- Provider VPC -->
+        <rect x="680" y="390" width="200" height="115" rx="8" fill="none" stroke="#a78bfa" stroke-width="1" stroke-dasharray="5 3"/>
+        <text x="695" y="408" fill="#a78bfa" font-size="9">Provider VPC</text>
+
+        <!-- Provider backend -->
+        <rect x="770" y="420" width="95" height="40" rx="6" fill="var(--card-bg, #1a1a2e)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="818" y="438" text-anchor="middle" fill="#a78bfa" font-size="9" font-weight="600">API Backend</text>
+        <text x="818" y="452" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="8">(EC2/ECS)</text>
+
+        <!-- NLB -->
+        <rect x="695" y="420" width="60" height="40" rx="6" fill="var(--card-bg, #1a1a2e)" stroke="#a78bfa" stroke-width="2"/>
+        <text x="725" y="444" text-anchor="middle" fill="#a78bfa" font-size="10" font-weight="600">NLB</text>
+
+        <!-- Arrow: NLB -> Backend -->
+        <line x1="755" y1="440" x2="770" y2="440" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#vpe-arrow)"/>
+
+        <!-- Endpoint service -->
+        <rect x="695" y="470" width="130" height="28" rx="5" fill="var(--card-bg, #1a1a2e)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="760" y="488" text-anchor="middle" fill="#a78bfa" font-size="9">Endpoint Service</text>
+
+        <!-- Arrow: NLB -> Endpoint service -->
+        <line x1="725" y1="460" x2="725" y2="470" stroke="#a78bfa" stroke-width="1" marker-end="url(#vpe-arrow)"/>
+
+        <!-- Consumer endpoint -->
+        <rect x="500" y="420" width="140" height="55" rx="8" fill="var(--card-bg, #1a1a2e)" stroke="#60a5fa" stroke-width="2"/>
+        <text x="570" y="442" text-anchor="middle" fill="#60a5fa" font-size="10" font-weight="600">Consumer Endpoint</text>
+        <text x="570" y="457" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="8">ENI: 10.0.2.88</text>
+        <text x="570" y="469" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="8">In consumer VPC</text>
+
+        <!-- Arrow: Consumer endpoint -> Endpoint service via PrivateLink -->
+        <line x1="640" y1="445" x2="695" y2="445" stroke="#a78bfa" stroke-width="2" marker-end="url(#vpe-arrow)"/>
+        <text x="655" y="438" fill="#a78bfa" font-size="8">PrivateLink</text>
+
+        <!-- Annotation: no broad VPC access -->
+        <rect x="500" y="487" width="170" height="22" rx="4" fill="#a78bfa" opacity="0.1"/>
+        <text x="585" y="502" text-anchor="middle" fill="#a78bfa" font-size="8">Consumer sees only NLB targets</text>
+
+        <!-- Legend -->
+        <rect x="20" y="545" width="880" height="60" rx="8" fill="var(--card-bg, #1a1a2e)" stroke="var(--border, #444)" stroke-width="1"/>
+        <text x="35" y="565" fill="var(--text-secondary, #aaa)" font-size="10" font-weight="600">Legend:</text>
+        <line x1="35" y1="578" x2="60" y2="578" stroke="#34d399" stroke-width="2"/>
+        <text x="65" y="582" fill="var(--text-secondary, #aaa)" font-size="9">Gateway endpoint (route-table, free, S3/DynamoDB)</text>
+        <line x1="320" y1="578" x2="345" y2="578" stroke="#60a5fa" stroke-width="2"/>
+        <text x="350" y="582" fill="var(--text-secondary, #aaa)" font-size="9">Interface endpoint (ENI, PrivateLink, 100+ services)</text>
+        <line x1="620" y1="578" x2="645" y2="578" stroke="#a78bfa" stroke-width="2"/>
+        <text x="650" y="582" fill="var(--text-secondary, #aaa)" font-size="9">PrivateLink provider pattern (NLB + endpoint service)</text>
+        <text x="35" y="598" fill="var(--text-secondary, #aaa)" font-size="9" font-style="italic">Endpoints provide connectivity. IAM + resource policies provide authorization. Both are required.</text>
+
+        <!-- Arrow marker -->
+        <defs>
+          <marker id="vpe-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 Z" fill="var(--text-secondary, #aaa)"/>
+          </marker>
+        </defs>
+      </svg>
+
+      <p><strong>Left side:</strong> The S3 gateway endpoint adds a prefix-list route to the route table. S3 traffic from the private subnet follows this route directly to S3 &mdash; no NAT gateway, no charge. <strong>Right side:</strong> The interface endpoint creates an ENI with a private IP. Private DNS resolves the service hostname to this IP. Traffic flows through PrivateLink to the AWS service. <strong>Bottom:</strong> For custom services, a provider publishes an endpoint service backed by an NLB. The consumer creates an interface endpoint that connects through PrivateLink &mdash; only the NLB targets are reachable, not the provider&rsquo;s entire VPC.</p>
+    </section>
+
+    <hr class="topic-divider">
+
+    <!-- VPE SECTION 4: Exam Gotchas -->
+    <section class="topic-section" id="vpe-gotchas">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        Exam Gotchas
+      </h2>
+
+      <div class="gotcha">
+        <h4>1. Gateway Endpoints = Interface Endpoints</h4>
+        <p><strong>Misconception:</strong> All VPC endpoints work the same way.</p>
+        <p><strong>Correct:</strong> Gateway endpoints add routes to route tables (S3 and DynamoDB only, free). Interface endpoints create ENIs with private IPs in subnets (PrivateLink, 100+ services, paid). They have different architectures, costs, and configuration requirements.</p>
+        <p><strong>Exam clue:</strong> "S3 access from private subnet without NAT" &rarr; gateway endpoint. "Private STS/KMS/ECR access with ENI" &rarr; interface endpoint.</p>
+        <p><strong>Memory rule:</strong> Gateway = route table. Interface = ENI.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>2. All VPC Endpoints Use PrivateLink</h4>
+        <p><strong>Misconception:</strong> Every VPC endpoint is powered by AWS PrivateLink.</p>
+        <p><strong>Correct:</strong> Only <strong>interface endpoints</strong> use PrivateLink. Gateway endpoints for S3 and DynamoDB are a separate mechanism based on route-table prefix lists. The AWS documentation explicitly states: "Gateway endpoints do not use AWS PrivateLink."</p>
+        <p><strong>Exam clue:</strong> "PrivateLink" in the answer &rarr; interface endpoint. "Route table entry for S3" &rarr; gateway endpoint.</p>
+        <p><strong>Memory rule:</strong> PrivateLink = interface endpoints only. Gateway endpoints are their own thing.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>3. Gateway Endpoints Create ENIs</h4>
+        <p><strong>Misconception:</strong> Gateway endpoints create endpoint network interfaces in subnets.</p>
+        <p><strong>Correct:</strong> Gateway endpoints do not create ENIs. They add a route to the route tables you select. Only interface endpoints (and GWLB endpoints) create endpoint network interfaces.</p>
+        <p><strong>Exam clue:</strong> "Endpoint network interface with private IP" &rarr; interface endpoint. "Prefix list in route table" &rarr; gateway endpoint.</p>
+        <p><strong>Memory rule:</strong> Gateway = route. Interface = ENI.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>4. Interface Endpoints Use Route Tables Like Gateway Endpoints</h4>
+        <p><strong>Misconception:</strong> Interface endpoints add a prefix-list route to the route table.</p>
+        <p><strong>Correct:</strong> Interface endpoints use <strong>DNS</strong> to direct traffic to the endpoint ENI&rsquo;s private IP. When private DNS is enabled, the standard service hostname resolves to the ENI&rsquo;s IP. No route-table change is needed. Gateway endpoints are the ones that add prefix-list routes.</p>
+        <p><strong>Exam clue:</strong> "Private DNS resolves service hostname to private IP" &rarr; interface endpoint.</p>
+        <p><strong>Memory rule:</strong> Gateway = route table routing. Interface = DNS routing.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>5. Gateway Endpoints Support Many Services</h4>
+        <p><strong>Misconception:</strong> Gateway endpoints work with any AWS service.</p>
+        <p><strong>Correct:</strong> Gateway endpoints support only <strong>Amazon S3</strong> and <strong>Amazon DynamoDB</strong>. For all other services (STS, KMS, ECR, CloudWatch, etc.), you need interface endpoints.</p>
+        <p><strong>Exam clue:</strong> "Gateway endpoint for KMS" &rarr; wrong. KMS requires an interface endpoint.</p>
+        <p><strong>Memory rule:</strong> Gateway endpoints = S3 and DynamoDB. Everything else = interface endpoint.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>6. PrivateLink = VPC Peering</h4>
+        <p><strong>Misconception:</strong> PrivateLink and VPC peering provide the same connectivity.</p>
+        <p><strong>Correct:</strong> PrivateLink exposes a <strong>specific service</strong> (NLB targets) without connecting entire VPCs. VPC peering connects <strong>entire VPCs</strong> bidirectionally. PrivateLink supports overlapping CIDRs; peering does not. PrivateLink is unidirectional (consumer &rarr; provider); peering is bidirectional.</p>
+        <p><strong>Exam clue:</strong> "Expose one service to another VPC without broad network access" &rarr; PrivateLink. "Full VPC-to-VPC connectivity" &rarr; peering or TGW.</p>
+        <p><strong>Memory rule:</strong> PrivateLink = one service. VPC peering = two whole networks.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>7. PrivateLink Exposes the Provider&rsquo;s Entire VPC</h4>
+        <p><strong>Misconception:</strong> A consumer using PrivateLink can reach any resource in the provider&rsquo;s VPC.</p>
+        <p><strong>Correct:</strong> The consumer can only reach the NLB targets behind the endpoint service. The provider&rsquo;s other resources are completely unreachable through the PrivateLink connection.</p>
+        <p><strong>Exam clue:</strong> "Minimize network exposure" + "expose only one API" &rarr; PrivateLink.</p>
+        <p><strong>Memory rule:</strong> PrivateLink is a keyhole, not an open door.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>8. VPC Endpoint = IAM Permission</h4>
+        <p><strong>Misconception:</strong> Creating a VPC endpoint grants the application permission to use the service.</p>
+        <p><strong>Correct:</strong> An endpoint provides <strong>network connectivity</strong>, not authorization. The application still needs IAM permissions, and resource policies must allow the request. Creating an S3 gateway endpoint does not grant any role <code>s3:GetObject</code>.</p>
+        <p><strong>Exam clue:</strong> "Application gets Access Denied through endpoint" &rarr; check IAM and resource policies, not just the endpoint.</p>
+        <p><strong>Memory rule:</strong> Endpoint = road to the service. IAM = permission to enter.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>9. Endpoint Policy Replaces IAM</h4>
+        <p><strong>Misconception:</strong> An endpoint policy is a substitute for IAM policies and resource policies.</p>
+        <p><strong>Correct:</strong> Endpoint policies are an <strong>additional</strong> restriction layer. All must agree: the endpoint policy, IAM identity policy, and resource policy. An endpoint policy allows <code>s3:GetObject</code>, but the IAM role also needs it, and the bucket policy must not deny it.</p>
+        <p><strong>Exam clue:</strong> "Restrict which buckets are accessible through the endpoint" &rarr; endpoint policy. "Grant the role S3 access" &rarr; IAM policy.</p>
+        <p><strong>Memory rule:</strong> Endpoint policy = network-level filter. IAM policy = identity-level grant. Both required.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>10. Security Groups Apply to Gateway Endpoints</h4>
+        <p><strong>Misconception:</strong> You can attach a security group to an S3 gateway endpoint.</p>
+        <p><strong>Correct:</strong> Gateway endpoints do not have ENIs, so they do not have security groups. Security groups apply to <strong>interface endpoint ENIs</strong>. For gateway endpoints, you control access through endpoint policies, IAM, and route-table associations.</p>
+        <p><strong>Exam clue:</strong> "Security group on endpoint" &rarr; interface endpoint. Gateway endpoints have no security groups.</p>
+        <p><strong>Memory rule:</strong> No ENI = no security group. Gateway endpoints have neither.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>11. Private DNS Works Without VPC DNS Settings</h4>
+        <p><strong>Misconception:</strong> Private DNS for interface endpoints works automatically.</p>
+        <p><strong>Correct:</strong> Private DNS requires the VPC to have <strong>DNS hostnames</strong> and <strong>DNS resolution</strong> enabled. If either is disabled, the standard service hostname will not resolve to the endpoint ENI&rsquo;s IP, and the application must use the endpoint-specific DNS name.</p>
+        <p><strong>Exam clue:</strong> "Application still resolves public IP despite endpoint" &rarr; private DNS prerequisites not met.</p>
+        <p><strong>Memory rule:</strong> Private DNS needs: DNS hostnames ON + DNS resolution ON + private DNS enabled on endpoint.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>12. Endpoint Prevents All Public Access</h4>
+        <p><strong>Misconception:</strong> Creating a VPC endpoint automatically blocks all public access to the service.</p>
+        <p><strong>Correct:</strong> An endpoint provides a private path, but it does not disable the public endpoint. Traffic can still reach S3 via NAT gateway or IGW unless you explicitly block it with bucket policies (<code>aws:SourceVpce</code>) or remove the alternative routes.</p>
+        <p><strong>Exam clue:</strong> "Ensure S3 access only from VPC endpoint" &rarr; bucket policy with <code>aws:SourceVpce</code> condition.</p>
+        <p><strong>Memory rule:</strong> Endpoints add a private path. They do not remove the public one. Block it separately.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>13. Endpoint Routing = Endpoint Authorization</h4>
+        <p><strong>Misconception:</strong> If traffic reaches the service through an endpoint, the request is automatically authorized.</p>
+        <p><strong>Correct:</strong> Routing and authorization are separate. The route table directs traffic to the endpoint (connectivity). IAM, resource policies, and endpoint policies determine whether the request succeeds (authorization). A properly routed but unauthorized request returns Access Denied.</p>
+        <p><strong>Exam clue:</strong> "Traffic reaches S3 through endpoint but gets 403" &rarr; routing works, authorization fails. Check IAM and bucket policy.</p>
+        <p><strong>Memory rule:</strong> Routing gets you to the door. Authorization lets you in.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>14. Endpoint Policies Work Identically Everywhere</h4>
+        <p><strong>Misconception:</strong> Every endpoint type and service supports endpoint policies with the same behavior.</p>
+        <p><strong>Correct:</strong> Endpoint policy support varies by service and endpoint type. Not all services support endpoint policies, and the available conditions and actions differ. Always verify for the specific service.</p>
+        <p><strong>Exam clue:</strong> Questions rarely test edge cases of endpoint policy support, but do not assume universal support.</p>
+        <p><strong>Memory rule:</strong> Endpoint policies are supported where the service allows them. Verify, do not assume.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>15. NAT Gateway = VPC Endpoint</h4>
+        <p><strong>Misconception:</strong> NAT gateways and VPC endpoints are interchangeable for AWS service access.</p>
+        <p><strong>Correct:</strong> NAT gateways provide general outbound internet access (traffic exits VPC). VPC endpoints provide private service-specific connectivity (traffic stays on AWS backbone). They solve different problems. An S3 gateway endpoint replaces NAT for S3 traffic but cannot replace NAT for internet-bound traffic.</p>
+        <p><strong>Exam clue:</strong> "Reduce NAT costs for S3 traffic" &rarr; S3 gateway endpoint. "Application needs to call an external API" &rarr; still needs NAT gateway.</p>
+        <p><strong>Memory rule:</strong> Endpoint = private AWS service access. NAT = internet access. Different tools.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>16. Successful Connection = Authorized Request</h4>
+        <p><strong>Misconception:</strong> If the endpoint connection is established, the API call will succeed.</p>
+        <p><strong>Correct:</strong> Connection and authorization are separate layers. The endpoint provides connectivity. The API call still goes through IAM evaluation, resource policies, and the endpoint policy. A working network path does not bypass AWS authorization.</p>
+        <p><strong>Exam clue:</strong> "Application connects but receives 403 Forbidden" &rarr; connectivity works, check authorization.</p>
+        <p><strong>Memory rule:</strong> Connection &ne; permission. Always check both.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>17. Forgetting Provider-Side Configuration</h4>
+        <p><strong>Misconception:</strong> A consumer can connect to any endpoint service without provider approval.</p>
+        <p><strong>Correct:</strong> The provider must add the consumer&rsquo;s AWS principal to the endpoint service&rsquo;s <strong>allowed principals</strong>. If manual acceptance is enabled, the provider must also accept each connection request. Without these steps, the consumer&rsquo;s interface endpoint stays in <code>PendingAcceptance</code> or <code>Rejected</code> state.</p>
+        <p><strong>Exam clue:</strong> "Endpoint stuck in pending" &rarr; provider has not accepted or has not added the consumer as an allowed principal.</p>
+        <p><strong>Memory rule:</strong> PrivateLink = both sides must agree. Provider allows, consumer connects.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>18. Endpoint Removes Need for Security Groups and NACLs</h4>
+        <p><strong>Misconception:</strong> Private endpoints eliminate the need for security groups and NACLs.</p>
+        <p><strong>Correct:</strong> Endpoints change the network path, not the security model. Interface endpoint ENIs still need security groups allowing HTTPS inbound. NACLs on the endpoint subnet still apply. An endpoint makes traffic private; it does not remove the need for network-level filtering and least-privilege IAM.</p>
+        <p><strong>Exam clue:</strong> "Application cannot reach endpoint" + "security group" &rarr; check endpoint ENI security group for port 443.</p>
+        <p><strong>Memory rule:</strong> Private does not mean unguarded. Security groups and NACLs still apply.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>19. All Endpoints Support Cross-Region Access</h4>
+        <p><strong>Misconception:</strong> VPC endpoints can connect to services in other Regions.</p>
+        <p><strong>Correct:</strong> Gateway endpoints connect only to the service in the same Region. Interface endpoints typically connect to services in the same Region, though some services support cross-Region patterns via specific configurations. Always verify for the particular service.</p>
+        <p><strong>Exam clue:</strong> "Access S3 in another Region via endpoint" &rarr; gateway endpoints do not support this. Interface endpoints or S3 Multi-Region Access Points may help.</p>
+        <p><strong>Memory rule:</strong> Endpoints are regional by default. Cross-Region requires explicit design.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>20. Endpoints Eliminate All NAT Costs</h4>
+        <p><strong>Misconception:</strong> Creating VPC endpoints eliminates the NAT gateway entirely.</p>
+        <p><strong>Correct:</strong> Endpoints cover only traffic to supported AWS services. If your application also calls third-party APIs, downloads packages, or accesses any service without an endpoint, you still need a NAT gateway. Interface endpoints have their own per-hour and per-GB charges.</p>
+        <p><strong>Exam clue:</strong> "Reduce NAT costs" &rarr; endpoints help for supported traffic. "Eliminate NAT gateway" &rarr; only if no other internet-bound traffic exists.</p>
+        <p><strong>Memory rule:</strong> Endpoints reduce NAT costs for supported traffic. They do not eliminate NAT unless nothing else needs internet.</p>
+      </div>
+
+    </section>
+
+    <hr class="topic-divider">
+
+    <!-- VPE SECTION 5: Practice Questions -->
+    <section class="topic-section" id="vpe-practice">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Scenario-Based Practice Questions
+      </h2>
+
+      <div class="practice-questions">
+        <h4>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          Practice Questions &mdash; VPC Endpoints &amp; PrivateLink
+        </h4>
+
+        <!-- Q1: Private EC2 Access to S3 -->
+        <div class="practice-q">
+          <p class="q-text">Q1. A company runs data-processing EC2 instances in private subnets that upload large files to an S3 bucket in the same Region. Currently, all S3 traffic goes through a NAT gateway, generating significant data-processing costs. The security team also wants S3 traffic to stay on the AWS backbone. The solution must not require application code changes. Which approach meets these requirements with the LOWEST cost?</p>
+          <ul class="q-options">
+            <li><span class="q-letter">A.</span> Create an S3 interface endpoint powered by PrivateLink in the private subnets. Enable private DNS so the application resolves <code>s3.amazonaws.com</code> to the endpoint ENI&rsquo;s private IP.</li>
+            <li><span class="q-letter">B.</span> Create an S3 gateway endpoint and associate it with the private subnet route tables. The route table will direct S3 traffic through the endpoint instead of the NAT gateway.</li>
+            <li><span class="q-letter">C.</span> Move the EC2 instances to a public subnet with an internet gateway so S3 traffic bypasses the NAT gateway. Assign public IPs to the instances.</li>
+            <li><span class="q-letter">D.</span> Create a VPC peering connection to the S3 service VPC and add a route in the private subnet route table pointing to the peering connection for S3 traffic.</li>
+          </ul>
+          <button class="reveal-btn">Show Answer</button>
+          <div class="answer-reveal">
+            <p><strong>Correct Answer: B</strong></p>
+            <p>An <strong>S3 gateway endpoint</strong> adds a prefix-list route to the associated route tables, directing S3 traffic through the endpoint instead of the NAT gateway. It is <strong>free</strong> (no hourly or per-GB charges), keeps traffic on the AWS backbone, and requires no application code changes &mdash; the application still calls <code>s3.amazonaws.com</code>.</p>
+            <p><strong>Why not the others?</strong></p>
+            <ul>
+              <li><strong>A</strong> works but S3 interface endpoints have per-hour and per-GB charges. For high-throughput S3 uploads in the same Region, the gateway endpoint is free and sufficient.</li>
+              <li><strong>C</strong> eliminates NAT costs but moves instances to a public subnet, exposing them to the internet. This violates the security requirement of keeping instances in private subnets.</li>
+              <li><strong>D</strong> is wrong because you cannot create a VPC peering connection to S3 &mdash; S3 is a public AWS service, not a VPC. VPC peering connects two VPCs.</li>
+            </ul>
+            <p><strong>Key exam clue:</strong> "S3 access from private subnet" + "reduce NAT costs" + "lowest cost" = S3 gateway endpoint (free).</p>
+            <p><strong>Takeaway:</strong> S3 gateway endpoint = free, route-table-based, same-Region S3 access. Always the lowest-cost option for private S3 access within the same Region.</p>
+          </div>
+        </div>
+
+        <!-- Q2: Private Access to Supported Service -->
+        <div class="practice-q">
+          <p class="q-text">Q2. A financial services application in a private subnet must call AWS STS and AWS KMS APIs. The company&rsquo;s security policy prohibits any traffic from the VPC traversing the public internet, even through a NAT gateway. The application uses the standard AWS SDK with default service hostnames. Which solution provides private API access with MINIMAL application changes?</p>
+          <ul class="q-options">
+            <li><span class="q-letter">A.</span> Create gateway endpoints for STS and KMS. Associate them with the private subnet route tables so traffic to these services follows the endpoint route.</li>
+            <li><span class="q-letter">B.</span> Create interface endpoints for STS and KMS with private DNS enabled. Ensure the endpoint security groups allow inbound HTTPS (port 443) from the application&rsquo;s security group.</li>
+            <li><span class="q-letter">C.</span> Create an S3 gateway endpoint for STS and KMS traffic. S3 gateway endpoints support all AWS services.</li>
+            <li><span class="q-letter">D.</span> Configure the application to use hard-coded endpoint-specific DNS names for STS and KMS. No VPC endpoint is needed because the SDK supports direct private IP connections.</li>
+          </ul>
+          <button class="reveal-btn">Show Answer</button>
+          <div class="answer-reveal">
+            <p><strong>Correct Answer: B</strong></p>
+            <p><strong>Interface endpoints</strong> powered by PrivateLink provide private connectivity to STS and KMS. With <strong>private DNS enabled</strong>, the standard hostnames (<code>sts.us-east-1.amazonaws.com</code>, <code>kms.us-east-1.amazonaws.com</code>) resolve to the endpoint ENIs&rsquo; private IPs, so the application needs no code changes. The endpoint ENI security groups must allow inbound HTTPS from the application.</p>
+            <p><strong>Why not the others?</strong></p>
+            <ul>
+              <li><strong>A</strong> is wrong because gateway endpoints are available only for S3 and DynamoDB, not STS or KMS.</li>
+              <li><strong>C</strong> is wrong because S3 gateway endpoints work only for S3 traffic, not for other AWS services.</li>
+              <li><strong>D</strong> is wrong because the SDK uses public endpoints by default, and without a VPC endpoint, the traffic would need to reach the public internet. Hard-coded endpoint DNS names would work if endpoints were created, but this approach is unnecessary when private DNS handles it automatically.</li>
+            </ul>
+            <p><strong>Key exam clue:</strong> "Private API access" + "STS/KMS" + "no internet traffic" + "minimal changes" = interface endpoints with private DNS.</p>
+            <p><strong>Takeaway:</strong> Interface endpoints + private DNS = transparent private access to 100+ AWS services. Gateway endpoints are only for S3 and DynamoDB.</p>
+          </div>
+        </div>
+
+        <!-- Q3: Exposing Service Across VPCs -->
+        <div class="practice-q">
+          <p class="q-text">Q3. Company A operates a compliance reporting API in VPC-A. Company B needs to call this API from VPC-B, which is in a different AWS account. Company A&rsquo;s security team requires that Company B can access ONLY the compliance API &mdash; not any other resources in VPC-A. The VPCs have overlapping CIDR ranges (both use 10.0.0.0/16). Which architecture meets these requirements?</p>
+          <ul class="q-options">
+            <li><span class="q-letter">A.</span> Create a VPC peering connection between VPC-A and VPC-B. Add route table entries in both VPCs. Use security groups to restrict Company B&rsquo;s access to only the compliance API servers.</li>
+            <li><span class="q-letter">B.</span> Deploy the compliance API behind an Application Load Balancer (ALB) with a public endpoint. Company B accesses it over the internet with TLS encryption.</li>
+            <li><span class="q-letter">C.</span> Create an AWS Transit Gateway and attach both VPCs. Configure TGW route tables to restrict Company B&rsquo;s traffic to only the compliance API subnet.</li>
+            <li><span class="q-letter">D.</span> Deploy the compliance API behind a Network Load Balancer in VPC-A. Create an endpoint service referencing the NLB, add Company B as an allowed principal, and have Company B create an interface endpoint in VPC-B to connect through PrivateLink.</li>
+          </ul>
+          <button class="reveal-btn">Show Answer</button>
+          <div class="answer-reveal">
+            <p><strong>Correct Answer: D</strong></p>
+            <p><strong>AWS PrivateLink</strong> exposes only the NLB targets (the compliance API) to Company B &mdash; not the rest of VPC-A. PrivateLink works with overlapping CIDRs because the consumer connects to the endpoint ENI&rsquo;s private IP in their own VPC, not to VPC-A&rsquo;s address space. The provider controls access through allowed principals and optional manual acceptance.</p>
+            <p><strong>Why not the others?</strong></p>
+            <ul>
+              <li><strong>A</strong> is impossible because VPC peering does not support overlapping CIDR ranges (both VPCs use 10.0.0.0/16). Even if CIDRs were different, peering would expose the entire VPC, not just the compliance API.</li>
+              <li><strong>B</strong> works but exposes the API to the public internet, violating the principle of least exposure. TLS encrypts traffic but does not prevent internet-based attacks.</li>
+              <li><strong>C</strong> also does not support overlapping CIDRs for Transit Gateway attachments. TGW provides broad network connectivity, which is more than needed for one API.</li>
+            </ul>
+            <p><strong>Key exam clue:</strong> "Expose one service" + "different accounts" + "overlapping CIDRs" + "no broad network access" = PrivateLink with NLB + endpoint service.</p>
+            <p><strong>Takeaway:</strong> PrivateLink = expose one service privately. Works with overlapping CIDRs. Consumer sees only NLB targets. Use it when the requirement is service-level, not network-level connectivity.</p>
           </div>
         </div>
       </div>
