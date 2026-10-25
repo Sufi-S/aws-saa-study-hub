@@ -1043,5 +1043,105 @@
     "term": "DynamoDB Access-Pattern-Driven Design",
     "definition": "Design DynamoDB tables around the queries your application needs to perform, not the entity relationships. Choose partition keys, sort keys, and indexes based on known access patterns. This is the opposite of relational database design.",
     "gotcha": "DynamoDB's flexible schema does not mean 'no design needed.' Poor key design leads to hot partitions, expensive scans, and inability to support required queries."
+  },
+  {
+    "term": "S3 Standard Storage",
+    "definition": "General-purpose S3 storage for frequently accessed data. Stored across >= 3 AZs. 99.99% availability, 11 nines durability. No retrieval charges, no minimum storage duration. Highest per-GB storage cost among standard classes.",
+    "gotcha": "Standard is not always the cheapest option. For infrequent access, Standard-IA or Glacier Instant Retrieval can reduce storage costs."
+  },
+  {
+    "term": "S3 Intelligent-Tiering Tiers",
+    "definition": "Automatically moves objects between tiers based on access: Frequent Access (default), Infrequent (30 days), Archive Instant (90 days). Optional: Archive Access (90+ days) and Deep Archive Access (180+ days). No retrieval charges for Frequent/Infrequent tiers. Small monitoring fee per object >= 128 KB.",
+    "gotcha": "Objects < 128 KB are NOT monitored and stay in Frequent Access. Optional archive tiers require a restore before access."
+  },
+  {
+    "term": "Standard-IA vs One Zone-IA",
+    "definition": "Standard-IA stores across >= 3 AZs (99.9% availability). One Zone-IA stores in a single AZ (99.5% availability, data lost if AZ destroyed). Both have 30-day minimum duration and retrieval charges. One Zone-IA is cheaper but not AZ-resilient.",
+    "gotcha": "If the exam requires 'resilience across AZs,' One Zone-IA is wrong. Use it only for recreatable or secondary copies."
+  },
+  {
+    "term": "S3 Glacier Instant Retrieval",
+    "definition": "Archival storage with millisecond retrieval for rarely accessed data (e.g., quarterly). Lower storage cost than Standard-IA but higher retrieval charges. 90-day minimum duration. No restore process needed — data available immediately.",
+    "gotcha": "Don't confuse with Glacier Flexible (needs restore, 1 min–12 hrs) or Deep Archive (12–48 hrs). Instant = milliseconds."
+  },
+  {
+    "term": "S3 Glacier Flexible Retrieval Options",
+    "definition": "Archive storage requiring a restore before access. Three retrieval tiers: Expedited (1–5 minutes), Standard (3–5 hours), Bulk (5–12 hours). 90-day minimum storage duration. Objects must be restored to a temporary Standard copy.",
+    "gotcha": "Expedited is minutes, not milliseconds. For millisecond archival access, use Glacier Instant Retrieval instead."
+  },
+  {
+    "term": "S3 Glacier Deep Archive",
+    "definition": "Lowest-cost S3 storage for data retained years and very rarely accessed. Standard retrieval within 12 hours, Bulk within 48 hours. No expedited option. 180-day minimum storage duration.",
+    "gotcha": "Deep Archive has NO expedited retrieval. If the scenario needs fast access, this is the wrong class."
+  },
+  {
+    "term": "S3 Lifecycle Transition Rules",
+    "definition": "Lifecycle policies automate moving objects to cheaper storage classes based on age. Transitions follow a one-way waterfall (Standard → IA → Glacier → Deep Archive). Objects < 128 KB don't transition to IA classes. Minimum duration constraints must be respected.",
+    "gotcha": "You cannot transition backwards (e.g., Glacier to Standard) via lifecycle. Each class has minimum duration before further transition."
+  },
+  {
+    "term": "S3 Lifecycle Expiration",
+    "definition": "Lifecycle expiration actions automatically delete objects or noncurrent versions after a specified period. Can target specific prefixes or tags. Useful for cleaning up temp files, logs, and old noncurrent versions in versioned buckets.",
+    "gotcha": "Transition moves objects to cheaper classes. Expiration deletes them. Don't confuse the two — they're separate lifecycle action types."
+  },
+  {
+    "term": "S3 Versioning Mechanics",
+    "definition": "When enabled, every PUT creates a new version with a unique version ID. Overwriting creates a new version; old versions remain. A simple DELETE creates a delete marker (hides but doesn't destroy). Permanent deletion requires specifying the version ID.",
+    "gotcha": "Once enabled, versioning can only be suspended, never fully disabled. All versions consume storage — use lifecycle rules on noncurrent versions."
+  },
+  {
+    "term": "S3 Version ID",
+    "definition": "A unique identifier assigned to each version of an object in a versioned bucket. Used to retrieve or permanently delete a specific version. Without specifying a version ID, operations affect the current version only.",
+    "gotcha": "DELETE with version ID = permanent irreversible deletion. DELETE without version ID = delete marker (recoverable)."
+  },
+  {
+    "term": "S3 Delete Marker",
+    "definition": "A placeholder created when an object is deleted in a versioned bucket without specifying a version ID. Hides the object from normal GET and LIST operations. All previous versions still exist. Removing the delete marker restores the latest version.",
+    "gotcha": "A delete marker is NOT permanent deletion. It's a hide operation. Remove it to restore access."
+  },
+  {
+    "term": "S3 Current vs Noncurrent Version",
+    "definition": "The current version is the latest version of an object (served by default GET). Noncurrent versions are all previous versions after an overwrite. Lifecycle rules can target current and noncurrent versions separately for different transition/expiration schedules.",
+    "gotcha": "Noncurrent versions accumulate storage costs. Without lifecycle rules, versioned buckets grow indefinitely."
+  },
+  {
+    "term": "S3 Same-Region Replication (SRR)",
+    "definition": "Copies eligible objects to another bucket in the same AWS Region. Requires versioning on both buckets. Uses IAM role for permissions. Common for log aggregation, test/prod separation, and compliance copies.",
+    "gotcha": "SRR copies within a Region — it does NOT provide cross-Region DR. Use CRR for that."
+  },
+  {
+    "term": "S3 Cross-Region Replication (CRR)",
+    "definition": "Copies eligible objects to a bucket in a different AWS Region. Requires versioning on both buckets, IAM role, and destination bucket policy. Replication is async with lag. Cross-Region data transfer charges apply.",
+    "gotcha": "CRR only replicates new objects after the rule is created. Use Batch Replication for existing objects. Delete markers are NOT replicated by default."
+  },
+  {
+    "term": "S3 Replication Lag and RTC",
+    "definition": "S3 replication is asynchronous — there is always some delay between source write and replica availability. Replication Time Control (RTC) provides an SLA that 99.99% of new objects replicate within 15 minutes, for additional cost.",
+    "gotcha": "RTC provides a 15-minute SLA, not instant replication. RTC does NOT apply to Batch Replication operations."
+  },
+  {
+    "term": "S3 Batch Replication",
+    "definition": "An on-demand job that replicates existing objects written before a replication rule was created. Also retries previously failed replications. Runs via S3 Batch Operations. Not covered by the RTC SLA.",
+    "gotcha": "Standard CRR/SRR = new objects only. Existing objects = Batch Replication. The exam tests this distinction."
+  },
+  {
+    "term": "S3 Object Lock",
+    "definition": "Provides WORM (Write Once Read Many) protection. Governance mode: can be overridden by privileged users. Compliance mode: cannot be overridden by anyone, including root, until retention expires. Legal hold: independent, no expiration. Requires versioning.",
+    "gotcha": "Object Lock must be enabled at bucket creation. Compliance mode retention cannot be shortened. Object Lock protects specific versions, not the entire object key."
+  },
+  {
+    "term": "S3 Governance vs Compliance Mode",
+    "definition": "Governance mode allows users with s3:BypassGovernanceRetention permission to override the lock. Compliance mode prevents ALL users (including root) from deleting or overwriting protected versions until retention expires. Compliance retention can only be extended, never shortened.",
+    "gotcha": "If exam says 'no one can delete, including administrators' → compliance mode. If 'most users can't but admins can override' → governance mode."
+  },
+  {
+    "term": "S3 Source and Destination Versioning",
+    "definition": "Both source and destination buckets MUST have versioning enabled for S3 Replication (CRR or SRR) to work. This is a hard prerequisite — replication cannot be configured without it.",
+    "gotcha": "Versioning is required on BOTH buckets, not just the source. This is a common exam trap."
+  },
+  {
+    "term": "S3 Replica vs Backup",
+    "definition": "A replica (via CRR/SRR) is a continuously updated copy of eligible new objects. A backup (snapshot, export) is a point-in-time copy. Replicas propagate changes (including overwrites). Backups preserve a fixed state. Both serve different recovery needs.",
+    "gotcha": "Replication propagates overwrites — a corrupted source file replicates the corruption. Backups/versioning preserve the pre-corruption state."
   }
 ]

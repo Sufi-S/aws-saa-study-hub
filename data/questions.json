@@ -892,5 +892,47 @@
     ],
     "correctAnswer": 3,
     "explanation": "An LSI shares the base table's partition key (AccountId) and provides an alternative sort key (TransactionAmount). LSI queries support strongly consistent reads. A GSI (A) only supports eventually consistent reads. Scanning (B) is expensive and does not sort. A separate table (C) adds unnecessary complexity."
+  },
+  {
+    "id": "d2-s3v-01",
+    "domain": "domain2",
+    "topic": "s3-storage-versioning-replication",
+    "question": "A company must archive financial records for 7 years. The records are almost never accessed, but when a regulatory audit occurs, the records must be retrievable within milliseconds. Which S3 storage class BEST meets this requirement?",
+    "options": [
+      "S3 Glacier Flexible Retrieval with expedited retrieval configured.",
+      "S3 Glacier Instant Retrieval.",
+      "S3 Glacier Deep Archive with standard retrieval.",
+      "S3 Standard-Infrequent Access (Standard-IA)."
+    ],
+    "correctAnswer": 1,
+    "explanation": "Glacier Instant Retrieval provides millisecond retrieval for rarely accessed archival data with lower storage cost than Standard-IA. Glacier Flexible Retrieval expedited (A) takes 1–5 minutes, not milliseconds. Deep Archive (C) takes up to 12 hours. Standard-IA (D) provides millisecond access but costs more per GB stored for data accessed this infrequently."
+  },
+  {
+    "id": "d2-s3v-02",
+    "domain": "domain2",
+    "topic": "s3-storage-versioning-replication",
+    "question": "A development team regularly overwrites configuration files stored in a versioned S3 bucket. A junior developer accidentally deletes an important file using a simple DELETE operation (without specifying a version ID). How should the team recover the file?",
+    "options": [
+      "The file is permanently deleted. Restore it from an external backup system.",
+      "Contact AWS Support to restore the object from S3's internal redundancy.",
+      "Delete the delete marker that was created, which restores the most recent version as the current object.",
+      "Re-enable versioning on the bucket, which automatically restores all deleted objects."
+    ],
+    "correctAnswer": 2,
+    "explanation": "In a versioned bucket, a simple DELETE creates a delete marker — it does not destroy any version. Removing the delete marker restores the most recent version. The file is not permanently deleted (A). AWS Support does not restore versioned objects this way (B). Re-enabling versioning does not auto-restore anything (D)."
+  },
+  {
+    "id": "d2-s3v-03",
+    "domain": "domain2",
+    "topic": "s3-storage-versioning-replication",
+    "question": "A healthcare company stores patient records in an S3 bucket in us-east-1. For disaster recovery, the company needs copies of all records (including existing objects) in eu-west-1. New records must replicate within 15 minutes. Which combination of S3 features meets these requirements?",
+    "options": [
+      "Enable Cross-Region Replication (CRR) with Replication Time Control (RTC). All existing and new objects will replicate within 15 minutes automatically.",
+      "Enable Same-Region Replication (SRR) with versioning. Use S3 Batch Replication for existing objects.",
+      "Enable Cross-Region Replication (CRR) with Replication Time Control (RTC) for new objects. Use S3 Batch Replication separately to copy existing objects to the destination bucket.",
+      "Create a lifecycle policy to transition objects to S3 Glacier Flexible Retrieval in eu-west-1 for disaster recovery."
+    ],
+    "correctAnswer": 2,
+    "explanation": "CRR with RTC provides a 15-minute SLA for new objects. Batch Replication copies existing objects. CRR does not automatically replicate existing objects (A). SRR copies within the same Region, not cross-Region (B). Lifecycle policies move between classes in the same bucket, not Regions (D)."
   }
 ]

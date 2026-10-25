@@ -82,6 +82,11 @@
         <li><a href="#ddb-diagram">DynamoDB &mdash; Keys &amp; Indexes Diagram</a></li>
         <li><a href="#ddb-gotchas">DynamoDB &mdash; Exam Gotchas</a></li>
         <li><a href="#ddb-practice">DynamoDB &mdash; Practice Questions</a></li>
+        <li><a href="#s3s-learn"><strong>S3 Storage Classes, Versioning &amp; Replication</strong> &mdash; Learn from Zero</a></li>
+        <li><a href="#s3s-real-world">S3 Storage &mdash; Real-World Scenarios</a></li>
+        <li><a href="#s3s-diagram">S3 Storage &mdash; Lifecycle, Versioning &amp; Replication Diagram</a></li>
+        <li><a href="#s3s-gotchas">S3 Storage &mdash; Exam Gotchas</a></li>
+        <li><a href="#s3s-practice">S3 Storage &mdash; Practice Questions</a></li>
       </ol>
     </nav>
 
@@ -4098,6 +4103,857 @@
           <p><strong>Correct Answer: D</strong></p>
           <p>An LSI shares the base table&rsquo;s partition key (<code>AccountId</code>) and provides an alternative sort key (<code>TransactionAmount</code>). LSI queries <strong>support strongly consistent reads</strong>. A is wrong &mdash; GSI queries are <strong>always eventually consistent</strong>; you cannot use <code>ConsistentRead = true</code> on a GSI. B is wrong &mdash; scanning the entire table is expensive and does not provide sorting by amount. C is wrong &mdash; creating a separate table and replicating data adds unnecessary complexity.</p>
           <p><strong>Memory rule:</strong> &ldquo;Same partition key&rdquo; + &ldquo;different sort key&rdquo; + &ldquo;strongly consistent&rdquo; = LSI. GSI can never provide strongly consistent reads.</p>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ============================================= -->
+    <!-- TOPIC 13: S3 Storage Classes, Versioning & Replication -->
+    <!-- ============================================= -->
+
+    <hr class="topic-divider" style="margin-top:4rem;">
+    <div class="page-header" style="border-bottom:none;padding-bottom:0;margin-bottom:1.5rem;">
+      <h1 style="display:flex;align-items:center;gap:0.6rem;font-size:1.75rem;">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--domain2)" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+        Amazon S3 &mdash; Storage Classes, Versioning &amp; Replication
+      </h1>
+    </div>
+
+    <section class="topic-section" id="s3s-learn">
+      <h2>
+        <svg class="topic-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        Learn from Zero
+      </h2>
+
+      <!-- 1A: Amazon S3 Fundamentals -->
+      <h3 id="s3s-1a">1A &mdash; Amazon S3 Fundamentals</h3>
+
+      <p><strong>Amazon Simple Storage Service (S3)</strong> is a fully managed <strong>object storage</strong> service. Unlike block storage (EBS) that provides raw disk volumes or file storage (EFS) that provides a shared file system, S3 stores data as discrete <em>objects</em> in <em>buckets</em>.</p>
+
+      <h4>Core Concepts</h4>
+      <ul>
+        <li><strong>Bucket</strong> &mdash; A container for objects. Bucket names are globally unique across all AWS accounts. Each bucket is created in a specific AWS Region.</li>
+        <li><strong>Object</strong> &mdash; A file stored in a bucket. Each object consists of data, metadata (key-value pairs), and a unique key.</li>
+        <li><strong>Object key</strong> &mdash; The full path that uniquely identifies an object within a bucket (e.g., <code>reports/2026/quarterly-summary.pdf</code>).</li>
+        <li><strong>Metadata</strong> &mdash; System-defined and user-defined key-value pairs attached to each object (content type, encryption, custom tags).</li>
+      </ul>
+
+      <h4>S3 vs Block vs File Storage</h4>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Feature</th><th>S3 (Object)</th><th>EBS (Block)</th><th>EFS (File)</th></tr></thead>
+          <tbody>
+            <tr><td>Unit</td><td>Object (whole file)</td><td>Block (disk sector)</td><td>File in directory tree</td></tr>
+            <tr><td>Access</td><td>HTTP/HTTPS API</td><td>Attached to one EC2 instance</td><td>NFS mount across instances</td></tr>
+            <tr><td>Mutability</td><td>Replace entire object</td><td>Modify individual blocks</td><td>Modify files in place</td></tr>
+            <tr><td>Use case</td><td>Backups, media, logs, data lakes</td><td>OS volumes, databases</td><td>Shared application files</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h4>Durability and Availability</h4>
+      <p><strong>Durability</strong> is the probability that a stored object will not be lost. Most S3 storage classes provide 99.999999999% (11 nines) durability by storing data redundantly.</p>
+      <p><strong>Availability</strong> is the percentage of time the service is accessible. Different storage classes offer different availability SLAs (e.g., S3 Standard targets 99.99% availability).</p>
+
+      <div class="callout callout-warn">
+        <strong>Durable does not mean available.</strong> An object can be safely stored (durable) but temporarily inaccessible due to a service disruption. And highly durable storage does not make your <em>application</em> highly available &mdash; you still need redundant compute, networking, and recovery plans.
+      </div>
+
+      <p>S3 is commonly used for: website assets, application data, backup and restore, log storage, data lakes and analytics, media hosting, disaster recovery copies, and compliance archives. Storage class selection should be based on access frequency, retrieval latency needs, retention duration, availability requirements, and cost.</p>
+
+      <!-- 1B: S3 Storage Classes -->
+      <h3 id="s3s-1b">1B &mdash; S3 Storage Classes</h3>
+
+      <h4>S3 Standard</h4>
+      <p>General-purpose storage for <strong>frequently accessed</strong> data. Stores objects redundantly across a minimum of three Availability Zones. Provides 99.99% availability and 11 nines durability. No retrieval charges, no minimum storage duration charge. Best for active content such as website assets, application data, and content distribution.</p>
+
+      <h4>S3 Intelligent-Tiering</h4>
+      <p>Designed for data with <strong>unknown or changing access patterns</strong>. Automatically moves objects between access tiers based on usage:</p>
+      <ul>
+        <li><strong>Frequent Access tier</strong> &mdash; Default tier for new objects.</li>
+        <li><strong>Infrequent Access tier</strong> &mdash; Objects not accessed for 30 days move here automatically.</li>
+        <li><strong>Archive Instant Access tier</strong> &mdash; Objects not accessed for 90 days move here automatically.</li>
+        <li><strong>Archive Access tier</strong> &mdash; Optional; must be enabled. Objects not accessed for 90+ days (configurable).</li>
+        <li><strong>Deep Archive Access tier</strong> &mdash; Optional; must be enabled. Objects not accessed for 180+ days (configurable).</li>
+      </ul>
+      <p>A small monthly <strong>monitoring and automation charge</strong> per object applies. No retrieval charges when accessing objects in the Frequent or Infrequent Access tiers. Objects in the optional archive tiers require a restore before access. Objects smaller than 128 KB are always stored in the Frequent Access tier and not monitored for tiering.</p>
+
+      <div class="callout callout-tip">
+        <strong>When to use:</strong> Intelligent-Tiering is ideal when you cannot predict which objects will become cold. It avoids the manual effort of lifecycle policies for unpredictable access patterns.
+      </div>
+
+      <h4>S3 Standard-Infrequent Access (Standard-IA)</h4>
+      <p>For data accessed <strong>less frequently</strong> but requiring <strong>rapid access</strong> when needed. Lower storage cost than Standard, but with per-GB retrieval charges. Stored across multiple AZs (11 nines durability, 99.9% availability). <strong>Minimum storage duration: 30 days</strong> (deleting earlier still incurs the 30-day charge). Minimum billable object size: 128 KB.</p>
+      <p>Best for: disaster recovery copies, infrequently accessed reports, long-lived data that is occasionally read.</p>
+
+      <h4>S3 One Zone-Infrequent Access (One Zone-IA)</h4>
+      <p>Similar to Standard-IA but stores data in a <strong>single Availability Zone</strong>. Lower cost than Standard-IA, but data is lost if that AZ is destroyed. 99.5% availability. Same 30-day minimum duration and 128 KB minimum size.</p>
+      <p>Best for: recreatable data, secondary backup copies, data that can be restored from another source.</p>
+
+      <div class="callout callout-warn">
+        <strong>One Zone-IA does NOT provide the same resilience as Standard-IA.</strong> If the exam requires &ldquo;resilience across Availability Zones,&rdquo; One Zone-IA is the wrong answer.
+      </div>
+
+      <h4>S3 Glacier Instant Retrieval</h4>
+      <p>For <strong>rarely accessed archival data</strong> that still needs <strong>millisecond retrieval</strong>. Lower storage cost than Standard-IA, but higher retrieval charges. <strong>Minimum storage duration: 90 days.</strong> Data is available immediately when requested &mdash; no restore process required.</p>
+      <p>Best for: medical images, news media archives, user-generated content accessed once a quarter.</p>
+
+      <h4>S3 Glacier Flexible Retrieval</h4>
+      <p>For <strong>archive data</strong> that can tolerate a <strong>restore process</strong> before access. Objects are not immediately readable &mdash; you must initiate a restore, which copies the data to Standard temporarily.</p>
+      <p>Retrieval options:</p>
+      <ul>
+        <li><strong>Expedited</strong> &mdash; typically 1&ndash;5 minutes.</li>
+        <li><strong>Standard</strong> &mdash; typically 3&ndash;5 hours.</li>
+        <li><strong>Bulk</strong> &mdash; typically 5&ndash;12 hours (lowest cost).</li>
+      </ul>
+      <p><strong>Minimum storage duration: 90 days.</strong> Best for: backup archives, regulatory records, disaster recovery data where multi-hour retrieval is acceptable.</p>
+
+      <h4>S3 Glacier Deep Archive</h4>
+      <p>The <strong>lowest-cost</strong> S3 storage class. For data retained for years and <strong>very rarely accessed</strong>.</p>
+      <p>Retrieval options:</p>
+      <ul>
+        <li><strong>Standard</strong> &mdash; within 12 hours.</li>
+        <li><strong>Bulk</strong> &mdash; within 48 hours.</li>
+      </ul>
+      <p><strong>Minimum storage duration: 180 days.</strong> Best for: long-term compliance archives, financial records retained for 7+ years, data that may never be accessed again but must be preserved.</p>
+
+      <div class="callout callout-warn">
+        <strong>Deep Archive is unsuitable for data that must be retrieved quickly.</strong> If the scenario requires fast access, use Glacier Instant Retrieval or a higher-tier class.
+      </div>
+
+      <h4>S3 Express One Zone</h4>
+      <p>A high-performance, <strong>single-AZ</strong> storage class for latency-sensitive workloads requiring single-digit-millisecond access. Uses a directory-bucket model rather than general-purpose buckets. Designed for specific compute-intensive use cases like ML training and analytics. Not a general replacement for S3 Standard.</p>
+
+      <!-- 1C: Storage Class Comparison Table -->
+      <h3 id="s3s-1c">1C &mdash; Storage Class Comparison</h3>
+
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Class</th><th>Access Pattern</th><th>Retrieval</th><th>Min Duration</th><th>AZ Resilience</th><th>Availability</th><th>Best For</th></tr></thead>
+          <tbody>
+            <tr><td>Standard</td><td>Frequent</td><td>Immediate, no charge</td><td>None</td><td>≥ 3 AZs</td><td>99.99%</td><td>Active data, websites</td></tr>
+            <tr><td>Intelligent-Tiering</td><td>Unknown/changing</td><td>Immediate (frequent/infrequent tiers)</td><td>None</td><td>≥ 3 AZs</td><td>99.9%</td><td>Unpredictable access</td></tr>
+            <tr><td>Standard-IA</td><td>Infrequent</td><td>Immediate, per-GB charge</td><td>30 days</td><td>≥ 3 AZs</td><td>99.9%</td><td>DR copies, reports</td></tr>
+            <tr><td>One Zone-IA</td><td>Infrequent</td><td>Immediate, per-GB charge</td><td>30 days</td><td>1 AZ</td><td>99.5%</td><td>Recreatable data</td></tr>
+            <tr><td>Glacier Instant</td><td>Rare</td><td>Milliseconds, higher charge</td><td>90 days</td><td>≥ 3 AZs</td><td>99.9%</td><td>Quarterly archives</td></tr>
+            <tr><td>Glacier Flexible</td><td>Rare/archive</td><td>Minutes to hours (restore)</td><td>90 days</td><td>≥ 3 AZs</td><td>99.99%*</td><td>Backup archives</td></tr>
+            <tr><td>Glacier Deep Archive</td><td>Very rare</td><td>12&ndash;48 hours (restore)</td><td>180 days</td><td>≥ 3 AZs</td><td>99.99%*</td><td>Long-term compliance</td></tr>
+            <tr><td>Express One Zone</td><td>Ultra-frequent</td><td>Single-digit ms</td><td>None**</td><td>1 AZ</td><td>99.95%</td><td>ML, analytics</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><small>* After restore completes. ** Express One Zone uses directory buckets with different billing. All classes except One Zone-IA and Express One Zone store data across ≥ 3 AZs. Durability is 11 nines for all standard classes.</small></p>
+
+      <div class="callout callout-tip">
+        <strong>Cost trade-offs:</strong> Lower storage rates come with retrieval charges, minimum duration charges, and sometimes restore delays. A &ldquo;cheaper&rdquo; storage class is only cheaper if the access pattern matches. Storing short-lived data in a 180-day minimum class wastes money.
+      </div>
+
+      <!-- 1D: Lifecycle Policies -->
+      <h3 id="s3s-1d">1D &mdash; S3 Lifecycle Policies</h3>
+
+      <p>A <strong>lifecycle configuration</strong> is a set of rules that automate transitions between storage classes and/or expire (delete) objects based on their age or other criteria.</p>
+
+      <h4>Transition Actions</h4>
+      <p>Move objects to a lower-cost storage class after a defined period. Example transitions:</p>
+      <ul>
+        <li>Standard &rarr; Standard-IA after 30 days</li>
+        <li>Standard-IA &rarr; Glacier Flexible Retrieval after 90 days</li>
+        <li>Glacier Flexible Retrieval &rarr; Glacier Deep Archive after 365 days</li>
+      </ul>
+
+      <div class="callout callout-warn">
+        <strong>Transition constraints:</strong> Objects must remain in a class for the minimum storage duration before transition (e.g., 30 days in Standard-IA before moving to Glacier). Not all transitions are allowed &mdash; you generally cannot transition from an archival class back to a more frequently accessed class via lifecycle rules. Objects smaller than 128 KB are not transitioned to Standard-IA or One Zone-IA.
+      </div>
+
+      <h4>Expiration Actions</h4>
+      <p>Automatically delete objects after a specified period. Common uses:</p>
+      <ul>
+        <li>Delete temporary log files after 90 days.</li>
+        <li>Remove incomplete multipart uploads after 7 days.</li>
+        <li>Expire noncurrent object versions after a defined retention period.</li>
+      </ul>
+
+      <h4>Scope and Versioning Interaction</h4>
+      <p>Lifecycle rules can target specific prefixes (e.g., <code>logs/</code>) or objects with specific tags. In versioned buckets, rules can apply separately to <strong>current versions</strong> and <strong>noncurrent versions</strong>. This enables policies like: &ldquo;Keep the current version in Standard, transition noncurrent versions to Glacier after 30 days, expire noncurrent versions after 365 days.&rdquo;</p>
+
+      <p>Always test lifecycle policies against actual retention and access requirements before deploying. Once an object transitions to an archival class, retrieval behavior changes.</p>
+
+      <!-- 1E: S3 Versioning -->
+      <h3 id="s3s-1e">1E &mdash; S3 Versioning</h3>
+
+      <p><strong>S3 Versioning</strong> preserves every version of every object in a bucket. When you overwrite or delete an object, S3 keeps the previous versions instead of replacing them.</p>
+
+      <h4>How It Works</h4>
+      <ul>
+        <li>Each version gets a unique <strong>version ID</strong>.</li>
+        <li><strong>Overwriting</strong> an object creates a new version; the old version remains accessible by its version ID.</li>
+        <li><strong>Deleting</strong> an object (without specifying a version ID) creates a <strong>delete marker</strong> &mdash; a placeholder that hides the current version from normal listings and GET requests.</li>
+        <li><strong>Permanent deletion</strong> requires specifying the exact version ID. This removes that specific version irreversibly.</li>
+      </ul>
+
+      <h4>Worked Example</h4>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Step</th><th>Action</th><th>Result</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>Upload <code>report.pdf</code></td><td>Version v1 created</td></tr>
+            <tr><td>2</td><td>Upload corrected <code>report.pdf</code></td><td>Version v2 created; v1 still exists</td></tr>
+            <tr><td>3</td><td>Delete <code>report.pdf</code> (no version ID)</td><td>Delete marker added; v1 and v2 still exist</td></tr>
+            <tr><td>4</td><td>GET <code>report.pdf</code></td><td>Returns 404 (delete marker hides the object)</td></tr>
+            <tr><td>5</td><td>Remove the delete marker</td><td>v2 becomes current again; object is accessible</td></tr>
+            <tr><td>6</td><td>GET <code>report.pdf?versionId=v1</code></td><td>Returns the original version</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout callout-warn">
+        <strong>Delete marker &ne; permanent deletion.</strong> A delete marker hides the object but does <em>not</em> destroy any version. Removing the delete marker restores access. Permanently deleting a version (by specifying its version ID) is irreversible.
+      </div>
+
+      <h4>Versioning States</h4>
+      <ul>
+        <li><strong>Unversioned</strong> (default) &mdash; No versions maintained.</li>
+        <li><strong>Enabled</strong> &mdash; All new objects get version IDs; old versions are preserved.</li>
+        <li><strong>Suspended</strong> &mdash; New objects get a <code>null</code> version ID; existing versions remain but no new versions are created.</li>
+      </ul>
+
+      <p>Versioning increases storage costs because every version consumes space. Use lifecycle policies on noncurrent versions to control costs. Versioning alone is not a complete backup strategy &mdash; it does not protect against bucket deletion, account compromise, or Region-wide outages.</p>
+
+      <!-- 1F: S3 Replication — SRR and CRR -->
+      <h3 id="s3s-1f">1F &mdash; S3 Replication &mdash; CRR and SRR</h3>
+
+      <p><strong>S3 Replication</strong> automatically copies objects from a source bucket to one or more destination buckets.</p>
+
+      <h4>Two Types</h4>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Feature</th><th>Cross-Region Replication (CRR)</th><th>Same-Region Replication (SRR)</th></tr></thead>
+          <tbody>
+            <tr><td>Destination</td><td>Different AWS Region</td><td>Same AWS Region</td></tr>
+            <tr><td>Primary use</td><td>Disaster recovery, data locality, compliance</td><td>Log aggregation, data separation, compliance copies</td></tr>
+            <tr><td>Latency</td><td>Higher (cross-Region transfer)</td><td>Lower (same Region)</td></tr>
+            <tr><td>Data transfer cost</td><td>Cross-Region transfer charges apply</td><td>No cross-Region charges</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h4>Prerequisites</h4>
+      <ul>
+        <li><strong>Versioning must be enabled</strong> on both source and destination buckets.</li>
+        <li>An <strong>IAM role</strong> must grant S3 permission to replicate objects to the destination.</li>
+        <li>The destination bucket must have appropriate <strong>bucket policy</strong> permissions.</li>
+        <li>If objects are encrypted with KMS, the replication role needs KMS permissions for both source and destination keys.</li>
+      </ul>
+
+      <h4>Important Behaviors</h4>
+      <ul>
+        <li>Replication is <strong>asynchronous</strong> &mdash; there is a delay (replication lag) between the source write and the replica appearing.</li>
+        <li><strong>S3 Replication Time Control (RTC)</strong> provides an SLA that 99.99% of objects replicate within 15 minutes, for an additional cost.</li>
+        <li>By default, replication applies only to <strong>new objects</strong> written after the rule is created.</li>
+        <li><strong>S3 Batch Replication</strong> can replicate existing objects that were written before the rule was configured.</li>
+        <li>Replication copies eligible objects according to the configured rules &mdash; it does not replicate the entire application infrastructure.</li>
+      </ul>
+
+      <div class="callout callout-warn">
+        <strong>Replication is not an instant mirror.</strong> There is always some lag. And a replicated bucket does not automatically make your application recoverable &mdash; you still need compute, DNS failover, and application configuration in the destination Region.
+      </div>
+
+      <!-- 1G: Replication Details and Delete Behavior -->
+      <h3 id="s3s-1g">1G &mdash; Replication Delete Behavior &amp; Details</h3>
+
+      <h4>Delete Marker Replication</h4>
+      <p>By default, <strong>delete markers are NOT replicated</strong>. If a user deletes an object in the source bucket, the delete marker is not copied to the destination &mdash; the replica remains visible. You can enable delete marker replication in the replication rule if you want deletions to propagate.</p>
+
+      <h4>Permanent Version Deletion</h4>
+      <p>When a user permanently deletes a specific object version (by version ID), that deletion is <strong>never replicated</strong>. This protects replicas from malicious or accidental permanent deletions at the source.</p>
+
+      <h4>Replication Scope</h4>
+      <ul>
+        <li>Rules can be scoped by <strong>prefix</strong> (e.g., <code>documents/</code>) or <strong>object tags</strong>.</li>
+        <li>Each object has a <strong>replication status</strong>: PENDING, COMPLETED, FAILED, or REPLICA.</li>
+        <li>Replica objects have their own version IDs and ownership settings.</li>
+      </ul>
+
+      <h4>Lifecycle and Replication Interaction</h4>
+      <p>Lifecycle rules operate independently on source and destination buckets. A transition or expiration in the source bucket does <strong>not</strong> trigger the same action in the destination. Plan lifecycle rules for both buckets based on their respective retention requirements.</p>
+
+      <!-- 1H: Object Lock, Encryption, and Data Protection -->
+      <h3 id="s3s-1h">1H &mdash; Object Lock, Encryption &amp; Data Protection</h3>
+
+      <h4>S3 Object Lock</h4>
+      <p><strong>Object Lock</strong> provides WORM (Write Once Read Many) protection for S3 objects. Once locked, an object version cannot be deleted or overwritten for the specified retention period.</p>
+
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Feature</th><th>Governance Mode</th><th>Compliance Mode</th></tr></thead>
+          <tbody>
+            <tr><td>Protection</td><td>Most users cannot delete/overwrite</td><td><strong>No one</strong> can delete/overwrite, including root</td></tr>
+            <tr><td>Override</td><td>Users with special permissions can override</td><td>Cannot be overridden by anyone during retention</td></tr>
+            <tr><td>Retention change</td><td>Can be shortened with permissions</td><td>Can only be extended, never shortened</td></tr>
+            <tr><td>Use case</td><td>Soft protection; testing retention policies</td><td>Regulatory compliance (SEC, HIPAA, FINRA)</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p><strong>Legal Hold</strong> &mdash; Independently prevents deletion of an object version until explicitly removed. No retention period &mdash; stays active until removed by an authorized user. Can be applied alongside retention modes.</p>
+
+      <div class="callout callout-warn">
+        <strong>Object Lock &ne; Versioning.</strong> Versioning preserves old versions but does not prevent their deletion. Object Lock prevents deletion of specific versions during the retention period. Object Lock requires versioning to be enabled, but adds enforcement that versioning alone does not provide.
+      </div>
+
+      <h4>Encryption at Rest</h4>
+      <p>S3 supports server-side encryption (SSE-S3, SSE-KMS, SSE-C) and client-side encryption. When replicating encrypted objects, the replication IAM role must have permissions for the source and destination KMS keys. The destination bucket may use a different encryption key.</p>
+
+      <h4>Additional Protections</h4>
+      <ul>
+        <li><strong>Least-privilege bucket policies</strong> &mdash; Restrict who can read, write, or delete.</li>
+        <li><strong>MFA Delete</strong> &mdash; Requires MFA to permanently delete object versions or change versioning state.</li>
+        <li><strong>Access logging and CloudTrail</strong> &mdash; Audit all S3 operations.</li>
+        <li><strong>Separate recovery copies</strong> &mdash; CRR to another Region provides geographic separation.</li>
+        <li><strong>Backup testing</strong> &mdash; Regularly verify that recovery procedures work.</li>
+      </ul>
+
+      <!-- 1I: Architecture and Cost Decisions -->
+      <h3 id="s3s-1i">1I &mdash; Architecture &amp; Cost Decisions</h3>
+
+      <h4>Decision Table</h4>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Requirement</th><th>Recommended S3 Feature</th><th>Why</th></tr></thead>
+          <tbody>
+            <tr><td>Frequently accessed app assets</td><td>S3 Standard</td><td>No retrieval charges, highest availability</td></tr>
+            <tr><td>Infrequent reports, rapid retrieval</td><td>Standard-IA</td><td>Lower storage cost, immediate access, multi-AZ</td></tr>
+            <tr><td>Unknown access patterns</td><td>Intelligent-Tiering</td><td>Automatic tier movement based on access</td></tr>
+            <tr><td>Archive with instant retrieval</td><td>Glacier Instant Retrieval</td><td>Millisecond access, lower storage than Standard-IA</td></tr>
+            <tr><td>Archive tolerating hours of restore</td><td>Glacier Flexible Retrieval</td><td>Low storage cost, 1 min to 12 hr retrieval</td></tr>
+            <tr><td>Deep archive (years, rarely accessed)</td><td>Glacier Deep Archive</td><td>Lowest cost, 12&ndash;48 hr retrieval</td></tr>
+            <tr><td>Protect against accidental deletion</td><td>Versioning + lifecycle on noncurrent versions</td><td>Keeps previous versions; lifecycle controls cost</td></tr>
+            <tr><td>Immutable compliance records</td><td>Object Lock (compliance mode)</td><td>WORM protection; cannot be overridden</td></tr>
+            <tr><td>Cross-Region DR copies</td><td>CRR + versioning</td><td>Async copy to another Region</td></tr>
+            <tr><td>Same-Region data separation</td><td>SRR</td><td>Copy to another bucket in same Region</td></tr>
+            <tr><td>Noncurrent version cleanup</td><td>Lifecycle expiration on noncurrent versions</td><td>Prevents unbounded version storage growth</td></tr>
+            <tr><td>Replicate existing objects</td><td>S3 Batch Replication</td><td>Standard replication only covers new objects</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h4>Cost Components</h4>
+      <ul>
+        <li><strong>Storage</strong> &mdash; Per-GB monthly rate varies by class.</li>
+        <li><strong>Retrieval</strong> &mdash; Per-GB charge for IA and Glacier classes.</li>
+        <li><strong>Requests</strong> &mdash; PUT, GET, LIST requests are charged.</li>
+        <li><strong>Minimum duration</strong> &mdash; Early deletion still incurs the minimum period charge.</li>
+        <li><strong>Transitions</strong> &mdash; Per-object lifecycle transition request charges.</li>
+        <li><strong>Version storage</strong> &mdash; All versions consume storage at the applicable class rate.</li>
+        <li><strong>Replication transfer</strong> &mdash; Cross-Region data transfer charges for CRR.</li>
+        <li><strong>Monitoring</strong> &mdash; Per-object charge for Intelligent-Tiering monitoring.</li>
+        <li><strong>Restore operations</strong> &mdash; Charges for Glacier restore requests.</li>
+      </ul>
+
+    </section>
+
+    <section class="topic-section" id="s3s-real-world">
+      <h2>
+        <svg class="topic-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        When Real Architects Actually Use This
+      </h2>
+
+      <!-- Scenario A -->
+      <h3>Scenario A &mdash; Frequently Accessed Website Assets</h3>
+      <p><strong>Requirement:</strong> A retail company stores product images and CSS/JS bundles that customers request thousands of times per day.</p>
+      <p><strong>Design:</strong> Store in <strong>S3 Standard</strong>. No retrieval charges, highest availability (99.99%), data redundant across &ge; 3 AZs.</p>
+      <p><strong>Why this works:</strong> Frequent-access data benefits from Standard&rsquo;s zero retrieval cost and highest availability. Moving active assets to IA classes would add retrieval charges that offset storage savings.</p>
+      <p><strong>Trade-offs:</strong> Standard has the highest per-GB storage rate. If some assets become inactive, a lifecycle policy or Intelligent-Tiering could optimize cost over time.</p>
+      <p><strong>Exam clue:</strong> &ldquo;Frequently accessed&rdquo; + &ldquo;highest availability&rdquo; &rarr; S3 Standard.</p>
+
+      <!-- Scenario B -->
+      <h3>Scenario B &mdash; Unknown Access Patterns</h3>
+      <p><strong>Requirement:</strong> A media company stores millions of articles and images. Some remain popular for weeks; others are never read again after publication.</p>
+      <p><strong>Design:</strong> Use <strong>S3 Intelligent-Tiering</strong>. Objects automatically move between access tiers based on actual usage. No retrieval charges for the Frequent and Infrequent Access tiers.</p>
+      <p><strong>Why this works:</strong> The company cannot predict which objects will stay hot. Intelligent-Tiering handles the optimization automatically, avoiding manual lifecycle rules for each object.</p>
+      <p><strong>Trade-offs:</strong> A small monthly monitoring charge per object (&ge; 128 KB) applies. Objects under 128 KB stay in the Frequent Access tier and are not monitored. The optional archive tiers require a restore before access.</p>
+      <p><strong>Exam clue:</strong> &ldquo;Unknown access patterns&rdquo; + &ldquo;automated cost optimization&rdquo; &rarr; Intelligent-Tiering.</p>
+
+      <!-- Scenario C -->
+      <h3>Scenario C &mdash; Long-Term Compliance Archives</h3>
+      <p><strong>Requirement:</strong> A financial institution must retain transaction records for 7 years. Records are almost never retrieved, but when they are, a 12-hour wait is acceptable.</p>
+      <p><strong>Design:</strong> Use <strong>S3 Glacier Deep Archive</strong>. Lowest storage cost. Standard retrieval within 12 hours, bulk within 48 hours. 180-day minimum storage duration aligns well with multi-year retention.</p>
+      <p><strong>Why this works:</strong> Extremely low access frequency and tolerance for long restore times make Deep Archive the most cost-effective choice.</p>
+      <p><strong>Why not Glacier Flexible Retrieval:</strong> Glacier Flexible Retrieval costs more per GB stored. It makes sense only if the company occasionally needs faster (1&ndash;5 minute expedited) retrieval, which this scenario does not require.</p>
+      <p><strong>Exam clue:</strong> &ldquo;Years of retention&rdquo; + &ldquo;rarely accessed&rdquo; + &ldquo;hours of retrieval acceptable&rdquo; &rarr; Glacier Deep Archive.</p>
+
+      <!-- Scenario D -->
+      <h3>Scenario D &mdash; Accidental Object Deletion</h3>
+      <p><strong>Requirement:</strong> A developer accidentally deletes a critical configuration file from S3. The company needs to restore the previous version.</p>
+      <p><strong>Design:</strong> Enable <strong>S3 Versioning</strong> on the bucket. The delete created a <strong>delete marker</strong>, not a permanent deletion. Remove the delete marker to restore the latest version, or retrieve a specific version by its version ID.</p>
+      <p><strong>Why this works:</strong> Versioning preserves every previous version. An ordinary delete only hides the object behind a delete marker &mdash; all versions remain intact.</p>
+      <p><strong>Trade-offs:</strong> Versioning increases storage costs (all versions consume space). Use lifecycle rules to expire noncurrent versions after a suitable retention period. For stronger protection, add <strong>MFA Delete</strong> to require multi-factor authentication for permanent version deletions.</p>
+      <p><strong>Exam clue:</strong> &ldquo;Recover previous version&rdquo; + &ldquo;accidental delete&rdquo; &rarr; S3 Versioning + remove delete marker.</p>
+
+      <!-- Scenario E -->
+      <h3>Scenario E &mdash; Cross-Region Disaster Recovery</h3>
+      <p><strong>Requirement:</strong> A healthcare company stores patient records in us-east-1 and needs a separate copy in eu-west-1 for disaster recovery.</p>
+      <p><strong>Design:</strong> Enable <strong>CRR (Cross-Region Replication)</strong> with versioning on both buckets. Configure an IAM role granting S3 replication permissions. If KMS-encrypted, grant the role access to both source and destination KMS keys.</p>
+      <p><strong>Why this works:</strong> CRR asynchronously copies new objects to the destination Region. If us-east-1 becomes unavailable, the eu-west-1 copy is accessible.</p>
+      <p><strong>Trade-offs:</strong> Replication is asynchronous &mdash; there is always some lag. CRR incurs cross-Region data transfer charges. Replication copies objects, not the application &mdash; compute, DNS, and networking must also be planned. For a 15-minute SLA, enable <strong>Replication Time Control (RTC)</strong>.</p>
+      <p><strong>Exam clue:</strong> &ldquo;Copy objects to another Region&rdquo; + &ldquo;disaster recovery&rdquo; &rarr; CRR with versioning.</p>
+
+      <!-- Scenario F -->
+      <h3>Scenario F &mdash; Same-Region Copies for Data Separation</h3>
+      <p><strong>Requirement:</strong> A company needs to replicate production data to a separate analytics bucket in the same Region, owned by a different team, for compliance and audit separation.</p>
+      <p><strong>Design:</strong> Use <strong>SRR (Same-Region Replication)</strong>. Both buckets must have versioning enabled. Configure appropriate destination bucket policies.</p>
+      <p><strong>Why this works:</strong> SRR copies eligible objects within the same Region without cross-Region transfer costs. The analytics team gets their own copy without impacting production.</p>
+      <p><strong>Trade-offs:</strong> SRR is still asynchronous. Lifecycle rules on the destination bucket operate independently. SRR does not aggregate from multiple sources automatically &mdash; configure separate rules if needed.</p>
+      <p><strong>Exam clue:</strong> &ldquo;Same-Region copy&rdquo; + &ldquo;separate bucket for compliance/analytics&rdquo; &rarr; SRR.</p>
+
+      <!-- Scenario G -->
+      <h3>Scenario G &mdash; Reduce Storage From Old Versions</h3>
+      <p><strong>Requirement:</strong> A versioned bucket stores application logs. Developers overwrite objects frequently, accumulating hundreds of noncurrent versions and inflating storage costs.</p>
+      <p><strong>Design:</strong> Create a <strong>lifecycle rule for noncurrent versions</strong>: transition noncurrent versions to Standard-IA after 30 days, then to Glacier Flexible Retrieval after 90 days, and expire them after 365 days.</p>
+      <p><strong>Why this works:</strong> Noncurrent versions rarely need fast access. Transitioning them to cheaper classes and eventually expiring them keeps costs under control while preserving recovery capability for a defined period.</p>
+      <p><strong>Trade-offs:</strong> Expiring noncurrent versions too early reduces recovery options. The policy should match the company&rsquo;s retention requirements.</p>
+      <p><strong>Exam clue:</strong> &ldquo;Versioned bucket&rdquo; + &ldquo;growing storage costs&rdquo; + &ldquo;old versions&rdquo; &rarr; lifecycle policy on noncurrent versions.</p>
+
+      <!-- Scenario H -->
+      <h3>Scenario H &mdash; Immutable Compliance Records</h3>
+      <p><strong>Requirement:</strong> A brokerage firm must store trading records that cannot be deleted or modified by anyone, including administrators, for a minimum of 5 years. This is a regulatory requirement.</p>
+      <p><strong>Design:</strong> Enable <strong>S3 Object Lock in compliance mode</strong> with a 5-year retention period. Enable versioning (required). Compliance mode prevents anyone &mdash; including the root user &mdash; from deleting or overwriting protected object versions until retention expires.</p>
+      <p><strong>Why not governance mode:</strong> Governance mode allows users with special permissions to override the lock. For regulatory requirements where no exceptions are allowed, compliance mode is mandatory.</p>
+      <p><strong>Trade-offs:</strong> Object Lock must be enabled at bucket creation. Compliance mode retention cannot be shortened once set. Plan carefully &mdash; mistakes in retention periods cannot be corrected downward.</p>
+      <p><strong>Exam clue:</strong> &ldquo;Cannot be deleted by anyone&rdquo; + &ldquo;regulatory retention&rdquo; &rarr; Object Lock compliance mode.</p>
+
+      <!-- Scenario I -->
+      <h3>Scenario I &mdash; Replicate Existing Objects</h3>
+      <p><strong>Requirement:</strong> A company enables CRR on an existing bucket with millions of objects, but discovers that only newly uploaded objects appear in the destination.</p>
+      <p><strong>Design:</strong> Use <strong>S3 Batch Replication</strong> to copy existing objects that were uploaded before the replication rule was created.</p>
+      <p><strong>Why this works:</strong> Standard replication (CRR/SRR) only applies to new objects written after the rule is configured. Batch Replication is an on-demand job that processes existing objects and can also retry previously failed replications.</p>
+      <p><strong>Trade-offs:</strong> Batch Replication is not covered by the RTC SLA. It runs as a batch job through S3 Batch Operations and incurs per-object and per-GB charges.</p>
+      <p><strong>Exam clue:</strong> &ldquo;Existing objects not replicated&rdquo; + &ldquo;replication rule already active&rdquo; &rarr; S3 Batch Replication.</p>
+
+      <!-- Scenario J -->
+      <h3>Scenario J &mdash; Balance Retrieval Speed and Cost</h3>
+      <p><strong>Requirement:</strong> A hospital stores medical imaging archives. Radiology images accessed within the first year need millisecond retrieval. Images older than one year can tolerate a 3&ndash;5 hour restore. Images older than 5 years need only long-term retention.</p>
+      <p><strong>Design:</strong> Use a lifecycle policy:</p>
+      <ol>
+        <li>Store in <strong>S3 Standard</strong> for the first 90 days (frequent access during initial review).</li>
+        <li>Transition to <strong>Glacier Instant Retrieval</strong> after 90 days (rare but instant access for the first year).</li>
+        <li>Transition to <strong>Glacier Flexible Retrieval</strong> after 365 days (standard 3&ndash;5 hour restore acceptable).</li>
+        <li>Transition to <strong>Glacier Deep Archive</strong> after 1,825 days / 5 years (long-term retention).</li>
+      </ol>
+      <p><strong>Why this works:</strong> Each stage matches the retrieval requirement to the lowest-cost class that can satisfy it. The lifecycle policy automates the transitions.</p>
+      <p><strong>Exam clue:</strong> &ldquo;Different retrieval needs at different ages&rdquo; &rarr; lifecycle policy transitioning through progressively cheaper classes.</p>
+
+    </section>
+
+    <section class="topic-section" id="s3s-diagram">
+      <h2>
+        <svg class="topic-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
+        S3 Lifecycle, Versioning &amp; Replication &mdash; Architecture Diagram
+      </h2>
+
+      <p>This diagram shows three key S3 workflows: storage lifecycle transitions, versioning with delete markers, and cross-Region replication.</p>
+
+      <svg role="img" aria-label="S3 storage lifecycle, versioning, and replication architecture diagram" viewBox="0 0 900 740" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:900px;height:auto;margin:1.5rem auto;display:block;font-family:inherit;">
+        <title>S3 Storage Lifecycle, Versioning &amp; Replication</title>
+        <desc>Three-part diagram showing S3 lifecycle transitions between storage classes, S3 versioning with delete markers and version recovery, and cross-Region replication from a source bucket to a destination bucket.</desc>
+
+        <defs>
+          <marker id="s3s-arrow" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto" fill="var(--domain2, #10b981)">
+            <polygon points="0 0, 10 3.5, 0 7"/>
+          </marker>
+          <marker id="s3s-arrow-red" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto" fill="#ef4444">
+            <polygon points="0 0, 10 3.5, 0 7"/>
+          </marker>
+          <marker id="s3s-arrow-blue" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto" fill="#3b82f6">
+            <polygon points="0 0, 10 3.5, 0 7"/>
+          </marker>
+        </defs>
+
+        <!-- Part A: Storage Lifecycle -->
+        <text x="450" y="24" text-anchor="middle" fill="var(--domain2, #10b981)" font-size="16" font-weight="bold">Part A: Storage Lifecycle Transitions</text>
+
+        <!-- Standard box -->
+        <rect x="50" y="40" width="140" height="44" rx="6" fill="var(--domain2, #10b981)" opacity="0.15" stroke="var(--domain2, #10b981)" stroke-width="1.5"/>
+        <text x="120" y="67" text-anchor="middle" fill="var(--domain2, #10b981)" font-size="13" font-weight="bold">S3 Standard</text>
+
+        <!-- Arrow to IA -->
+        <line x1="190" y1="62" x2="250" y2="62" stroke="var(--domain2, #10b981)" stroke-width="1.5" marker-end="url(#s3s-arrow)"/>
+        <text x="220" y="55" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-size="9">30+ days</text>
+
+        <!-- Standard-IA box -->
+        <rect x="255" y="40" width="140" height="44" rx="6" fill="var(--domain2, #10b981)" opacity="0.1" stroke="var(--domain2, #10b981)" stroke-width="1.5"/>
+        <text x="325" y="67" text-anchor="middle" fill="var(--domain2, #10b981)" font-size="12" font-weight="bold">Standard-IA</text>
+
+        <!-- Arrow to Glacier Instant -->
+        <line x1="395" y1="62" x2="455" y2="62" stroke="var(--domain2, #10b981)" stroke-width="1.5" marker-end="url(#s3s-arrow)"/>
+        <text x="425" y="55" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-size="9">90+ days</text>
+
+        <!-- Glacier Instant box -->
+        <rect x="460" y="40" width="140" height="44" rx="6" fill="#3b82f6" opacity="0.15" stroke="#3b82f6" stroke-width="1.5"/>
+        <text x="530" y="59" text-anchor="middle" fill="#3b82f6" font-size="11" font-weight="bold">Glacier Instant</text>
+        <text x="530" y="74" text-anchor="middle" fill="#3b82f6" font-size="10">Retrieval</text>
+
+        <!-- Arrow to Glacier Flexible -->
+        <line x1="600" y1="62" x2="660" y2="62" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#s3s-arrow-blue)"/>
+
+        <!-- Glacier Flexible box -->
+        <rect x="665" y="40" width="140" height="44" rx="6" fill="#8b5cf6" opacity="0.15" stroke="#8b5cf6" stroke-width="1.5"/>
+        <text x="735" y="59" text-anchor="middle" fill="#8b5cf6" font-size="11" font-weight="bold">Glacier Flexible</text>
+        <text x="735" y="74" text-anchor="middle" fill="#8b5cf6" font-size="10">Retrieval</text>
+
+        <!-- Arrow down to Deep Archive -->
+        <line x1="735" y1="84" x2="735" y2="110" stroke="#8b5cf6" stroke-width="1.5" marker-end="url(#s3s-arrow-blue)"/>
+
+        <!-- Glacier Deep Archive box -->
+        <rect x="645" y="115" width="180" height="44" rx="6" fill="#6d28d9" opacity="0.15" stroke="#6d28d9" stroke-width="1.5"/>
+        <text x="735" y="134" text-anchor="middle" fill="#6d28d9" font-size="11" font-weight="bold">Glacier Deep Archive</text>
+        <text x="735" y="149" text-anchor="middle" fill="#6d28d9" font-size="10">180-day min · 12&ndash;48 hr</text>
+
+        <!-- Annotations -->
+        <text x="120" y="100" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-size="9">No min duration</text>
+        <text x="120" y="113" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-size="9">No retrieval charge</text>
+        <text x="325" y="100" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-size="9">30-day min</text>
+        <text x="325" y="113" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-size="9">Retrieval charge</text>
+        <text x="530" y="100" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-size="9">90-day min</text>
+        <text x="530" y="113" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-size="9">Millisecond retrieval</text>
+
+        <!-- Intelligent-Tiering callout -->
+        <rect x="50" y="130" width="300" height="30" rx="4" fill="#f59e0b" opacity="0.1" stroke="#f59e0b" stroke-width="1" stroke-dasharray="4,2"/>
+        <text x="200" y="150" text-anchor="middle" fill="#f59e0b" font-size="10" font-weight="bold">Intelligent-Tiering: auto-moves between tiers based on access</text>
+
+        <text x="450" y="178" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-size="10" font-style="italic">Lifecycle transitions are one-way. Not all paths are direct. Verify constraints before deployment.</text>
+
+        <!-- Part B: Versioning -->
+        <text x="250" y="212" text-anchor="middle" fill="var(--domain2, #10b981)" font-size="16" font-weight="bold">Part B: S3 Versioning &amp; Delete Markers</text>
+
+        <!-- Timeline -->
+        <line x1="60" y1="245" x2="840" y2="245" stroke="var(--text-secondary, #94a3b8)" stroke-width="1" stroke-dasharray="4,2"/>
+
+        <!-- Step 1: Upload v1 -->
+        <rect x="60" y="225" width="110" height="60" rx="6" fill="var(--domain2, #10b981)" opacity="0.15" stroke="var(--domain2, #10b981)" stroke-width="1.5"/>
+        <text x="115" y="248" text-anchor="middle" fill="var(--domain2, #10b981)" font-size="11" font-weight="bold">Upload v1</text>
+        <text x="115" y="265" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">report.pdf</text>
+        <text x="115" y="278" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-size="9">Version ID: v1</text>
+
+        <!-- Arrow -->
+        <line x1="170" y1="255" x2="210" y2="255" stroke="var(--domain2, #10b981)" stroke-width="1.5" marker-end="url(#s3s-arrow)"/>
+
+        <!-- Step 2: Overwrite = v2 -->
+        <rect x="215" y="225" width="130" height="60" rx="6" fill="var(--domain2, #10b981)" opacity="0.15" stroke="var(--domain2, #10b981)" stroke-width="1.5"/>
+        <text x="280" y="248" text-anchor="middle" fill="var(--domain2, #10b981)" font-size="11" font-weight="bold">Overwrite → v2</text>
+        <text x="280" y="265" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">v2 = current</text>
+        <text x="280" y="278" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-size="9">v1 still exists</text>
+
+        <!-- Arrow -->
+        <line x1="345" y1="255" x2="385" y2="255" stroke="#ef4444" stroke-width="1.5" marker-end="url(#s3s-arrow-red)"/>
+
+        <!-- Step 3: Delete = delete marker -->
+        <rect x="390" y="225" width="160" height="60" rx="6" fill="#ef4444" opacity="0.1" stroke="#ef4444" stroke-width="1.5"/>
+        <text x="470" y="245" text-anchor="middle" fill="#ef4444" font-size="11" font-weight="bold">DELETE (no version ID)</text>
+        <text x="470" y="262" text-anchor="middle" fill="#ef4444" font-size="10">→ Delete marker added</text>
+        <text x="470" y="278" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-size="9">v1, v2 still exist!</text>
+
+        <!-- Arrow -->
+        <line x1="550" y1="255" x2="590" y2="255" stroke="var(--domain2, #10b981)" stroke-width="1.5" marker-end="url(#s3s-arrow)"/>
+
+        <!-- Step 4: Recovery -->
+        <rect x="595" y="225" width="170" height="60" rx="6" fill="var(--domain2, #10b981)" opacity="0.15" stroke="var(--domain2, #10b981)" stroke-width="1.5"/>
+        <text x="680" y="245" text-anchor="middle" fill="var(--domain2, #10b981)" font-size="11" font-weight="bold">Remove delete marker</text>
+        <text x="680" y="262" text-anchor="middle" fill="var(--domain2, #10b981)" font-size="10">→ v2 restored as current</text>
+        <text x="680" y="278" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-size="9">Or GET v1 by version ID</text>
+
+        <!-- Warning annotation -->
+        <rect x="175" y="298" width="550" height="24" rx="4" fill="#f59e0b" opacity="0.1"/>
+        <text x="450" y="314" text-anchor="middle" fill="#f59e0b" font-size="10" font-weight="bold">⚠ Delete marker ≠ permanent deletion. Specifying a version ID permanently deletes that version.</text>
+
+        <!-- Part C: Replication -->
+        <text x="450" y="360" text-anchor="middle" fill="var(--domain2, #10b981)" font-size="16" font-weight="bold">Part C: Cross-Region Replication (CRR)</text>
+
+        <!-- Source bucket -->
+        <rect x="50" y="380" width="320" height="200" rx="8" fill="none" stroke="var(--domain2, #10b981)" stroke-width="2" stroke-dasharray="6,3"/>
+        <rect x="50" y="380" width="320" height="30" rx="8" fill="var(--domain2, #10b981)" opacity="0.15"/>
+        <text x="210" y="400" text-anchor="middle" fill="var(--domain2, #10b981)" font-size="13" font-weight="bold">Source Bucket — us-east-1</text>
+
+        <text x="70" y="425" fill="var(--text-primary, #e2e8f0)" font-size="11">✓ Versioning enabled (required)</text>
+        <text x="70" y="445" fill="var(--text-primary, #e2e8f0)" font-size="11">✓ Replication rule configured</text>
+        <text x="70" y="465" fill="var(--text-primary, #e2e8f0)" font-size="11">✓ IAM replication role</text>
+        <text x="70" y="485" fill="var(--text-primary, #e2e8f0)" font-size="11">✓ KMS permissions (if encrypted)</text>
+
+        <text x="70" y="515" fill="#f59e0b" font-size="10">⚠ Only new objects replicate by default</text>
+        <text x="70" y="532" fill="#f59e0b" font-size="10">⚠ Use Batch Replication for existing objects</text>
+        <text x="70" y="549" fill="#f59e0b" font-size="10">⚠ Delete markers NOT replicated by default</text>
+        <text x="70" y="566" fill="var(--text-secondary, #94a3b8)" font-size="10">Permanent version deletes never replicate</text>
+
+        <!-- Replication arrow -->
+        <line x1="370" y1="480" x2="520" y2="480" stroke="var(--domain2, #10b981)" stroke-width="2" marker-end="url(#s3s-arrow)"/>
+        <text x="445" y="470" text-anchor="middle" fill="var(--domain2, #10b981)" font-size="11" font-weight="bold">CRR</text>
+        <text x="445" y="498" text-anchor="middle" fill="#f59e0b" font-size="10">Async — lag exists</text>
+        <text x="445" y="512" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-size="9">RTC: 99.99% within 15 min</text>
+
+        <!-- Destination bucket -->
+        <rect x="530" y="380" width="320" height="200" rx="8" fill="none" stroke="#3b82f6" stroke-width="2" stroke-dasharray="6,3"/>
+        <rect x="530" y="380" width="320" height="30" rx="8" fill="#3b82f6" opacity="0.15"/>
+        <text x="690" y="400" text-anchor="middle" fill="#3b82f6" font-size="13" font-weight="bold">Destination Bucket — eu-west-1</text>
+
+        <text x="550" y="425" fill="var(--text-primary, #e2e8f0)" font-size="11">✓ Versioning enabled (required)</text>
+        <text x="550" y="445" fill="var(--text-primary, #e2e8f0)" font-size="11">✓ Bucket policy grants source access</text>
+        <text x="550" y="465" fill="var(--text-primary, #e2e8f0)" font-size="11">✓ Destination KMS key (if encrypted)</text>
+        <text x="550" y="485" fill="var(--text-primary, #e2e8f0)" font-size="11">✓ Independent lifecycle rules</text>
+
+        <text x="550" y="515" fill="var(--text-secondary, #94a3b8)" font-size="10">Replica objects have own version IDs</text>
+        <text x="550" y="532" fill="var(--text-secondary, #94a3b8)" font-size="10">Lifecycle runs independently on destination</text>
+        <text x="550" y="549" fill="var(--text-secondary, #94a3b8)" font-size="10">Source deletion does not delete replica</text>
+        <text x="550" y="566" fill="var(--text-secondary, #94a3b8)" font-size="10">(unless delete marker replication enabled)</text>
+
+        <!-- Bottom annotation -->
+        <text x="450" y="608" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-size="10" font-style="italic">Replication copies eligible objects — it does not replicate compute, DNS, or application infrastructure.</text>
+
+        <!-- Legend -->
+        <rect x="170" y="630" width="560" height="100" rx="6" fill="none" stroke="var(--text-secondary, #94a3b8)" stroke-width="1" stroke-dasharray="4,2"/>
+        <text x="450" y="650" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-size="12" font-weight="bold">Key Requirements for Replication</text>
+        <text x="260" y="672" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="11">1. Versioning on both buckets</text>
+        <text x="600" y="672" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="11">2. IAM role with replication perms</text>
+        <text x="260" y="692" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="11">3. Destination bucket policy</text>
+        <text x="600" y="692" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="11">4. KMS perms (if objects encrypted)</text>
+        <text x="450" y="720" text-anchor="middle" fill="#f59e0b" font-size="10">Batch Replication for existing objects · RTC for 15-min SLA · Delete marker replication is optional</text>
+      </svg>
+
+      <p><strong>Key takeaways from the diagram:</strong> Lifecycle transitions move objects to progressively cheaper classes but are one-way and subject to minimum duration constraints. Versioning protects against accidental deletion through delete markers, which are distinct from permanent version deletion. CRR requires versioning on both buckets, proper IAM and KMS permissions, and is asynchronous — use Batch Replication for existing objects and RTC for tighter replication guarantees.</p>
+
+    </section>
+
+    <section class="topic-section" id="s3s-gotchas">
+      <h2>
+        <svg class="topic-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Exam Gotchas
+      </h2>
+
+      <div class="gotcha-list">
+
+        <div class="gotcha-item">
+          <h4>1. Choosing an archival class when immediate retrieval is required</h4>
+          <p><strong>Wrong:</strong> Picking Glacier Flexible Retrieval or Deep Archive for data that must be accessed instantly.</p>
+          <p><strong>Right:</strong> Glacier Flexible and Deep Archive require a <strong>restore process</strong> (minutes to hours). If millisecond retrieval is needed, use <strong>Glacier Instant Retrieval</strong>, Standard-IA, or Standard.</p>
+          <p><strong>Memory rule:</strong> &ldquo;Immediate access&rdquo; = Glacier Instant or higher. &ldquo;Can wait hours&rdquo; = Glacier Flexible/Deep Archive.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <h4>2. Confusing Standard-IA with One Zone-IA</h4>
+          <p><strong>Wrong:</strong> Treating them as identical except for price.</p>
+          <p><strong>Right:</strong> Standard-IA stores across &ge; 3 AZs (99.9% availability). <strong>One Zone-IA stores in a single AZ</strong> (99.5% availability). Data is lost if that AZ is destroyed.</p>
+          <p><strong>Memory rule:</strong> &ldquo;AZ resilience required&rdquo; = Standard-IA. &ldquo;Recreatable data&rdquo; = One Zone-IA.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <h4>3. Assuming lower storage rate = lower total cost</h4>
+          <p><strong>Wrong:</strong> Choosing the cheapest per-GB class for all data.</p>
+          <p><strong>Right:</strong> IA and Glacier classes add <strong>retrieval charges, minimum duration charges, and restore fees</strong>. Frequently accessed data in an IA class may cost more than Standard.</p>
+          <p><strong>Memory rule:</strong> Total cost = storage + retrieval + requests + minimum-duration penalty. Evaluate all components.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <h4>4. Forgetting retrieval charges and minimum storage duration</h4>
+          <p><strong>Wrong:</strong> Storing short-lived data in Glacier Deep Archive (180-day minimum) and deleting after 30 days.</p>
+          <p><strong>Right:</strong> Early deletion still incurs the <strong>full minimum-duration charge</strong>. Standard-IA: 30 days. Glacier Instant: 90 days. Deep Archive: 180 days.</p>
+          <p><strong>Memory rule:</strong> Short-lived data in archival classes = wasted money. Match retention to minimum duration.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <h4>5. Assuming Intelligent-Tiering has no costs or limitations</h4>
+          <p><strong>Wrong:</strong> Intelligent-Tiering is free and works for all objects.</p>
+          <p><strong>Right:</strong> A <strong>monthly monitoring charge</strong> per object applies. Objects &lt; 128 KB are not monitored. Optional archive tiers require a restore before access.</p>
+          <p><strong>Memory rule:</strong> Intelligent-Tiering = great for unpredictable access, but has monitoring fees and size thresholds.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <h4>6. Assuming all Glacier classes have the same retrieval</h4>
+          <p><strong>Wrong:</strong> Glacier Instant, Flexible, and Deep Archive all take hours.</p>
+          <p><strong>Right:</strong> <strong>Glacier Instant</strong> = milliseconds. <strong>Glacier Flexible</strong> = 1 min to 12 hours (depending on tier). <strong>Deep Archive</strong> = 12&ndash;48 hours. No expedited option for Deep Archive.</p>
+          <p><strong>Memory rule:</strong> Instant = ms. Flexible = min-to-hours. Deep = half-day to two days.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <h4>7. Confusing lifecycle transition with lifecycle expiration</h4>
+          <p><strong>Wrong:</strong> Thinking transition and expiration are the same.</p>
+          <p><strong>Right:</strong> <strong>Transition</strong> moves objects to a different storage class. <strong>Expiration</strong> deletes objects (or noncurrent versions). Both are lifecycle actions but do completely different things.</p>
+          <p><strong>Memory rule:</strong> Transition = move to cheaper class. Expiration = delete.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <h4>8. Assuming any object can transition to any class at any time</h4>
+          <p><strong>Wrong:</strong> Objects can freely move between any storage classes via lifecycle.</p>
+          <p><strong>Right:</strong> Lifecycle transitions follow a <strong>one-way waterfall</strong>. You cannot transition from Glacier back to Standard via lifecycle. Objects &lt; 128 KB don&rsquo;t transition to IA classes. Minimum duration constraints must be respected.</p>
+          <p><strong>Memory rule:</strong> Lifecycle = downhill only. Check minimum durations and size limits.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <h4>9. Forgetting noncurrent versions in versioned buckets</h4>
+          <p><strong>Wrong:</strong> Ignoring version storage when versioning is enabled.</p>
+          <p><strong>Right:</strong> Every overwritten version accumulates storage costs. Use <strong>lifecycle rules on noncurrent versions</strong> to transition or expire them.</p>
+          <p><strong>Memory rule:</strong> Versioned bucket + no noncurrent lifecycle = unbounded storage growth.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <h4>10. Assuming versioning protects against everything</h4>
+          <p><strong>Wrong:</strong> Versioning is a complete backup solution.</p>
+          <p><strong>Right:</strong> Versioning protects against accidental overwrites and simple deletes. It does <strong>not</strong> protect against bucket deletion, account compromise, or Region-wide failures. Combine with <strong>CRR, Object Lock, and MFA Delete</strong>.</p>
+          <p><strong>Memory rule:</strong> Versioning = one layer of protection, not the entire strategy.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <h4>11. Confusing delete marker with permanent deletion</h4>
+          <p><strong>Wrong:</strong> A delete marker removes all versions of an object.</p>
+          <p><strong>Right:</strong> A delete marker <strong>hides</strong> the current version but all versions remain. <strong>Permanent deletion</strong> requires specifying the version ID and is irreversible.</p>
+          <p><strong>Memory rule:</strong> DELETE without version ID = delete marker (recoverable). DELETE with version ID = permanent.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <h4>12. Assuming an ordinary delete permanently removes every version</h4>
+          <p><strong>Wrong:</strong> Running <code>aws s3 rm</code> on a versioned object destroys it.</p>
+          <p><strong>Right:</strong> It creates a delete marker. All prior versions survive. To permanently remove, delete each version by its version ID.</p>
+          <p><strong>Memory rule:</strong> Simple delete = hide. Version-specific delete = destroy.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <h4>13. Assuming CRR and SRR have identical purposes</h4>
+          <p><strong>Wrong:</strong> CRR and SRR are the same thing in different locations.</p>
+          <p><strong>Right:</strong> <strong>CRR</strong> copies to another Region (DR, data locality, compliance). <strong>SRR</strong> copies within the same Region (log aggregation, test/prod separation). CRR incurs cross-Region transfer charges.</p>
+          <p><strong>Memory rule:</strong> CRR = cross-Region DR. SRR = same-Region separation.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <h4>14. Forgetting versioning is required for replication</h4>
+          <p><strong>Wrong:</strong> Replication works without versioning.</p>
+          <p><strong>Right:</strong> Versioning <strong>must be enabled on both source and destination buckets</strong>. This is a hard prerequisite.</p>
+          <p><strong>Memory rule:</strong> Replication = versioning on both buckets. No exceptions.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <h4>15. Assuming new replication rules copy existing objects</h4>
+          <p><strong>Wrong:</strong> Enabling CRR retroactively copies all existing objects.</p>
+          <p><strong>Right:</strong> Replication applies only to <strong>new objects</strong> written after the rule is created. Use <strong>S3 Batch Replication</strong> for existing objects.</p>
+          <p><strong>Memory rule:</strong> New rule = new objects only. Existing objects = Batch Replication.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <h4>16. Confusing async replication with synchronous consistency</h4>
+          <p><strong>Wrong:</strong> CRR provides an instant synchronized copy.</p>
+          <p><strong>Right:</strong> Replication is <strong>asynchronous</strong>. There is always a lag. <strong>RTC</strong> provides a 15-minute SLA for 99.99% of objects, but it is not instant either.</p>
+          <p><strong>Memory rule:</strong> Replication = async with lag. RTC = 15-min SLA (not instant).</p>
+        </div>
+
+        <div class="gotcha-item">
+          <h4>17. Assuming replicated objects = full DR</h4>
+          <p><strong>Wrong:</strong> CRR alone makes the application recoverable in another Region.</p>
+          <p><strong>Right:</strong> CRR copies objects. A full DR plan also needs <strong>compute, networking, DNS failover, and application configuration</strong> in the destination Region.</p>
+          <p><strong>Memory rule:</strong> Replicated data &ne; replicated application. Plan the whole stack.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <h4>18. Assuming source deletion always deletes the replica</h4>
+          <p><strong>Wrong:</strong> Deleting an object in the source bucket always removes the replica.</p>
+          <p><strong>Right:</strong> <strong>Delete markers are not replicated by default.</strong> Permanent version deletions are <strong>never replicated</strong>. Enable delete marker replication explicitly if you want deletions to propagate.</p>
+          <p><strong>Memory rule:</strong> Delete at source &ne; delete at destination (by default). A safety feature.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <h4>19. Forgetting replication permissions and encryption</h4>
+          <p><strong>Wrong:</strong> Replication just needs a rule &mdash; permissions handle themselves.</p>
+          <p><strong>Right:</strong> Replication requires an <strong>IAM role</strong>, destination bucket policy, and (for KMS-encrypted objects) <strong>KMS key permissions</strong> on both source and destination.</p>
+          <p><strong>Memory rule:</strong> Replication = rule + IAM role + bucket policy + KMS perms.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <h4>20. Confusing Object Lock with versioning</h4>
+          <p><strong>Wrong:</strong> Versioning and Object Lock are the same thing.</p>
+          <p><strong>Right:</strong> Versioning <strong>preserves</strong> versions but does not prevent their deletion. Object Lock <strong>prevents deletion</strong> of specific versions during the retention period. Object Lock requires versioning but adds enforcement.</p>
+          <p><strong>Memory rule:</strong> Versioning = keep versions. Object Lock = prevent deletion of versions.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <h4>21. Confusing governance mode with compliance mode</h4>
+          <p><strong>Wrong:</strong> Both Object Lock modes provide the same protection.</p>
+          <p><strong>Right:</strong> <strong>Governance</strong> mode can be overridden by users with special permissions. <strong>Compliance</strong> mode cannot be overridden by anyone, including root, until retention expires.</p>
+          <p><strong>Memory rule:</strong> Governance = soft lock (overridable). Compliance = hard lock (absolute).</p>
+        </div>
+
+        <div class="gotcha-item">
+          <h4>22. Ignoring lifecycle and replication interactions</h4>
+          <p><strong>Wrong:</strong> Lifecycle and replication configurations work independently with no side effects.</p>
+          <p><strong>Right:</strong> Lifecycle rules run <strong>independently on each bucket</strong>. A transition or expiration in the source does not trigger the same action in the destination. Plan both.</p>
+          <p><strong>Memory rule:</strong> Source lifecycle &ne; destination lifecycle. Configure each bucket&rsquo;s rules separately.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <h4>23. Forgetting lifecycle rules must match retention requirements</h4>
+          <p><strong>Wrong:</strong> Any lifecycle transition or expiration is safe.</p>
+          <p><strong>Right:</strong> Expiring noncurrent versions too early loses recovery data. Transitioning to archival classes changes retrieval behavior. <strong>Lifecycle rules must align with actual retention and access needs.</strong></p>
+          <p><strong>Memory rule:</strong> Lifecycle saves money but can lose data. Test rules against business requirements.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <h4>24. Assuming storage class changes S3 authorization</h4>
+          <p><strong>Wrong:</strong> Moving objects to a different storage class changes who can access them.</p>
+          <p><strong>Right:</strong> Storage class affects cost, retrieval behavior, and availability. <strong>IAM policies, bucket policies, and ACLs</strong> control access regardless of storage class.</p>
+          <p><strong>Memory rule:</strong> Storage class = cost/performance. Access control = IAM/policy. They are independent.</p>
+        </div>
+
+      </div>
+
+    </section>
+
+    <section class="topic-section" id="s3s-practice">
+      <h2>
+        <svg class="topic-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Practice Questions
+      </h2>
+
+      <div class="practice-q">
+        <p class="q-text">Q1. A company must archive financial records for 7 years. The records are almost never accessed, but when a regulatory audit occurs, the records must be retrievable within milliseconds. Which S3 storage class BEST meets this requirement?</p>
+        <ul class="q-options">
+          <li><span class="q-letter">A.</span> S3 Glacier Flexible Retrieval with expedited retrieval configured.</li>
+          <li><span class="q-letter">B.</span> S3 Glacier Instant Retrieval.</li>
+          <li><span class="q-letter">C.</span> S3 Glacier Deep Archive with standard retrieval.</li>
+          <li><span class="q-letter">D.</span> S3 Standard-Infrequent Access (Standard-IA).</li>
+        </ul>
+        <button class="reveal-btn">Show Answer</button>
+        <div class="answer-reveal">
+          <p><strong>Correct Answer: B</strong></p>
+          <p><strong>Glacier Instant Retrieval</strong> provides millisecond retrieval for rarely accessed archival data. It has a 90-day minimum storage duration, which is well within a 7-year retention. A is wrong &mdash; Glacier Flexible Retrieval expedited takes 1&ndash;5 minutes, not milliseconds. C is wrong &mdash; Deep Archive standard retrieval takes up to 12 hours. D is wrong &mdash; Standard-IA provides millisecond access but has higher storage costs than Glacier Instant for data accessed this infrequently.</p>
+          <p><strong>Memory rule:</strong> &ldquo;Archival&rdquo; + &ldquo;millisecond retrieval&rdquo; = Glacier Instant Retrieval. Not Flexible, not Deep Archive.</p>
+        </div>
+      </div>
+
+      <div class="practice-q">
+        <p class="q-text">Q2. A development team regularly overwrites configuration files stored in a versioned S3 bucket. A junior developer accidentally deletes an important file using a simple DELETE operation (without specifying a version ID). How should the team recover the file?</p>
+        <ul class="q-options">
+          <li><span class="q-letter">A.</span> The file is permanently deleted. Restore it from an external backup system.</li>
+          <li><span class="q-letter">B.</span> Contact AWS Support to restore the object from S3&rsquo;s internal redundancy.</li>
+          <li><span class="q-letter">C.</span> Delete the delete marker that was created, which restores the most recent version as the current object.</li>
+          <li><span class="q-letter">D.</span> Re-enable versioning on the bucket, which automatically restores all deleted objects.</li>
+        </ul>
+        <button class="reveal-btn">Show Answer</button>
+        <div class="answer-reveal">
+          <p><strong>Correct Answer: C</strong></p>
+          <p>In a versioned bucket, a simple DELETE (without a version ID) creates a <strong>delete marker</strong> &mdash; it does not destroy any version. Removing the delete marker restores the most recent version. A is wrong &mdash; the file is not permanently deleted. B is wrong &mdash; AWS Support does not restore S3 objects this way; versioning handles it. D is wrong &mdash; versioning is already enabled, and re-enabling it does not auto-restore anything.</p>
+          <p><strong>Memory rule:</strong> Simple DELETE on versioned bucket = delete marker (recoverable). Remove the marker &rarr; object restored.</p>
+        </div>
+      </div>
+
+      <div class="practice-q">
+        <p class="q-text">Q3. A healthcare company stores patient records in an S3 bucket in us-east-1. For disaster recovery, the company needs copies of all records (including existing objects) in eu-west-1. New records must replicate within 15 minutes. Which combination of S3 features meets these requirements?</p>
+        <ul class="q-options">
+          <li><span class="q-letter">A.</span> Enable Cross-Region Replication (CRR) with Replication Time Control (RTC). All existing and new objects will replicate within 15 minutes automatically.</li>
+          <li><span class="q-letter">B.</span> Enable Same-Region Replication (SRR) with versioning. Use S3 Batch Replication for existing objects.</li>
+          <li><span class="q-letter">C.</span> Enable Cross-Region Replication (CRR) with Replication Time Control (RTC) for new objects. Use S3 Batch Replication separately to copy existing objects to the destination bucket.</li>
+          <li><span class="q-letter">D.</span> Create a lifecycle policy to transition objects to S3 Glacier Flexible Retrieval in eu-west-1 for disaster recovery.</li>
+        </ul>
+        <button class="reveal-btn">Show Answer</button>
+        <div class="answer-reveal">
+          <p><strong>Correct Answer: C</strong></p>
+          <p>CRR with RTC provides a 15-minute SLA for 99.99% of <strong>new objects</strong>. However, CRR only replicates objects written after the rule is created. <strong>S3 Batch Replication</strong> is needed separately to copy existing objects. A is wrong &mdash; CRR does not automatically replicate existing objects, and RTC does not apply to batch operations. B is wrong &mdash; SRR copies within the same Region, not cross-Region. D is wrong &mdash; lifecycle policies move objects between storage classes in the same bucket, not to another Region.</p>
+          <p><strong>Memory rule:</strong> New objects = CRR + RTC. Existing objects = Batch Replication. Both needed for full coverage.</p>
         </div>
       </div>
 
