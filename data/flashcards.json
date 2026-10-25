@@ -833,5 +833,100 @@
     "term": "ELB vs Auto Scaling Responsibilities",
     "definition": "ELB distributes incoming traffic to healthy targets and performs health checks to control routing. Auto Scaling manages instance count — launching, terminating, and replacing instances based on capacity settings and scaling policies. ELB does not create instances; ASG does not route traffic.",
     "gotcha": "The exam often tests whether you know which service does what. 'Route traffic to healthy targets' → ELB. 'Replace unhealthy instances' → ASG. 'Adjust capacity based on demand' → ASG scaling policy."
+  },
+  {
+    "term": "Amazon RDS",
+    "definition": "A managed relational database service supporting MySQL, PostgreSQL, MariaDB, Oracle, SQL Server, and Aurora. AWS handles hardware, patching, backups, and infrastructure. The customer manages schema design, queries, security configuration, performance tuning, and recovery planning.",
+    "gotcha": "RDS is managed but not maintenance-free. You still choose the deployment architecture (Multi-AZ, replicas, backups), configure security groups, and handle application connection retry logic."
+  },
+  {
+    "term": "RDS Multi-AZ DB Instance Deployment",
+    "definition": "The traditional Multi-AZ architecture: one primary DB instance + one synchronous standby in a different AZ. The standby does NOT serve read traffic. If the primary fails, RDS automatically promotes the standby and updates the DB endpoint DNS. Typical failover: 60–120 seconds.",
+    "gotcha": "The standby is for failover only — it cannot serve read queries. If the exam says 'offload reads,' Multi-AZ DB instance alone is the wrong answer. You need read replicas or a Multi-AZ DB cluster."
+  },
+  {
+    "term": "RDS Multi-AZ DB Cluster",
+    "definition": "1 writer + 2 readable standby instances across 3 AZs. Readers serve read traffic via a reader endpoint. Uses semisynchronous replication. Faster failover (~35 seconds). Currently supports MySQL 8.0+ and PostgreSQL 13.4+ only.",
+    "gotcha": "Unlike the traditional Multi-AZ, the DB cluster's standby instances ARE readable. If the exam mentions 'readable standby in Multi-AZ,' it's describing the DB cluster model. Check engine compatibility."
+  },
+  {
+    "term": "Primary DB Instance",
+    "definition": "The database instance that handles all write operations and, depending on the architecture, also serves read queries. In a Multi-AZ deployment, the primary is the active instance that applications connect to for normal operations.",
+    "gotcha": "All writes always go to the primary. Read replicas and Multi-AZ DB cluster readers only serve reads. If a query modifies data, it must use the primary (or writer) endpoint."
+  },
+  {
+    "term": "Standby DB Instance (Traditional Multi-AZ)",
+    "definition": "A synchronous copy of the primary in another AZ, maintained solely for automatic failover. It does not serve application traffic. During failover, RDS promotes the standby to primary and updates the endpoint DNS.",
+    "gotcha": "The standby is invisible to applications — no separate endpoint, no read queries. It exists only to take over when the primary fails. Do not confuse it with a read replica."
+  },
+  {
+    "term": "RDS Read Replica Architecture",
+    "definition": "Applications direct suitable read queries to replica endpoints while writes go to the primary. Replicas use asynchronous replication and may lag. Each standard RDS replica has its own endpoint. The application must route reads and writes to the correct endpoints.",
+    "gotcha": "Adding replicas does nothing if the application sends all queries to the primary. The app must be modified to route reads to replica endpoints. More replicas don't help if writes or storage I/O are the bottleneck."
+  },
+  {
+    "term": "Automatic Failover (RDS Multi-AZ)",
+    "definition": "When the primary DB instance fails, RDS automatically promotes the standby to primary and updates the DB endpoint DNS. Applications reconnect using the same endpoint. Active connections are dropped during failover.",
+    "gotcha": "Failover is automatic but NOT invisible. Active TCP connections break. Applications must implement retry logic and handle transient connection errors. DNS caching can delay reconnection."
+  },
+  {
+    "term": "Read Scaling",
+    "definition": "Increasing read throughput by distributing read queries across multiple database instances (read replicas). The primary handles writes; replicas handle reads. Effective when the workload is read-heavy and reads can tolerate some replication lag.",
+    "gotcha": "Read scaling only helps if reads are the bottleneck. If writes or storage I/O are saturated, adding replicas does not help. The application must be modified to route reads to replica endpoints."
+  },
+  {
+    "term": "Asynchronous Replication (RDS)",
+    "definition": "The primary confirms a write immediately; changes are streamed to replicas afterward. The replica may lag behind the primary. Used by RDS read replicas and cross-Region replicas.",
+    "gotcha": "Asynchronous ≠ real-time. Replication lag means the replica's data is eventually consistent. For read-after-write consistency, read from the primary. Monitor ReplicaLag in CloudWatch."
+  },
+  {
+    "term": "Replication Lag",
+    "definition": "The time difference between the primary's latest committed transaction and the replica's latest applied transaction. Higher lag means the replica has older data. Caused by write volume exceeding replica apply rate, network latency, or undersized replica.",
+    "gotcha": "During disaster recovery, RPO = replication lag at the time of failure. If lag is 30 seconds, up to 30 seconds of transactions may be lost. Monitor continuously — lag is not constant."
+  },
+  {
+    "term": "Read-After-Write Consistency",
+    "definition": "The guarantee that a read immediately following a write returns the written data. Asynchronous read replicas cannot provide this because of replication lag. Applications requiring read-after-write consistency must read from the primary.",
+    "gotcha": "Classic exam trap: 'Customer places an order and immediately sees it.' If the read goes to a replica, the order may not exist yet. Route critical confirmation reads to the primary."
+  },
+  {
+    "term": "Reader Endpoint (RDS)",
+    "definition": "A load-balanced DNS endpoint in a Multi-AZ DB cluster (or Aurora) that distributes read connections across available reader instances. Simplifies application configuration — one endpoint for all read traffic instead of individual replica endpoints.",
+    "gotcha": "Reader endpoints exist in Multi-AZ DB clusters and Aurora, not in traditional Multi-AZ DB instance deployments (the standby has no endpoint). For standard RDS read replicas, each replica has its own separate endpoint."
+  },
+  {
+    "term": "Cross-Region Read Replica",
+    "definition": "A read replica in a different AWS Region, receiving asynchronous replication from the primary. Serves two purposes: read scaling in the remote Region and a potential DR target. Can be promoted to a standalone primary during a Regional outage.",
+    "gotcha": "Cross-Region replication has higher lag due to network latency. Promotion is manual, not automatic. The replica alone does not make the full application recoverable — compute, secrets, and networking must also be in the DR Region."
+  },
+  {
+    "term": "RTO and RPO for Database Recovery",
+    "definition": "RTO: maximum acceptable time to restore database service. RPO: maximum acceptable data loss (time since last good data). Multi-AZ provides near-zero RPO (synchronous) and low RTO (automatic failover). Cross-Region replicas provide RPO = replication lag and RTO = promotion + app reconfiguration time.",
+    "gotcha": "Daily snapshots = RPO up to 24 hours. If the exam specifies RPO of minutes, snapshots alone are too slow. Continuous replication (cross-Region replica) meets tight RPO requirements."
+  },
+  {
+    "term": "RDS Automated Backups and Snapshots",
+    "definition": "Automated backups: daily snapshots + transaction logs, enabling point-in-time recovery (PITR) within the retention period (up to 35 days). Manual snapshots persist until deleted. PITR creates a new DB instance restored to a chosen second within the retention window.",
+    "gotcha": "Replication (Multi-AZ, replicas) propagates accidental deletions. PITR is the only way to recover to a moment before the deletion. Always enable automated backups with sufficient retention for production databases."
+  },
+  {
+    "term": "Read Replica Promotion",
+    "definition": "Promoting a read replica to a standalone, independent read-write database. This is a manual operation that breaks the replication link. The promoted instance gets a new endpoint. Used for DR (cross-Region) or migration scenarios.",
+    "gotcha": "Promotion is NOT automatic failover. The application must be reconfigured to use the new endpoint. Any data not yet replicated before promotion is lost. After promotion, the former replica is fully independent."
+  },
+  {
+    "term": "Database Connection Recovery",
+    "definition": "During RDS failover, active TCP connections to the old primary are dropped. The DB endpoint DNS updates to point to the new primary. Applications must detect the broken connection, re-resolve DNS, and reconnect. Connection pools should validate connections before use.",
+    "gotcha": "A stable endpoint does not mean connections survive failover. JVM DNS caching, OS DNS caching, and connection pool stale entries all delay reconnection. Set short DNS TTLs and implement retry logic."
+  },
+  {
+    "term": "Multi-AZ vs Read Replicas",
+    "definition": "Multi-AZ: synchronous standby for automatic failover (HA). Read replicas: asynchronous copies for read scaling. Multi-AZ standby is not readable (traditional deployment). Read replicas do not auto-failover. Choose based on whether you need availability, read performance, or both.",
+    "gotcha": "The exam's most common RDS trap: using Multi-AZ when you need read scaling, or using read replicas when you need automatic failover. Know which mechanism solves which problem."
+  },
+  {
+    "term": "Backup vs Replication",
+    "definition": "Replication (Multi-AZ, read replicas) copies all changes including accidental deletes and corruption. Backups (snapshots, PITR) preserve data at a point in time before the corruption. Replication protects against infrastructure failure. Backups protect against logical data errors.",
+    "gotcha": "If the exam says 'accidental deletion' or 'data corruption,' the answer involves backups/PITR, not Multi-AZ or read replicas. Both replicate the bad data."
   }
 ]

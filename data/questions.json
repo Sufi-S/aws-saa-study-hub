@@ -808,5 +808,47 @@
     ],
     "correctAnswer": 1,
     "explanation": "Scheduled scaling ensures capacity is pre-provisioned before the predictable 9 AM rush. Target tracking on ALBRequestCountPerTarget handles unpredictable breaking-news spikes. Option A relies solely on predictive scaling, which cannot anticipate unprecedented events. Option C uses only reactive scaling, so the 9 AM surge hits before scale-out. Option D wastes resources by maintaining peak capacity 24/7."
+  },
+  {
+    "id": "d2-rma-01",
+    "domain": "domain2",
+    "topic": "rds-multi-az-replicas",
+    "question": "A company runs a critical order-processing application backed by an Amazon RDS MySQL database in a single Availability Zone. If the database becomes unavailable due to an AZ failure, orders cannot be processed. The company needs automatic database failover with minimal data loss. Which solution meets this requirement?",
+    "options": [
+      "Create a read replica in another AZ. If the primary fails, promote the read replica to a standalone primary.",
+      "Enable RDS Multi-AZ deployment. RDS creates a synchronous standby in another AZ and automatically fails over if the primary becomes unavailable.",
+      "Take hourly automated snapshots and restore from the latest snapshot if the primary fails.",
+      "Deploy a second RDS instance in another AZ and use application-level logic to switch between them."
+    ],
+    "correctAnswer": 1,
+    "explanation": "RDS Multi-AZ creates a synchronous standby in a different AZ and performs automatic failover with near-zero data loss. Read replicas (A) use asynchronous replication and require manual promotion. Snapshots (C) lose data since the last snapshot and take time to restore. Custom failover logic (D) is error-prone and not managed by AWS."
+  },
+  {
+    "id": "d2-rma-02",
+    "domain": "domain2",
+    "topic": "rds-multi-az-replicas",
+    "question": "A company's RDS PostgreSQL database handles both customer-facing transactions and reporting queries. The reporting team runs complex analytical queries that consume significant CPU, causing slow response times for customers. The reporting queries can tolerate data that is a few seconds old. How should a solutions architect reduce the impact of reporting on the production database?",
+    "options": [
+      "Enable RDS Multi-AZ and direct reporting queries to the standby instance.",
+      "Create an RDS read replica and direct reporting queries to the replica endpoint.",
+      "Increase the RDS instance size to handle both workloads on the primary.",
+      "Create a cross-Region read replica and direct reporting queries to the remote Region."
+    ],
+    "correctAnswer": 1,
+    "explanation": "A read replica offloads reporting queries from the primary. The reporting team tolerates seconds of lag. The Multi-AZ standby (A) does not serve read traffic in a traditional deployment. Scaling up (C) has limits and does not separate workloads. A cross-Region replica (D) adds unnecessary latency and cost."
+  },
+  {
+    "id": "d2-rma-03",
+    "domain": "domain2",
+    "topic": "rds-multi-az-replicas",
+    "question": "A company operates an RDS MySQL database in us-east-1 with Multi-AZ enabled. The business requires the ability to recover the database in eu-west-1 if the entire us-east-1 Region becomes unavailable. The acceptable RPO is 5 minutes. Which approach BEST supports this requirement?",
+    "options": [
+      "Rely on the existing Multi-AZ deployment. If the Region fails, the standby in a different AZ handles traffic.",
+      "Take daily automated snapshots and copy them to eu-west-1. Restore from the latest snapshot during a Regional outage.",
+      "Create a cross-Region read replica in eu-west-1 with continuous asynchronous replication. Promote the replica and redirect traffic during a Regional outage.",
+      "Create an additional read replica in us-east-1 in a third AZ to increase redundancy."
+    ],
+    "correctAnswer": 2,
+    "explanation": "A cross-Region read replica continuously replicates to eu-west-1. Typical replication lag is well under 5 minutes, meeting the RPO. Multi-AZ (A) operates within one Region only. Daily snapshots (B) give up to 24 hours of RPO. An additional same-Region replica (D) does not help during a Regional outage."
   }
 ]

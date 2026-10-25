@@ -72,6 +72,11 @@
         <li><a href="#eas-diagram">ELB &amp; Auto Scaling &mdash; Architecture Diagram</a></li>
         <li><a href="#eas-gotchas">ELB &amp; Auto Scaling &mdash; Exam Gotchas</a></li>
         <li><a href="#eas-practice">ELB &amp; Auto Scaling &mdash; Practice Questions</a></li>
+        <li><a href="#rds-learn"><strong>RDS Multi-AZ &amp; Read Replicas</strong> &mdash; Learn from Zero</a></li>
+        <li><a href="#rds-real-world">RDS Multi-AZ &amp; Read Replicas &mdash; Real-World Scenarios</a></li>
+        <li><a href="#rds-diagram">RDS Multi-AZ &amp; Read Replicas &mdash; Architecture Diagram</a></li>
+        <li><a href="#rds-gotchas">RDS Multi-AZ &amp; Read Replicas &mdash; Exam Gotchas</a></li>
+        <li><a href="#rds-practice">RDS Multi-AZ &amp; Read Replicas &mdash; Practice Questions</a></li>
       </ol>
     </nav>
 
@@ -2468,6 +2473,775 @@
           <p><strong>Correct Answer: B</strong></p>
           <p>Scheduled scaling ensures capacity is pre-provisioned before the predictable 9 AM rush, eliminating the delay of reactive scaling. Target tracking on <code>ALBRequestCountPerTarget</code> handles unpredictable breaking-news spikes by adjusting capacity based on actual request load. A relies solely on predictive scaling, which cannot anticipate unprecedented breaking news events &mdash; it forecasts from history, not from real-time signals. C uses only reactive scaling, which means the 9 AM surge hits before capacity scales out. D wastes resources by running peak capacity 24/7 instead of scaling to match demand.</p>
           <p><strong>Memory rule:</strong> Known pattern = scheduled scaling. Unknown spikes = dynamic scaling. Best practice combines both.</p>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ============================================= -->
+    <!-- TOPIC 11: RDS Multi-AZ & Read Replicas        -->
+    <!-- ============================================= -->
+
+    <hr class="topic-divider" style="margin-top:4rem;">
+    <div class="page-header" style="border-bottom:none;padding-bottom:0;margin-bottom:1.5rem;">
+      <h1 style="display:flex;align-items:center;gap:0.6rem;font-size:1.75rem;">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--domain2)" stroke-width="2"><ellipse cx="12" cy="6" rx="9" ry="4"/><path d="M3 6v6c0 2.2 4 4 9 4s9-1.8 9-4V6"/><path d="M3 12v6c0 2.2 4 4 9 4s9-1.8 9-4v-6"/></svg>
+        Amazon RDS Multi-AZ &amp; Read Replicas
+      </h1>
+      <p>How architects design database layers for high availability, read scaling, and disaster recovery using Amazon RDS.</p>
+    </div>
+
+    <!-- RDS SECTION 1: Learn from Zero -->
+    <section class="topic-section" id="rds-learn">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain2)" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        Learn from Zero
+      </h2>
+
+      <h3>Part 1A &mdash; Relational Database Fundamentals</h3>
+
+      <p><strong>What is a database?</strong> A database is an organized system for storing, retrieving, and managing data. Applications need databases because they cannot hold everything in memory &mdash; data must survive restarts, be shared among application servers, and support complex queries.</p>
+
+      <p><strong>What is a relational database?</strong> A relational database organizes data into <strong>tables</strong>. Each table has <strong>columns</strong> (fields) and <strong>rows</strong> (records). A <strong>primary key</strong> uniquely identifies each row. Relationships between tables use foreign keys. You interact with the data using <strong>SQL</strong> (Structured Query Language).</p>
+
+      <div class="card" style="margin:1.5rem 0;">
+        <h4>Example: Online Shopping Application</h4>
+        <p>An online store uses three tables:</p>
+        <ul>
+          <li><strong>Customers</strong> &mdash; customer_id (primary key), name, email.</li>
+          <li><strong>Orders</strong> &mdash; order_id (primary key), customer_id (foreign key), total, status.</li>
+          <li><strong>Payments</strong> &mdash; payment_id (primary key), order_id (foreign key), amount, method.</li>
+        </ul>
+        <p>When a customer places an order, the application writes to Orders and Payments. When the customer views order history, the application reads from Orders. <strong>The database must remain available for both operations.</strong> If the database goes down, customers cannot place orders or check their status.</p>
+        <p>This store serves 80% reads (browsing products, checking orders) and 20% writes (placing orders, processing payments). This read-heavy pattern is common and influences database architecture decisions.</p>
+      </div>
+
+      <p><strong>A database instance</strong> is a running copy of the database software on a server, with allocated CPU, memory, storage, and network. A <strong>database engine</strong> (MySQL, PostgreSQL, Oracle, SQL Server, MariaDB) is the software that manages data; a <strong>database instance</strong> is that engine running on specific hardware.</p>
+
+      <p><strong>Why databases become bottlenecks.</strong> Application servers can scale horizontally (add more EC2 instances behind a load balancer), but the database often cannot be duplicated as easily. All application instances write to the same primary database. If the database runs out of CPU, connections, or storage, every application instance is affected &mdash; even if the application tier has plenty of capacity.</p>
+
+      <p><strong>Protecting a database involves more than launching a second server:</strong></p>
+      <ul>
+        <li><strong>Connections</strong> &mdash; each application instance opens database connections; too many connections exhaust database resources.</li>
+        <li><strong>Storage</strong> &mdash; the database needs reliable, durable storage that does not lose data.</li>
+        <li><strong>Backups</strong> &mdash; a copy of the data at a point in time, for recovery after corruption or accidental deletion.</li>
+        <li><strong>Replication</strong> &mdash; copying data to another database instance for availability or read scaling.</li>
+        <li><strong>Failover</strong> &mdash; switching to a backup instance when the primary fails.</li>
+      </ul>
+
+      <hr style="border:none;border-top:1px dashed var(--border);margin:2rem 0;">
+
+      <h3>Part 1B &mdash; Amazon RDS Fundamentals</h3>
+
+      <p><strong>Amazon Relational Database Service (RDS)</strong> is a managed service that makes it easier to set up, operate, and scale relational databases in the cloud. RDS handles hardware provisioning, database setup, patching, backups, and infrastructure management.</p>
+
+      <p><strong>Supported engines:</strong> MySQL, PostgreSQL, MariaDB, Oracle, SQL Server, and Amazon Aurora (a cloud-native engine compatible with MySQL and PostgreSQL).</p>
+
+      <p><strong>What AWS manages vs. what you manage:</strong></p>
+      <table>
+        <thead><tr><th>AWS manages</th><th>You manage</th></tr></thead>
+        <tbody>
+          <tr><td>Hardware provisioning and maintenance</td><td>Database schema and queries</td></tr>
+          <tr><td>Database engine installation and patching</td><td>Application connection logic and retry behavior</td></tr>
+          <tr><td>Automated backups</td><td>Security configuration (security groups, IAM, encryption)</td></tr>
+          <tr><td>Storage management and scaling</td><td>Performance tuning and indexing</td></tr>
+          <tr><td>Multi-AZ replication and failover</td><td>Choosing the right deployment architecture</td></tr>
+          <tr><td>Monitoring infrastructure</td><td>Recovery planning and testing</td></tr>
+        </tbody>
+      </table>
+
+      <p><strong>RDS vs. database on EC2.</strong> Running a database on EC2 gives you full OS-level access but requires you to manage everything: installation, patching, backups, replication, failover, and monitoring. RDS trades some control for significantly less operational burden. Most production workloads on the SAA-C03 exam use RDS or Aurora.</p>
+
+      <p><strong>Key RDS concepts:</strong></p>
+      <ul>
+        <li><strong>DB instance</strong> &mdash; the database environment running in the cloud (compute + memory + storage).</li>
+        <li><strong>DB endpoint</strong> &mdash; a DNS address that applications use to connect. This endpoint does not change during failover, allowing applications to reconnect to the new primary.</li>
+        <li><strong>DB subnet group</strong> &mdash; a collection of subnets (typically across multiple AZs) where RDS can place DB instances. Spanning AZs enables Multi-AZ deployments.</li>
+        <li><strong>Security groups</strong> &mdash; control network access to the DB instance. Only allow connections from authorized sources (application servers, specific CIDR blocks).</li>
+        <li><strong>Automated backups</strong> &mdash; RDS automatically takes daily snapshots and captures transaction logs, enabling point-in-time recovery within the retention period (up to 35 days).</li>
+        <li><strong>DB snapshots</strong> &mdash; manual, user-initiated backups that persist until explicitly deleted.</li>
+      </ul>
+
+      <p><strong>A database should generally not be publicly accessible.</strong> Placing an RDS instance in a private subnet with no public IP and restricting security groups to only your application servers is standard practice. Public accessibility exposes the database to the internet and should only be used when the requirements explicitly justify it.</p>
+
+      <p><strong>Applications must handle connection interruptions.</strong> Even with RDS managing failover, active TCP connections are dropped during a failover event. Applications need connection-retry logic, connection pooling with health checks, and error handling for transient database unavailability.</p>
+
+      <p><strong>Multi-AZ, read replicas, and backups solve different problems:</strong></p>
+      <table>
+        <thead><tr><th>Mechanism</th><th>Primary purpose</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Multi-AZ</strong></td><td>High availability &mdash; automatic failover if the primary fails</td></tr>
+          <tr><td><strong>Read replicas</strong></td><td>Read scaling &mdash; offload read queries from the primary</td></tr>
+          <tr><td><strong>Backups / snapshots</strong></td><td>Data recovery &mdash; restore after corruption, deletion, or point-in-time</td></tr>
+        </tbody>
+      </table>
+      <p>These are not interchangeable. Each addresses a different category of database risk.</p>
+
+      <hr style="border:none;border-top:1px dashed var(--border);margin:2rem 0;">
+
+      <h3>Part 1C &mdash; High Availability and RDS Multi-AZ</h3>
+
+      <p><strong>Why a single database instance is a risk.</strong> If the database instance runs in one AZ and that AZ experiences a disruption, the database is unavailable until the AZ recovers or you manually restore from a backup. For production applications, this downtime is unacceptable.</p>
+
+      <p><strong>RDS Multi-AZ solves this</strong> by maintaining a copy of the database in another AZ. If the primary fails, RDS automatically fails over to the copy. The application connects through a <strong>stable DB endpoint</strong> (a DNS name) that points to whichever instance is currently the primary. After failover, the DNS record updates, and applications reconnect to the new primary.</p>
+
+      <p><strong>How automatic failover works (conceptually):</strong></p>
+      <ol>
+        <li>RDS detects that the primary DB instance is unhealthy (AZ failure, instance failure, storage failure).</li>
+        <li>RDS promotes the standby to primary.</li>
+        <li>The DB endpoint&rsquo;s DNS record is updated to point to the new primary.</li>
+        <li>Applications using the endpoint reconnect to the new primary.</li>
+      </ol>
+
+      <p><strong>Why failover still interrupts connections.</strong> Active database connections to the old primary are dropped. The DNS update takes a short time to propagate. Applications must detect the closed connection, resolve the endpoint again, and reconnect. Without proper retry logic, users may see brief errors.</p>
+
+      <p><strong>Multi-AZ improves availability within a Region but:</strong></p>
+      <ul>
+        <li>It does not protect against a Region-wide disaster (all AZs in a Region affected).</li>
+        <li>It does not automatically scale read throughput (in the traditional DB instance deployment).</li>
+        <li>It does not protect against accidental data deletion &mdash; a DELETE command replicates to the standby too.</li>
+      </ul>
+
+      <hr style="border:none;border-top:1px dashed var(--border);margin:2rem 0;">
+
+      <h3>Part 1D &mdash; RDS Multi-AZ DB Instance vs Multi-AZ DB Cluster</h3>
+
+      <p>This distinction is a frequent source of exam confusion. AWS offers two different Multi-AZ deployment models for RDS, and they have different architectures and capabilities.</p>
+
+      <h4>Multi-AZ DB Instance Deployment (Traditional)</h4>
+
+      <p>This is the original, widely available Multi-AZ architecture:</p>
+      <ul>
+        <li>One <strong>primary DB instance</strong> handles all reads and writes.</li>
+        <li>One <strong>standby DB instance</strong> in a different AZ receives synchronous replication from the primary.</li>
+        <li>The <strong>standby does not serve read traffic</strong> &mdash; it exists solely for failover.</li>
+        <li>Applications connect through a single <strong>DB instance endpoint</strong>.</li>
+        <li>If the primary fails, RDS promotes the standby to primary and updates the endpoint. Typical failover takes 60&ndash;120 seconds.</li>
+        <li>Supported by all RDS engines (MySQL, PostgreSQL, MariaDB, Oracle, SQL Server).</li>
+      </ul>
+      <p><strong>Key point:</strong> The traditional standby is <em>not</em> a read replica. It cannot be queried. It only becomes active when the primary fails.</p>
+
+      <h4>Multi-AZ DB Cluster Deployment</h4>
+
+      <p>This is a newer architecture with a different topology:</p>
+      <ul>
+        <li>One <strong>writer DB instance</strong> handles all write operations.</li>
+        <li>Two <strong>reader DB instances</strong> in two other AZs &mdash; three instances across three AZs total.</li>
+        <li>The reader instances <strong>can serve read traffic</strong> via a reader endpoint, providing both HA and some read scaling.</li>
+        <li>Uses semisynchronous replication &mdash; a write is acknowledged after at least one reader confirms receipt, providing a balance of durability and performance.</li>
+        <li>Three endpoints: <strong>cluster endpoint</strong> (writes &rarr; writer), <strong>reader endpoint</strong> (reads &rarr; readers), and individual <strong>instance endpoints</strong>.</li>
+        <li>Faster failover &mdash; typically around 35 seconds.</li>
+        <li>Currently supported for <strong>MySQL 8.0.28+</strong> and <strong>PostgreSQL 13.4+</strong> (not all engines or all Regions).</li>
+      </ul>
+
+      <table>
+        <thead><tr><th>Characteristic</th><th>Multi-AZ DB Instance</th><th>Multi-AZ DB Cluster</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Topology</strong></td><td>1 primary + 1 standby (2 AZs)</td><td>1 writer + 2 readers (3 AZs)</td></tr>
+          <tr><td><strong>Standby readable?</strong></td><td>No</td><td>Yes &mdash; readers serve read queries</td></tr>
+          <tr><td><strong>Replication</strong></td><td>Synchronous block-level</td><td>Semisynchronous transaction log-based</td></tr>
+          <tr><td><strong>Endpoints</strong></td><td>Single DB instance endpoint</td><td>Cluster, reader, and instance endpoints</td></tr>
+          <tr><td><strong>Typical failover time</strong></td><td>60&ndash;120 seconds</td><td>~35 seconds</td></tr>
+          <tr><td><strong>Engine support</strong></td><td>All RDS engines</td><td>MySQL 8.0.28+, PostgreSQL 13.4+</td></tr>
+          <tr><td><strong>Primary use</strong></td><td>HA failover</td><td>HA failover + limited read scaling</td></tr>
+        </tbody>
+      </table>
+
+      <div class="card" style="margin:1.5rem 0;">
+        <h4>Exam Tip</h4>
+        <p>If the scenario says &ldquo;Multi-AZ deployment with a standby that does not serve read traffic,&rdquo; it describes the traditional DB instance deployment. If it mentions &ldquo;readable standby instances&rdquo; or &ldquo;reader endpoint in a Multi-AZ deployment,&rdquo; it describes the DB cluster deployment. Read carefully &mdash; the exam tests whether you can distinguish these architectures.</p>
+      </div>
+
+      <hr style="border:none;border-top:1px dashed var(--border);margin:2rem 0;">
+
+      <h3>Part 1E &mdash; RDS Read Replicas</h3>
+
+      <p><strong>What is a read replica?</strong> A read replica is a separate, read-only copy of the primary database. The primary streams changes to the replica using <strong>asynchronous replication</strong>. Applications can direct read queries to the replica to reduce load on the primary.</p>
+
+      <p><strong>Why use read replicas?</strong></p>
+      <ul>
+        <li>Offload read-heavy workloads (reports, dashboards, search) from the primary.</li>
+        <li>Allow the primary to focus on write operations.</li>
+        <li>Scale read throughput by adding multiple replicas.</li>
+      </ul>
+
+      <p><strong>How it works:</strong></p>
+      <ol>
+        <li>The primary database processes writes and streams changes to replicas asynchronously.</li>
+        <li>Each replica has its own endpoint. Applications direct suitable read queries to replica endpoints.</li>
+        <li>Writes always go to the primary &mdash; replicas are read-only.</li>
+      </ol>
+
+      <p><strong>Replication lag.</strong> Because replication is asynchronous, the replica may be seconds or more behind the primary. A query on the replica immediately after a write to the primary may return stale data. This is called <strong>replication lag</strong>, and it means replicas provide <strong>eventual consistency</strong>, not immediate consistency.</p>
+
+      <p><strong>Read replicas are not Multi-AZ standby instances.</strong> These are fundamentally different mechanisms:</p>
+      <table>
+        <thead><tr><th>Characteristic</th><th>Multi-AZ Standby (DB Instance)</th><th>Read Replica</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Purpose</strong></td><td>High availability / automatic failover</td><td>Read scaling</td></tr>
+          <tr><td><strong>Readable?</strong></td><td>No (standby only)</td><td>Yes (read-only queries)</td></tr>
+          <tr><td><strong>Replication</strong></td><td>Synchronous</td><td>Asynchronous</td></tr>
+          <tr><td><strong>Data currency</strong></td><td>Always current with primary</td><td>May lag behind primary</td></tr>
+          <tr><td><strong>Failover</strong></td><td>Automatic, RDS-managed</td><td>Manual promotion (not automatic)</td></tr>
+          <tr><td><strong>Endpoint</strong></td><td>Shared DB instance endpoint</td><td>Separate, per-replica endpoint</td></tr>
+        </tbody>
+      </table>
+
+      <p><strong>Read replica promotion.</strong> A read replica can be promoted to a standalone primary database. This is a <em>manual</em> operation (not automatic failover) and breaks the replication link. After promotion, the replica becomes an independent read-write database. Promotion is sometimes used in disaster recovery but requires application reconfiguration to point to the new endpoint.</p>
+
+      <p><strong>Replica limits:</strong> Up to 5 read replicas per primary for standard RDS engines (MySQL, PostgreSQL, MariaDB). Aurora supports up to 15 replicas with integrated reader endpoints and automatic failover.</p>
+
+      <hr style="border:none;border-top:1px dashed var(--border);margin:2rem 0;">
+
+      <h3>Part 1F &mdash; Cross-Region Read Replicas and Disaster Recovery</h3>
+
+      <p><strong>A cross-Region read replica</strong> is a read replica in a different AWS Region than the primary. It serves two purposes: read scaling in the remote Region and a potential recovery target if the primary Region becomes unavailable.</p>
+
+      <p><strong>How cross-Region replication works:</strong></p>
+      <ul>
+        <li>The primary streams changes to the remote replica <strong>asynchronously</strong>.</li>
+        <li>Cross-Region network latency means replication lag is typically higher than same-Region replicas.</li>
+        <li>The actual RPO equals the replication lag at the moment of failure &mdash; any data committed but not yet replicated is lost.</li>
+      </ul>
+
+      <p><strong>Promotion for disaster recovery:</strong></p>
+      <ol>
+        <li>The primary Region becomes unavailable.</li>
+        <li>An operator promotes the cross-Region read replica to a standalone primary.</li>
+        <li>Applications must be reconfigured (or DNS must be updated) to point to the promoted database in the new Region.</li>
+        <li>The promoted database is now independent &mdash; it has no replication link back to the original.</li>
+      </ol>
+
+      <p><strong>Why a cross-Region replica is not a complete DR solution by itself:</strong></p>
+      <ul>
+        <li>Promotion is manual, not automatic &mdash; an operator must initiate it.</li>
+        <li>Applications in the DR Region need to be running and configured (compute, secrets, networking, permissions).</li>
+        <li>DNS or traffic routing must redirect clients to the new Region.</li>
+        <li>Replication lag means some recent data may be lost.</li>
+        <li>The full application stack (not just the database) must be recoverable.</li>
+      </ul>
+
+      <p><strong>Comparing the four database resilience mechanisms:</strong></p>
+      <table>
+        <thead><tr><th>Mechanism</th><th>Scope</th><th>Purpose</th><th>Data loss risk</th><th>Automation</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Multi-AZ (same Region)</strong></td><td>Within Region</td><td>HA failover</td><td>Near-zero (synchronous)</td><td>Automatic</td></tr>
+          <tr><td><strong>Read replicas (same Region)</strong></td><td>Within Region</td><td>Read scaling</td><td>Lag window (async)</td><td>Manual promotion</td></tr>
+          <tr><td><strong>Cross-Region read replica</strong></td><td>Across Regions</td><td>DR + remote reads</td><td>Higher lag (async + network)</td><td>Manual promotion</td></tr>
+          <tr><td><strong>Backups / snapshots</strong></td><td>Same or cross-Region</td><td>Data recovery</td><td>Up to last backup time</td><td>Manual restore</td></tr>
+        </tbody>
+      </table>
+
+      <p>Link to Topic 9: Multi-AZ protects against AZ failures (same as Topic 9&rsquo;s multi-AZ concept applied to databases). Cross-Region replicas and backups contribute to the warm standby and backup-and-restore DR strategies.</p>
+
+      <hr style="border:none;border-top:1px dashed var(--border);margin:2rem 0;">
+
+      <h3>Part 1G &mdash; Replication Lag and Read/Write Patterns</h3>
+
+      <p>Not all reads are the same. The decision to route a query to a replica depends on whether the application can tolerate stale data.</p>
+
+      <div class="card" style="margin:1.5rem 0;">
+        <h4>Read/Write Pattern Examples</h4>
+        <table>
+          <thead><tr><th>Workload</th><th>Read from replica?</th><th>Why</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Order checkout</strong> &mdash; write an order, then immediately confirm it</td><td>No &mdash; read from primary</td><td>The customer must see their just-placed order. A lagging replica might show &ldquo;no order found.&rdquo;</td></tr>
+            <tr><td><strong>Reporting dashboard</strong> &mdash; aggregate daily sales data</td><td>Yes &mdash; read from replica</td><td>Reports tolerate data that is seconds old. Offloading these queries frees the primary for writes.</td></tr>
+            <tr><td><strong>Product catalogue</strong> &mdash; browse products</td><td>Usually yes</td><td>Product data changes infrequently. A few seconds of lag is invisible to shoppers.</td></tr>
+            <tr><td><strong>Payment verification</strong> &mdash; check payment status after processing</td><td>No &mdash; read from primary</td><td>Financial transactions require current, accurate state. Stale reads could cause duplicate charges.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p><strong>Read-after-write consistency.</strong> When an application writes data and immediately reads it back, it needs <strong>read-after-write consistency</strong>. This means the read must return the data that was just written. Asynchronous replicas cannot guarantee this. The safe pattern is: <em>write to the primary, read critical confirmations from the primary, route everything else to replicas.</em></p>
+
+      <p><strong>Monitoring replication lag.</strong> CloudWatch provides the <code>ReplicaLag</code> metric. If lag increases, it may indicate that the primary is generating changes faster than the replica can apply them, or that network throughput is limited. Persistent high lag means the replica&rsquo;s data is increasingly stale.</p>
+
+      <p><strong>More replicas do not always improve performance.</strong> If the bottleneck is storage I/O, query design, connection limits, or the primary&rsquo;s write capacity, adding read replicas will not help. Each replica adds replication overhead to the primary. Diagnose the actual bottleneck before adding replicas.</p>
+
+      <hr style="border:none;border-top:1px dashed var(--border);margin:2rem 0;">
+
+      <h3>Part 1H &mdash; RDS Failover, Backups, and Recovery</h3>
+
+      <p>Each resilience mechanism has a specific purpose and limitations.</p>
+
+      <table>
+        <thead><tr><th></th><th>Multi-AZ Failover</th><th>Read Replica Promotion</th><th>Automated Backup / PITR</th><th>DB Snapshot</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Purpose</strong></td><td>HA &mdash; survive AZ failure</td><td>DR or migration</td><td>Recover to a point in time</td><td>Manual backup at a moment</td></tr>
+          <tr><td><strong>Trigger</strong></td><td>AZ/instance/storage failure</td><td>Operator-initiated promotion</td><td>Operator initiates restore</td><td>Operator initiates restore</td></tr>
+          <tr><td><strong>Data behavior</strong></td><td>Synchronous &mdash; standby is current</td><td>Async &mdash; may have lag</td><td>Restores to chosen time within retention</td><td>Restores to snapshot time</td></tr>
+          <tr><td><strong>Interruption</strong></td><td>60&ndash;120s (DB instance) or ~35s (DB cluster)</td><td>Minutes &mdash; promotion + app reconfig</td><td>Creates a new DB instance</td><td>Creates a new DB instance</td></tr>
+          <tr><td><strong>Operator action?</strong></td><td>No &mdash; automatic</td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
+          <tr><td><strong>Protects against</strong></td><td>AZ/instance failure</td><td>Regional failure (cross-Region)</td><td>Corruption, accidental deletion</td><td>Any data loss event</td></tr>
+          <tr><td><strong>Does NOT protect against</strong></td><td>Accidental deletion, corruption, Regional outage</td><td>Data committed during lag window</td><td>Infrastructure failure (no automatic failover)</td><td>Data written after snapshot</td></tr>
+        </tbody>
+      </table>
+
+      <p><strong>Why these are not interchangeable:</strong></p>
+      <ul>
+        <li>Multi-AZ failover is automatic but does not undo accidental deletions &mdash; the DELETE replicates to the standby.</li>
+        <li>Read replica promotion is manual and may lose data during the replication lag window.</li>
+        <li>Backups and PITR can recover to a specific point before the corruption, but restoring creates a new instance and takes time.</li>
+      </ul>
+
+      <p><strong>Always test recovery procedures.</strong> A backup that has never been restored is an assumption, not a plan. Multi-AZ failover behavior varies by engine. Read replica promotion behavior depends on the engine and replication state. The team must verify the actual behavior with their specific configuration.</p>
+
+      <hr style="border:none;border-top:1px dashed var(--border);margin:2rem 0;">
+
+      <h3>Part 1I &mdash; Choosing the Right RDS Architecture</h3>
+
+      <table>
+        <thead><tr><th>Requirement</th><th>Recommended architecture</th><th>Why</th></tr></thead>
+        <tbody>
+          <tr><td>Automatic failover within a Region</td><td>Multi-AZ DB instance or DB cluster</td><td>Synchronous replication + automatic promotion</td></tr>
+          <tr><td>Read-heavy workload needs more query capacity</td><td>Read replicas</td><td>Offload reads to async replicas; primary focuses on writes</td></tr>
+          <tr><td>Read scaling with tolerable lag</td><td>Read replicas</td><td>Async replication is acceptable for reports and analytics</td></tr>
+          <tr><td>HA + some read scaling in one deployment</td><td>Multi-AZ DB cluster (MySQL/PostgreSQL)</td><td>Readable standby instances serve read queries</td></tr>
+          <tr><td>Regional disaster recovery</td><td>Cross-Region read replica + backup strategy</td><td>Replica for fast recovery; backups for point-in-time</td></tr>
+          <tr><td>Intensive reporting queries</td><td>Read replica (dedicated for reports)</td><td>Prevents report queries from degrading write performance</td></tr>
+          <tr><td>Read-after-write for checkout</td><td>Read from primary endpoint</td><td>Replicas may lag &mdash; critical reads must use the primary</td></tr>
+          <tr><td>Recover from accidental deletion</td><td>Automated backups + point-in-time recovery</td><td>Multi-AZ and replicas both replicate the deletion</td></tr>
+          <tr><td>Lowest cost HA</td><td>Multi-AZ DB instance</td><td>One standby, no readable replicas, all engines supported</td></tr>
+          <tr><td>Fastest failover</td><td>Multi-AZ DB cluster (~35s)</td><td>Faster than traditional DB instance failover (60&ndash;120s)</td></tr>
+        </tbody>
+      </table>
+
+      <p><strong>Trade-offs to consider:</strong></p>
+      <ul>
+        <li><strong>Availability vs. read performance:</strong> Multi-AZ provides HA but not read scaling (traditional deployment). Read replicas provide read scaling but not automatic failover.</li>
+        <li><strong>Replication lag vs. consistency:</strong> Async replicas are eventually consistent. Applications needing immediate consistency must read from the primary.</li>
+        <li><strong>Cost:</strong> Multi-AZ doubles instance cost (standby runs continuously). Each read replica is an additional instance. Cross-Region replicas add data transfer costs.</li>
+        <li><strong>Complexity:</strong> Read replicas require application changes to route reads appropriately. Cross-Region recovery requires a tested failover plan covering the entire application stack.</li>
+        <li><strong>Engine compatibility:</strong> Multi-AZ DB cluster is only available for MySQL 8.0.28+ and PostgreSQL 13.4+. Not all engines support all features.</li>
+      </ul>
+
+    </section>
+
+    <hr class="topic-divider">
+
+    <!-- RDS SECTION 2: Real-World Scenarios -->
+    <section class="topic-section" id="rds-real-world">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain2)" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        When Real Architects Actually Use This
+      </h2>
+
+      <div class="scenario-card">
+        <h3>Scenario A &mdash; Production Database Must Survive an AZ Failure</h3>
+        <p><strong>Business requirement:</strong> An order-processing application uses an RDS MySQL database. If the primary&rsquo;s AZ fails, the database must fail over automatically with minimal data loss.</p>
+        <p><strong>Architecture:</strong></p>
+        <ul>
+          <li>Enable <strong>RDS Multi-AZ DB instance deployment</strong>.</li>
+          <li>RDS creates a synchronous standby in a second AZ.</li>
+          <li>The application connects through the DB instance endpoint.</li>
+          <li>If the primary&rsquo;s AZ fails, RDS promotes the standby in 60&ndash;120 seconds and updates the endpoint&rsquo;s DNS.</li>
+          <li>The application detects the dropped connection, re-resolves the endpoint, and reconnects to the new primary.</li>
+        </ul>
+        <p><strong>Why Multi-AZ:</strong> Synchronous replication means the standby is always current &mdash; near-zero data loss. Failover is automatic with no operator intervention. Read replicas use asynchronous replication and require manual promotion, making them unsuitable as the primary HA mechanism.</p>
+        <p><strong>Application responsibility:</strong> The application must implement connection retry logic. Active transactions are interrupted during failover. Without retry handling, users see errors even though the database recovers quickly.</p>
+        <p><strong>Exam clue:</strong> &ldquo;Automatic failover,&rdquo; &ldquo;survive AZ failure,&rdquo; &ldquo;high availability for the database&rdquo; &rarr; RDS Multi-AZ.</p>
+      </div>
+
+      <div class="scenario-card">
+        <h3>Scenario B &mdash; Read-Heavy Reporting Workload</h3>
+        <p><strong>Business requirement:</strong> A business intelligence team runs daily reports against the production MySQL database. Report queries are slow, complex aggregations that consume significant CPU and I/O, degrading the experience for customers using the application.</p>
+        <p><strong>Architecture:</strong></p>
+        <ul>
+          <li>Create one or more <strong>RDS read replicas</strong>.</li>
+          <li>Configure the reporting application to connect to the <strong>replica endpoint</strong>.</li>
+          <li>The primary handles all writes and real-time application reads.</li>
+          <li>Reports can tolerate data that is seconds old &mdash; asynchronous lag is acceptable.</li>
+        </ul>
+        <p><strong>Why read replicas:</strong> Offloads expensive read queries from the primary. The primary&rsquo;s CPU and I/O remain available for the customer-facing application. A Multi-AZ standby cannot serve read traffic (traditional deployment), so it does not solve this problem.</p>
+        <p><strong>Watch for:</strong> Monitor <code>ReplicaLag</code> in CloudWatch. If lag grows, the replica may be undersized or the primary is generating changes faster than the replica can apply.</p>
+        <p><strong>Exam clue:</strong> &ldquo;Offload read traffic,&rdquo; &ldquo;reporting workload impacts production,&rdquo; &ldquo;read scaling&rdquo; &rarr; RDS read replicas.</p>
+      </div>
+
+      <div class="scenario-card">
+        <h3>Scenario C &mdash; Strong Read-After-Write Requirement</h3>
+        <p><strong>Business requirement:</strong> After a customer places an order, the application immediately displays the order confirmation with its status. The customer must see the order they just placed.</p>
+        <p><strong>Architecture:</strong></p>
+        <ul>
+          <li>Write the order to the <strong>primary database</strong>.</li>
+          <li>Read the order confirmation from the <strong>primary database</strong> (not a replica).</li>
+          <li>Route other reads (product browsing, order history) to read replicas where lag is acceptable.</li>
+        </ul>
+        <p><strong>Why not use a replica for this read?</strong> Asynchronous replication means the replica may be seconds behind the primary. If the application reads from the replica immediately after writing, the order may not exist yet on the replica. The customer sees &ldquo;no order found&rdquo; &mdash; a confusing and incorrect experience.</p>
+        <p><strong>Design principle:</strong> Route critical, consistency-sensitive reads to the primary. Route everything else to replicas. The application must know which reads require consistency.</p>
+        <p><strong>Exam clue:</strong> &ldquo;Must see the data just written,&rdquo; &ldquo;read-after-write consistency&rdquo; &rarr; read from primary, not replica.</p>
+      </div>
+
+      <div class="scenario-card">
+        <h3>Scenario D &mdash; Regional Disaster Recovery</h3>
+        <p><strong>Business requirement:</strong> A company needs to recover its production database in another Region if the primary Region becomes completely unavailable. RTO: 1 hour. RPO: 5 minutes.</p>
+        <p><strong>Architecture:</strong></p>
+        <ul>
+          <li>Create a <strong>cross-Region read replica</strong> in the DR Region.</li>
+          <li>The replica continuously receives asynchronous updates from the primary.</li>
+          <li>If the primary Region fails, promote the cross-Region replica to a standalone primary (manual action).</li>
+          <li>Update DNS (Route 53) to point the application to the DR Region&rsquo;s database endpoint.</li>
+          <li>Ensure application servers, secrets, and networking are pre-staged in the DR Region (Topic 9 warm standby).</li>
+          <li>Also maintain <strong>automated backups with cross-Region replication</strong> for point-in-time recovery if the replica itself has data corruption.</li>
+        </ul>
+        <p><strong>RPO consideration:</strong> The actual RPO = replication lag at the time of failure. If the replica is typically &lt;1 second behind, RPO is well within 5 minutes. But network issues could increase lag, so monitor <code>ReplicaLag</code> continuously.</p>
+        <p><strong>Why not Multi-AZ alone?</strong> Multi-AZ protects within a Region only. A Regional outage affects all AZs, including the standby.</p>
+        <p><strong>Exam clue:</strong> &ldquo;Recover in another Region,&rdquo; &ldquo;Regional disaster recovery,&rdquo; &ldquo;RPO of minutes&rdquo; &rarr; cross-Region read replica + backup strategy.</p>
+      </div>
+
+      <div class="scenario-card">
+        <h3>Scenario E &mdash; Read Workload Needs Additional Capacity</h3>
+        <p><strong>Business requirement:</strong> A product search feature generates thousands of read queries per second. The primary database&rsquo;s CPU is at 85% and response times are increasing.</p>
+        <p><strong>Architecture:</strong></p>
+        <ul>
+          <li>Create 2&ndash;3 <strong>read replicas</strong> and route product search queries to them.</li>
+          <li>Writes (new products, inventory updates) continue to the primary.</li>
+          <li>Product data changes infrequently &mdash; seconds of replica lag is invisible to shoppers.</li>
+        </ul>
+        <p><strong>Why not just scale up the primary?</strong> Scaling up (larger instance) has an upper limit and requires a restart. Read replicas allow horizontal read scaling without affecting the primary&rsquo;s availability.</p>
+        <p><strong>Important caveat:</strong> Adding replicas does not help if the bottleneck is write throughput, storage I/O, or poor query design. If all queries do full table scans, more replicas just do more full table scans. Fix the query and indexing first.</p>
+        <p><strong>Exam clue:</strong> &ldquo;Read-heavy,&rdquo; &ldquo;high CPU on primary due to read queries,&rdquo; &ldquo;offload reads&rdquo; &rarr; read replicas.</p>
+      </div>
+
+      <div class="scenario-card">
+        <h3>Scenario F &mdash; Automatic Database Failover and Stale Connections</h3>
+        <p><strong>Business requirement:</strong> After an RDS Multi-AZ failover, the application returns database connection errors for several minutes even though the database is operational again.</p>
+        <p><strong>Root cause:</strong></p>
+        <ul>
+          <li>During failover, all existing TCP connections to the old primary are dropped.</li>
+          <li>The DB endpoint&rsquo;s DNS record updates to point to the new primary.</li>
+          <li>The application&rsquo;s connection pool holds stale connections to the old IP address.</li>
+          <li>DNS caching in the application, JVM, or OS delays resolution of the new IP.</li>
+        </ul>
+        <p><strong>Solution:</strong></p>
+        <ul>
+          <li>Use connection pooling with health checks that validate connections before use.</li>
+          <li>Set the JVM&rsquo;s TTL for DNS entries to a short value (e.g., 60 seconds or less).</li>
+          <li>Implement connection retry logic with backoff in the application.</li>
+          <li>Test failover behavior in a staging environment before production.</li>
+        </ul>
+        <p><strong>Key lesson:</strong> A stable endpoint does not mean connections survive failover. The endpoint&rsquo;s DNS updates, but existing connections are broken. The application must detect and recover.</p>
+        <p><strong>Exam clue:</strong> &ldquo;Connection errors after failover,&rdquo; &ldquo;application not reconnecting&rdquo; &rarr; connection handling, DNS caching, retry logic.</p>
+      </div>
+
+      <div class="scenario-card">
+        <h3>Scenario G &mdash; Choosing Between Multi-AZ Deployment Models</h3>
+        <p><strong>Business requirement:</strong> A company runs PostgreSQL 15 on RDS. It needs automatic failover and wants the standby to handle some read queries to reduce primary load.</p>
+        <p><strong>Architecture options:</strong></p>
+        <table>
+          <thead><tr><th></th><th>Multi-AZ DB Instance</th><th>Multi-AZ DB Cluster</th></tr></thead>
+          <tbody>
+            <tr><td>Standby reads?</td><td>No</td><td>Yes &mdash; two readable standby instances</td></tr>
+            <tr><td>Failover time</td><td>60&ndash;120 seconds</td><td>~35 seconds</td></tr>
+            <tr><td>AZ coverage</td><td>2 AZs</td><td>3 AZs</td></tr>
+            <tr><td>Cost</td><td>1 extra instance</td><td>2 extra instances</td></tr>
+            <tr><td>Engine support</td><td>PostgreSQL 15 &mdash; yes</td><td>PostgreSQL 13.4+ &mdash; yes</td></tr>
+          </tbody>
+        </table>
+        <p><strong>Recommendation:</strong> Since the company needs both HA and read scaling, and PostgreSQL 15 is supported, the <strong>Multi-AZ DB cluster</strong> fits. It provides faster failover, three-AZ coverage, and readable standby instances. The trade-off is higher cost (two additional instances vs. one).</p>
+        <p><strong>Exam clue:</strong> &ldquo;Readable standby,&rdquo; &ldquo;HA + read scaling in one deployment,&rdquo; &ldquo;faster failover&rdquo; &rarr; Multi-AZ DB cluster (check engine compatibility).</p>
+      </div>
+
+      <div class="scenario-card">
+        <h3>Scenario H &mdash; Accidental Data Deletion or Corruption</h3>
+        <p><strong>Business requirement:</strong> A developer accidentally runs <code>DELETE FROM orders WHERE status = 'pending'</code> in production, deleting thousands of valid orders. The database has Multi-AZ enabled.</p>
+        <p><strong>Why Multi-AZ does not help:</strong> The DELETE statement is a valid write operation. It replicates synchronously to the standby. Both the primary and standby now have the deleted data. Multi-AZ protects against infrastructure failure, not logical data corruption.</p>
+        <p><strong>Recovery:</strong></p>
+        <ul>
+          <li>Use <strong>point-in-time recovery (PITR)</strong> to restore the database to a moment <em>just before</em> the accidental DELETE was executed.</li>
+          <li>PITR creates a new DB instance with data as of the chosen timestamp.</li>
+          <li>The application must be reconfigured to use the restored instance (or data migrated back).</li>
+          <li>Automated backups must be enabled with sufficient retention (up to 35 days).</li>
+        </ul>
+        <p><strong>Why read replicas also do not help:</strong> The DELETE replicates to read replicas too (they are asynchronous but still replicate all changes). The only difference is timing &mdash; if you catch the error within seconds, the replica might not have applied it yet, but this is not a reliable recovery strategy.</p>
+        <p><strong>Key lesson:</strong> Replication (Multi-AZ and replicas) protects against infrastructure failure. Backups and PITR protect against data corruption and human error. Both are needed.</p>
+        <p><strong>Exam clue:</strong> &ldquo;Accidental deletion,&rdquo; &ldquo;data corruption,&rdquo; &ldquo;recover to a specific time&rdquo; &rarr; automated backups + point-in-time recovery.</p>
+      </div>
+
+    </section>
+
+    <hr class="topic-divider">
+
+    <!-- RDS SECTION 3: Architecture Diagram -->
+    <section class="topic-section" id="rds-diagram">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain2)" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+        RDS Multi-AZ &amp; Read Replica Architecture
+      </h2>
+
+      <svg role="img" aria-label="Diagram comparing RDS Multi-AZ DB instance deployment with synchronous standby for high availability against read replicas with asynchronous replication for read scaling, plus a Multi-AZ DB cluster inset" viewBox="0 0 920 660" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:920px;height:auto;margin:1.5rem auto;display:block;font-family:inherit;">
+        <title>RDS Multi-AZ vs Read Replicas Architecture</title>
+        <desc>Left side shows a traditional Multi-AZ DB instance deployment with a primary in AZ-A and a non-readable synchronous standby in AZ-B, connected by a single DB endpoint. Right side shows a primary database with asynchronous read replicas serving read-only traffic, with a warning about replication lag. A bottom inset shows the Multi-AZ DB cluster with one writer and two readable standby instances across three AZs.</desc>
+
+        <defs>
+          <marker id="rds-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 Z" fill="var(--text-secondary, #aaa)"/>
+          </marker>
+          <marker id="rds-arrow-green" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 Z" fill="#22c55e"/>
+          </marker>
+          <marker id="rds-arrow-cyan" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 Z" fill="#06b6d4"/>
+          </marker>
+          <marker id="rds-arrow-orange" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 Z" fill="#f59e0b"/>
+          </marker>
+        </defs>
+
+        <!-- Background -->
+        <rect x="0" y="0" width="920" height="660" rx="12" fill="var(--card-bg, #1a1a2e)" stroke="var(--border, #333)" stroke-width="1.5"/>
+
+        <!-- ===== LEFT SIDE: Multi-AZ DB Instance ===== -->
+        <text x="225" y="30" text-anchor="middle" fill="var(--text-primary, #e0e0e0)" font-size="14" font-weight="bold">Multi-AZ DB Instance (HA)</text>
+
+        <!-- Region box -->
+        <rect x="20" y="42" width="410" height="290" rx="10" fill="none" stroke="var(--border, #333)" stroke-width="1" stroke-dasharray="6 3"/>
+        <text x="35" y="62" fill="var(--text-secondary, #aaa)" font-size="10" font-weight="bold">Region &mdash; us-east-1</text>
+
+        <!-- App -->
+        <rect x="160" y="72" width="130" height="34" rx="6" fill="rgba(168,85,247,0.10)" stroke="#a855f7" stroke-width="1"/>
+        <text x="225" y="94" text-anchor="middle" fill="#a855f7" font-size="10" font-weight="bold">Application</text>
+
+        <!-- DB Endpoint -->
+        <rect x="150" y="120" width="150" height="28" rx="14" fill="rgba(96,165,250,0.12)" stroke="#60a5fa" stroke-width="1"/>
+        <text x="225" y="139" text-anchor="middle" fill="#60a5fa" font-size="9" font-weight="bold">DB Instance Endpoint</text>
+
+        <!-- Arrow app to endpoint -->
+        <line x1="225" y1="106" x2="225" y2="118" stroke="var(--text-secondary, #aaa)" stroke-width="1.5" marker-end="url(#rds-arrow)"/>
+
+        <!-- AZ-A -->
+        <rect x="40" y="165" width="175" height="145" rx="8" fill="rgba(34,197,94,0.06)" stroke="#22c55e" stroke-width="1" stroke-dasharray="4 2"/>
+        <text x="128" y="183" text-anchor="middle" fill="#22c55e" font-size="10" font-weight="bold">AZ-A</text>
+
+        <!-- Primary DB -->
+        <rect x="65" y="195" width="125" height="55" rx="8" fill="rgba(96,165,250,0.10)" stroke="#60a5fa" stroke-width="1.5"/>
+        <text x="128" y="218" text-anchor="middle" fill="#60a5fa" font-size="11" font-weight="bold">Primary</text>
+        <text x="128" y="237" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="9">Reads + Writes</text>
+
+        <!-- Arrow endpoint to primary -->
+        <line x1="215" y1="148" x2="155" y2="193" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#rds-arrow-cyan)"/>
+
+        <!-- AZ-B -->
+        <rect x="235" y="165" width="175" height="145" rx="8" fill="rgba(6,182,212,0.06)" stroke="#06b6d4" stroke-width="1" stroke-dasharray="4 2"/>
+        <text x="323" y="183" text-anchor="middle" fill="#06b6d4" font-size="10" font-weight="bold">AZ-B</text>
+
+        <!-- Standby DB -->
+        <rect x="260" y="195" width="125" height="55" rx="8" fill="rgba(107,114,128,0.15)" stroke="#6b7280" stroke-width="1.5"/>
+        <text x="323" y="218" text-anchor="middle" fill="#6b7280" font-size="11" font-weight="bold">Standby</text>
+        <text x="323" y="237" text-anchor="middle" fill="#ef4444" font-size="9">&#x2718; Not readable</text>
+
+        <!-- Sync replication arrow -->
+        <line x1="190" y1="222" x2="258" y2="222" stroke="#22c55e" stroke-width="1.5" marker-end="url(#rds-arrow-green)"/>
+        <text x="224" y="215" text-anchor="middle" fill="#22c55e" font-size="8" font-weight="bold">Synchronous</text>
+
+        <!-- Failover arrow -->
+        <path d="M323,255 L323,285 L225,285 L225,260" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="5 3" fill="none" marker-end="url(#rds-arrow-orange)"/>
+        <text x="275" y="300" text-anchor="middle" fill="#f59e0b" font-size="9" font-weight="bold">Failover (60&ndash;120s)</text>
+
+        <!-- Left annotation -->
+        <text x="225" y="340" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="9" font-style="italic">Standby is for failover only &mdash; not for read queries</text>
+
+        <!-- ===== RIGHT SIDE: Read Replicas ===== -->
+        <text x="680" y="30" text-anchor="middle" fill="var(--text-primary, #e0e0e0)" font-size="14" font-weight="bold">Read Replicas (Read Scaling)</text>
+
+        <!-- Region box -->
+        <rect x="480" y="42" width="420" height="290" rx="10" fill="none" stroke="var(--border, #333)" stroke-width="1" stroke-dasharray="6 3"/>
+        <text x="495" y="62" fill="var(--text-secondary, #aaa)" font-size="10" font-weight="bold">Region &mdash; us-east-1</text>
+
+        <!-- App writes -->
+        <rect x="510" y="72" width="110" height="34" rx="6" fill="rgba(168,85,247,0.10)" stroke="#a855f7" stroke-width="1"/>
+        <text x="565" y="94" text-anchor="middle" fill="#a855f7" font-size="10" font-weight="bold">Writes</text>
+
+        <!-- App reads -->
+        <rect x="760" y="72" width="110" height="34" rx="6" fill="rgba(168,85,247,0.10)" stroke="#a855f7" stroke-width="1"/>
+        <text x="815" y="94" text-anchor="middle" fill="#a855f7" font-size="10" font-weight="bold">Reads</text>
+
+        <!-- Primary DB (right) -->
+        <rect x="510" y="130" width="130" height="55" rx="8" fill="rgba(96,165,250,0.10)" stroke="#60a5fa" stroke-width="1.5"/>
+        <text x="575" y="153" text-anchor="middle" fill="#60a5fa" font-size="11" font-weight="bold">Primary</text>
+        <text x="575" y="172" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="9">Reads + Writes</text>
+
+        <!-- Arrow writes to primary -->
+        <line x1="565" y1="106" x2="565" y2="128" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#rds-arrow-cyan)"/>
+
+        <!-- Replica 1 -->
+        <rect x="710" y="130" width="130" height="55" rx="8" fill="rgba(34,197,94,0.10)" stroke="#22c55e" stroke-width="1.5"/>
+        <text x="775" y="153" text-anchor="middle" fill="#22c55e" font-size="11" font-weight="bold">Replica 1</text>
+        <text x="775" y="172" text-anchor="middle" fill="#22c55e" font-size="9">&#x2714; Read-only</text>
+
+        <!-- Replica 2 -->
+        <rect x="710" y="205" width="130" height="55" rx="8" fill="rgba(34,197,94,0.10)" stroke="#22c55e" stroke-width="1.5"/>
+        <text x="775" y="228" text-anchor="middle" fill="#22c55e" font-size="11" font-weight="bold">Replica 2</text>
+        <text x="775" y="247" text-anchor="middle" fill="#22c55e" font-size="9">&#x2714; Read-only</text>
+
+        <!-- Arrow reads to replicas -->
+        <line x1="815" y1="106" x2="800" y2="128" stroke="#22c55e" stroke-width="1.5" marker-end="url(#rds-arrow-green)"/>
+        <line x1="815" y1="106" x2="800" y2="203" stroke="#22c55e" stroke-width="1.2" marker-end="url(#rds-arrow-green)"/>
+
+        <!-- Async replication arrows -->
+        <line x1="640" y1="155" x2="708" y2="155" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#rds-arrow-orange)"/>
+        <line x1="640" y1="170" x2="708" y2="230" stroke="#f59e0b" stroke-width="1.2" stroke-dasharray="5 3" marker-end="url(#rds-arrow-orange)"/>
+        <text x="670" y="145" text-anchor="middle" fill="#f59e0b" font-size="8" font-weight="bold">Async</text>
+
+        <!-- Lag warning -->
+        <rect x="670" y="275" width="210" height="40" rx="6" fill="rgba(239,68,68,0.10)" stroke="#ef4444" stroke-width="1"/>
+        <text x="775" y="291" text-anchor="middle" fill="#ef4444" font-size="9" font-weight="bold">&#x26A0; Replication Lag</text>
+        <text x="775" y="305" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="8">Replica reads may be stale</text>
+
+        <!-- Right annotation -->
+        <text x="680" y="340" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="9" font-style="italic">Replicas scale reads &mdash; they do NOT auto-failover like Multi-AZ</text>
+
+        <!-- ===== BOTTOM: Multi-AZ DB Cluster ===== -->
+        <rect x="40" y="370" width="840" height="270" rx="10" fill="rgba(168,85,247,0.04)" stroke="#a855f7" stroke-width="1.2"/>
+        <text x="460" y="395" text-anchor="middle" fill="#a855f7" font-size="13" font-weight="bold">Multi-AZ DB Cluster (HA + Read Scaling)</text>
+        <text x="460" y="412" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="10">MySQL 8.0+ &amp; PostgreSQL 13.4+ only</text>
+
+        <!-- App -->
+        <rect x="370" y="425" width="180" height="30" rx="6" fill="rgba(168,85,247,0.10)" stroke="#a855f7" stroke-width="1"/>
+        <text x="460" y="445" text-anchor="middle" fill="#a855f7" font-size="10" font-weight="bold">Application</text>
+
+        <!-- Cluster endpoint -->
+        <rect x="120" y="468" width="150" height="26" rx="13" fill="rgba(96,165,250,0.12)" stroke="#60a5fa" stroke-width="1"/>
+        <text x="195" y="486" text-anchor="middle" fill="#60a5fa" font-size="9" font-weight="bold">Cluster Endpoint (writes)</text>
+
+        <!-- Reader endpoint -->
+        <rect x="640" y="468" width="150" height="26" rx="13" fill="rgba(34,197,94,0.12)" stroke="#22c55e" stroke-width="1"/>
+        <text x="715" y="486" text-anchor="middle" fill="#22c55e" font-size="9" font-weight="bold">Reader Endpoint (reads)</text>
+
+        <!-- Arrow app to cluster endpoint -->
+        <line x1="400" y1="455" x2="272" y2="476" stroke="#60a5fa" stroke-width="1.2" marker-end="url(#rds-arrow-cyan)"/>
+        <!-- Arrow app to reader endpoint -->
+        <line x1="520" y1="455" x2="638" y2="476" stroke="#22c55e" stroke-width="1.2" marker-end="url(#rds-arrow-green)"/>
+
+        <!-- AZ-A Writer -->
+        <rect x="60" y="510" width="175" height="110" rx="8" fill="rgba(34,197,94,0.06)" stroke="#22c55e" stroke-width="1" stroke-dasharray="4 2"/>
+        <text x="148" y="528" text-anchor="middle" fill="#22c55e" font-size="10" font-weight="bold">AZ-A</text>
+        <rect x="85" y="540" width="125" height="55" rx="8" fill="rgba(96,165,250,0.10)" stroke="#60a5fa" stroke-width="1.5"/>
+        <text x="148" y="563" text-anchor="middle" fill="#60a5fa" font-size="11" font-weight="bold">Writer</text>
+        <text x="148" y="582" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="9">Reads + Writes</text>
+
+        <!-- Arrow cluster endpoint to writer -->
+        <line x1="195" y1="494" x2="165" y2="538" stroke="#60a5fa" stroke-width="1.2" marker-end="url(#rds-arrow-cyan)"/>
+
+        <!-- AZ-B Reader 1 -->
+        <rect x="370" y="510" width="175" height="110" rx="8" fill="rgba(6,182,212,0.06)" stroke="#06b6d4" stroke-width="1" stroke-dasharray="4 2"/>
+        <text x="458" y="528" text-anchor="middle" fill="#06b6d4" font-size="10" font-weight="bold">AZ-B</text>
+        <rect x="395" y="540" width="125" height="55" rx="8" fill="rgba(34,197,94,0.10)" stroke="#22c55e" stroke-width="1.5"/>
+        <text x="458" y="563" text-anchor="middle" fill="#22c55e" font-size="11" font-weight="bold">Reader 1</text>
+        <text x="458" y="582" text-anchor="middle" fill="#22c55e" font-size="9">&#x2714; Readable standby</text>
+
+        <!-- AZ-C Reader 2 -->
+        <rect x="680" y="510" width="175" height="110" rx="8" fill="rgba(245,158,11,0.06)" stroke="#f59e0b" stroke-width="1" stroke-dasharray="4 2"/>
+        <text x="768" y="528" text-anchor="middle" fill="#f59e0b" font-size="10" font-weight="bold">AZ-C</text>
+        <rect x="705" y="540" width="125" height="55" rx="8" fill="rgba(34,197,94,0.10)" stroke="#22c55e" stroke-width="1.5"/>
+        <text x="768" y="563" text-anchor="middle" fill="#22c55e" font-size="11" font-weight="bold">Reader 2</text>
+        <text x="768" y="582" text-anchor="middle" fill="#22c55e" font-size="9">&#x2714; Readable standby</text>
+
+        <!-- Arrow reader endpoint to readers -->
+        <line x1="700" y1="494" x2="480" y2="538" stroke="#22c55e" stroke-width="1.2" marker-end="url(#rds-arrow-green)"/>
+        <line x1="730" y1="494" x2="755" y2="538" stroke="#22c55e" stroke-width="1.2" marker-end="url(#rds-arrow-green)"/>
+
+        <!-- Semisync replication arrows -->
+        <line x1="210" y1="565" x2="393" y2="565" stroke="#a855f7" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#rds-arrow)"/>
+        <line x1="210" y1="575" x2="703" y2="575" stroke="#a855f7" stroke-width="1.2" stroke-dasharray="5 3" marker-end="url(#rds-arrow)"/>
+        <text x="310" y="558" fill="#a855f7" font-size="8" font-weight="bold">Semisynchronous replication</text>
+
+        <!-- Failover annotation -->
+        <text x="460" y="645" text-anchor="middle" fill="#f59e0b" font-size="10" font-weight="bold">Failover: ~35 seconds &mdash; readers are promoted to writer</text>
+      </svg>
+
+      <p><strong>Key takeaway:</strong> The traditional Multi-AZ DB instance deployment (top left) provides high availability with a non-readable standby. Read replicas (top right) provide read scaling with asynchronous replication and possible lag. The Multi-AZ DB cluster (bottom) combines both: HA failover with readable standby instances across three AZs, but is limited to MySQL 8.0+ and PostgreSQL 13.4+. Choose based on whether you need HA, read scaling, or both.</p>
+
+    </section>
+
+    <hr class="topic-divider">
+
+    <!-- RDS SECTION 4: Exam Gotchas -->
+    <section class="topic-section" id="rds-gotchas">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain2)" stroke-width="2"><path d="M12 9v4m0 4h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+        20 Exam Gotchas
+      </h2>
+
+      <ol class="gotcha-list">
+        <li><strong>A traditional Multi-AZ standby is not a read replica</strong> &mdash; the standby in a Multi-AZ DB instance deployment exists solely for failover. It does not serve read traffic. If the scenario needs read scaling, Multi-AZ alone is the wrong answer.</li>
+        <li><strong>A traditional Multi-AZ standby cannot serve read queries</strong> &mdash; even if you want to offload reads, the standby is not accessible for queries. You need read replicas (or a Multi-AZ DB cluster with readable standby instances) for read scaling.</li>
+        <li><strong>A read replica does not auto-failover like Multi-AZ</strong> &mdash; read replicas use asynchronous replication and require manual promotion. If the exam asks for &ldquo;automatic failover,&rdquo; the answer is Multi-AZ, not read replicas.</li>
+        <li><strong>Not all Multi-AZ deployments have two instances</strong> &mdash; the Multi-AZ DB cluster has 1 writer + 2 readers = 3 instances across 3 AZs. The traditional deployment has 1 primary + 1 standby = 2 instances. Read the scenario carefully to determine which architecture is described.</li>
+        <li><strong>Multi-AZ DB instance &ne; Multi-AZ DB cluster</strong> &mdash; the DB instance deployment has a non-readable standby. The DB cluster has readable standby instances and faster failover (~35s vs. 60&ndash;120s). These are different architectures with different capabilities.</li>
+        <li><strong>Multi-AZ DB cluster readers ARE readable</strong> &mdash; unlike the traditional standby, the two reader instances in a DB cluster can serve read queries via the reader endpoint. If the scenario mentions &ldquo;readable standby in a Multi-AZ deployment,&rdquo; it describes the DB cluster model.</li>
+        <li><strong>Not all engines support the Multi-AZ DB cluster</strong> &mdash; as of current documentation, only MySQL 8.0+ and PostgreSQL 13.4+ support the DB cluster deployment. Oracle, SQL Server, and MariaDB do not. Always check engine compatibility.</li>
+        <li><strong>Read replicas have replication lag</strong> &mdash; asynchronous replication means the replica may be seconds or more behind the primary. The exam uses lag to distinguish when replicas are suitable (analytics) versus when they are not (read-after-write for checkout).</li>
+        <li><strong>Reading immediately after writing may return stale data from a replica</strong> &mdash; if the application writes an order and immediately reads from a replica, the order may not exist on the replica yet. Read-after-write consistency requires reading from the primary.</li>
+        <li><strong>Read replicas do not replace Multi-AZ for HA</strong> &mdash; if the requirement is &ldquo;automatic failover when the primary fails,&rdquo; read replicas are wrong. They require manual promotion. Multi-AZ provides automatic failover.</li>
+        <li><strong>Multi-AZ alone does not solve read-throughput problems</strong> &mdash; the standby is not readable (traditional deployment). If the primary is overloaded with read queries, adding Multi-AZ does nothing for performance. Add read replicas instead.</li>
+        <li><strong>RDS failover drops active connections</strong> &mdash; during a Multi-AZ failover, existing TCP connections to the old primary are terminated. Applications must detect the drop, resolve the endpoint DNS again, and reconnect. Without retry logic, users see errors even after the database is available.</li>
+        <li><strong>A stable DB endpoint does not preserve connections</strong> &mdash; the endpoint DNS updates to point to the new primary, but existing TCP connections are broken. The endpoint provides a stable address for reconnection, not connection continuity.</li>
+        <li><strong>Cross-Region replication is not the same as same-Region Multi-AZ</strong> &mdash; Multi-AZ protects within one Region (AZ-level failure). Cross-Region read replicas address Regional DR. A Regional outage affects all AZs in that Region, including the Multi-AZ standby.</li>
+        <li><strong>A cross-Region read replica is not a complete DR solution</strong> &mdash; the replica handles database replication, but the application also needs compute, secrets, networking, and DNS changes in the DR Region. Promoting the replica does not automatically restore the full application.</li>
+        <li><strong>Backups, Multi-AZ standby, and read replicas are not interchangeable</strong> &mdash; Multi-AZ = automatic HA failover. Read replicas = read scaling. Backups = recovery from corruption/deletion. Using one when you need another is the most common exam trap in this topic.</li>
+        <li><strong>Replication does not protect against accidental deletion</strong> &mdash; a <code>DELETE</code> or <code>DROP TABLE</code> replicates to both the standby and all read replicas. Multi-AZ and read replicas both contain the corrupted data. Point-in-time recovery (from backups) is the correct recovery mechanism.</li>
+        <li><strong>Replication lag affects RPO during disaster recovery</strong> &mdash; if a cross-Region replica is 30 seconds behind and the primary Region fails, those 30 seconds of transactions are lost. RPO = replication lag at the time of failure, not zero.</li>
+        <li><strong>More replicas do not always improve performance</strong> &mdash; if the bottleneck is write throughput, storage I/O, query design, or connection limits, adding read replicas will not help. Each replica also adds replication overhead to the primary.</li>
+        <li><strong>The application must route reads and writes correctly</strong> &mdash; adding read replicas does nothing if the application sends all queries to the primary. The application must be modified to direct appropriate reads to replica endpoints and writes to the primary endpoint.</li>
+      </ol>
+
+    </section>
+
+    <hr class="topic-divider">
+
+    <!-- RDS SECTION 5: Practice Questions -->
+    <section class="topic-section" id="rds-practice">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain2)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3m.08 4h.01"/></svg>
+        Quick-Fire Practice
+      </h2>
+
+      <div class="practice-q">
+        <p class="q-text">Q1. A company runs a critical order-processing application backed by an Amazon RDS MySQL database in a single Availability Zone. If the database becomes unavailable due to an AZ failure, orders cannot be processed. The company needs automatic database failover with minimal data loss. Which solution meets this requirement?</p>
+        <ul class="q-options">
+          <li><span class="q-letter">A.</span> Create a read replica in another AZ. If the primary fails, promote the read replica to a standalone primary.</li>
+          <li><span class="q-letter">B.</span> Enable RDS Multi-AZ deployment. RDS creates a synchronous standby in another AZ and automatically fails over if the primary becomes unavailable.</li>
+          <li><span class="q-letter">C.</span> Take hourly automated snapshots and restore from the latest snapshot if the primary fails.</li>
+          <li><span class="q-letter">D.</span> Deploy a second RDS instance in another AZ and use application-level logic to switch between them.</li>
+        </ul>
+        <button class="reveal-btn">Show Answer</button>
+        <div class="answer-reveal">
+          <p><strong>Correct Answer: B</strong></p>
+          <p>RDS Multi-AZ creates a synchronous standby in a different AZ and performs automatic failover. Synchronous replication means the standby is always current, providing near-zero data loss. A (read replica) uses asynchronous replication and requires manual promotion &mdash; it does not provide automatic failover. C (snapshots) restores to a new instance, which takes significant time and loses data since the last snapshot. D requires custom application logic for failover, which is error-prone and not managed by AWS.</p>
+          <p><strong>Memory rule:</strong> &ldquo;Automatic failover + minimal data loss&rdquo; = Multi-AZ. Read replicas are for read scaling, not automatic HA.</p>
+        </div>
+      </div>
+
+      <div class="practice-q">
+        <p class="q-text">Q2. A company&rsquo;s RDS PostgreSQL database handles both customer-facing transactions and reporting queries. The reporting team runs complex analytical queries that consume significant CPU, causing slow response times for customers. The reporting queries can tolerate data that is a few seconds old. How should a solutions architect reduce the impact of reporting on the production database?</p>
+        <ul class="q-options">
+          <li><span class="q-letter">A.</span> Enable RDS Multi-AZ and direct reporting queries to the standby instance.</li>
+          <li><span class="q-letter">B.</span> Create an RDS read replica and direct reporting queries to the replica endpoint.</li>
+          <li><span class="q-letter">C.</span> Increase the RDS instance size to handle both workloads on the primary.</li>
+          <li><span class="q-letter">D.</span> Create a cross-Region read replica and direct reporting queries to the remote Region.</li>
+        </ul>
+        <button class="reveal-btn">Show Answer</button>
+        <div class="answer-reveal">
+          <p><strong>Correct Answer: B</strong></p>
+          <p>A read replica offloads reporting queries from the primary. Asynchronous replication means the replica may lag by seconds, which the reporting team can tolerate. A is wrong &mdash; the standby in a traditional Multi-AZ DB instance deployment does not serve read traffic. C (scaling up) has limits, costs more, requires a restart, and does not separate the workloads. D works technically but adds unnecessary cross-Region latency and cost when a same-Region replica suffices.</p>
+          <p><strong>Memory rule:</strong> &ldquo;Offload read queries&rdquo; + &ldquo;tolerable lag&rdquo; = read replica. Multi-AZ standby cannot serve reads (traditional deployment).</p>
+        </div>
+      </div>
+
+      <div class="practice-q">
+        <p class="q-text">Q3. A company operates an RDS MySQL database in us-east-1 with Multi-AZ enabled. The business requires the ability to recover the database in eu-west-1 if the entire us-east-1 Region becomes unavailable. The acceptable RPO is 5 minutes. Which approach BEST supports this requirement?</p>
+        <ul class="q-options">
+          <li><span class="q-letter">A.</span> Rely on the existing Multi-AZ deployment. If the Region fails, the standby in a different AZ handles traffic.</li>
+          <li><span class="q-letter">B.</span> Take daily automated snapshots and copy them to eu-west-1. Restore from the latest snapshot during a Regional outage.</li>
+          <li><span class="q-letter">C.</span> Create a cross-Region read replica in eu-west-1 with continuous asynchronous replication. Promote the replica and redirect traffic during a Regional outage.</li>
+          <li><span class="q-letter">D.</span> Create an additional read replica in us-east-1 in a third AZ to increase redundancy.</li>
+        </ul>
+        <button class="reveal-btn">Show Answer</button>
+        <div class="answer-reveal">
+          <p><strong>Correct Answer: C</strong></p>
+          <p>A cross-Region read replica continuously replicates data to eu-west-1. With typical replication lag well under 5 minutes, the RPO requirement is met. During a Regional outage, the team promotes the replica and redirects traffic. A is wrong &mdash; Multi-AZ operates within one Region; a Regional outage affects all AZs, including the standby. B (daily snapshots) gives up to 24 hours of RPO, far exceeding the 5-minute requirement. D adds redundancy within us-east-1 but does not help during a Regional outage.</p>
+          <p><strong>Memory rule:</strong> Regional DR with RPO of minutes = cross-Region read replica with continuous replication. Multi-AZ protects within a Region only.</p>
         </div>
       </div>
 
