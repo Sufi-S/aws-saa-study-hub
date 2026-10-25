@@ -77,6 +77,11 @@
         <li><a href="#sg-diagram">Security Groups vs NACLs &mdash; VPC Traffic Flow Diagram</a></li>
         <li><a href="#sg-gotchas">Security Groups vs NACLs &mdash; Exam Gotchas</a></li>
         <li><a href="#sg-practice">Security Groups vs NACLs &mdash; Practice Questions</a></li>
+        <li><a href="#sm-learn"><strong>Secrets Manager vs Parameter Store</strong> &mdash; Learn from Zero</a></li>
+        <li><a href="#sm-real-world">Secrets Manager vs Parameter Store &mdash; Real-World Scenarios</a></li>
+        <li><a href="#sm-diagram">Secrets Manager vs Parameter Store &mdash; Architecture Diagram</a></li>
+        <li><a href="#sm-gotchas">Secrets Manager vs Parameter Store &mdash; Exam Gotchas</a></li>
+        <li><a href="#sm-practice">Secrets Manager vs Parameter Store &mdash; Practice Questions</a></li>
       </ol>
     </nav>
 
@@ -2428,6 +2433,762 @@ Rule#   Type    Port    Source          Action
             </ul>
             <p><strong>Key exam clue:</strong> "Least privilege" + "tier-to-tier communication" = security group references (SG IDs), not CIDR blocks.</p>
             <p><strong>Takeaway:</strong> Reference security group IDs instead of CIDR blocks for tier-to-tier rules. This provides the tightest access control and scales with Auto Scaling groups.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================= -->
+    <!-- TOPIC 5: Secrets Manager vs Parameter Store   -->
+    <!-- ============================================= -->
+
+    <hr class="topic-divider" style="margin-top:4rem;">
+
+    <div class="page-header" style="border-bottom:none;padding-bottom:0;margin-bottom:1.5rem;">
+      <h1 style="display:flex;align-items:center;gap:0.6rem;font-size:1.75rem;">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="var(--domain1)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        AWS Secrets Manager vs Parameter Store
+      </h1>
+      <p>Managing application configuration and secrets securely &mdash; choosing between Secrets Manager and Systems Manager Parameter Store for the right job.</p>
+    </div>
+
+    <!-- SM SECTION 1: Learn from Zero -->
+    <section class="topic-section" id="sm-learn">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain1)" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        Learn from Zero
+      </h2>
+
+      <!-- Part A: What Are Secrets and Application Parameters? -->
+      <h3>What Are Secrets and Application Parameters?</h3>
+      <p>Every application needs <strong>configuration</strong> &mdash; values that tell it how to behave and where to find the services it depends on. Some of these values are harmless if exposed (the name of the current environment, a feature flag, or a public API endpoint). Others are extremely sensitive and must be protected (database passwords, API keys, authentication tokens, encryption keys).</p>
+
+      <p>Consider a simple web application that connects to a database:</p>
+      <ul>
+        <li><strong>Configuration parameters (non-secret):</strong> the database hostname (<code>db.example.com</code>), the database port (<code>3306</code>), the application environment (<code>production</code>), a feature flag (<code>enable_new_dashboard=true</code>).</li>
+        <li><strong>Secrets:</strong> the database username and password (<code>admin</code> / <code>P@ssw0rd!xK9</code>), an external payment API key, an OAuth client secret.</li>
+      </ul>
+
+      <div class="key-concept">
+        <strong>Core principle:</strong> <strong>Never hard-code credentials</strong> in source code, container images, deployment scripts, or Git repositories. A leaked Git repository, a shared container image, or an accidental log message can expose every credential embedded in the code. Centralized configuration and secret management keeps sensitive values out of your codebase and under controlled access.
+      </div>
+
+      <p><strong>Centralized configuration management</strong> means storing all your application settings in a dedicated service rather than scattering them across code files, environment variables baked into images, or configuration files committed to version control. This approach provides several benefits:</p>
+      <ul>
+        <li><strong>Single source of truth</strong> &mdash; one place to update a value, and every application instance picks up the change.</li>
+        <li><strong>Access control</strong> &mdash; IAM policies determine who and what can read each value.</li>
+        <li><strong>Audit trail</strong> &mdash; CloudTrail logs every retrieval, so you know exactly which principal accessed which configuration.</li>
+        <li><strong>Encryption</strong> &mdash; sensitive values are encrypted at rest using KMS, not stored in plaintext files.</li>
+      </ul>
+
+      <p>It is important to understand three separate concerns:</p>
+      <ol>
+        <li><strong>Storing a value</strong> &mdash; where the data lives (Secrets Manager, Parameter Store, a config file).</li>
+        <li><strong>Controlling access to it</strong> &mdash; who or what is allowed to retrieve the value (IAM policies, resource policies).</li>
+        <li><strong>Encrypting it</strong> &mdash; protecting the value so that even if the storage is compromised, the plaintext is not exposed (KMS encryption).</li>
+      </ol>
+      <p>AWS provides two primary services for centralized configuration and secret management: <strong>AWS Secrets Manager</strong> and <strong>AWS Systems Manager Parameter Store</strong>. Each serves a different primary purpose, though they overlap in some capabilities.</p>
+
+      <!-- Part B: AWS Secrets Manager -->
+      <h3>AWS Secrets Manager</h3>
+      <p><strong>AWS Secrets Manager</strong> is a purpose-built service for storing, managing, and rotating secrets throughout their lifecycle. It is designed for values that are genuinely sensitive &mdash; database credentials, API keys, OAuth tokens, and other authentication material.</p>
+
+      <h4>How Secrets Are Stored and Protected</h4>
+      <p>When you create a secret in Secrets Manager, the secret value (which can be up to <strong>65,536 bytes</strong>) is encrypted at rest using a KMS key. By default, Secrets Manager uses the AWS managed key <code>aws/secretsmanager</code> at no extra KMS cost. You can also specify a <strong>customer managed KMS key</strong> for additional control &mdash; this is required for cross-account access because AWS managed keys cannot be shared across accounts.</p>
+      <p>The secret itself is a resource with an ARN, a name, and metadata. The actual sensitive value is the <strong>secret value</strong>, which can be a plaintext string or a JSON key-value structure (commonly used for database credentials with fields like <code>username</code>, <code>password</code>, <code>host</code>, <code>port</code>).</p>
+
+      <h4>Retrieving Secrets at Runtime</h4>
+      <p>Applications retrieve secrets by calling the Secrets Manager API (<code>GetSecretValue</code>) using the AWS SDK. The calling principal must have:</p>
+      <ul>
+        <li><strong>IAM permission</strong> &mdash; <code>secretsmanager:GetSecretValue</code> on the specific secret ARN.</li>
+        <li><strong>KMS permission</strong> &mdash; <code>kms:Decrypt</code> on the KMS key that encrypts the secret (unless using the default AWS managed key within the same account, where this is handled automatically).</li>
+      </ul>
+      <p>Many AWS services provide native integrations: RDS can reference a Secrets Manager secret directly, Lambda can attach a secret as an environment variable source, and ECS can inject secrets into container definitions at task launch.</p>
+
+      <h4>Secret Versions and Staging Labels</h4>
+      <p>Each secret maintains <strong>versions</strong>. Secrets Manager uses <strong>staging labels</strong> to track which version is current:</p>
+      <ul>
+        <li><code>AWSCURRENT</code> &mdash; the version that applications should use right now.</li>
+        <li><code>AWSPREVIOUS</code> &mdash; the version that was current before the last rotation.</li>
+        <li><code>AWSPENDING</code> &mdash; the version being prepared during an in-progress rotation.</li>
+      </ul>
+      <p>By default, <code>GetSecretValue</code> returns the <code>AWSCURRENT</code> version. The versioning system ensures that applications can transition smoothly during rotation &mdash; the previous credentials remain available while the new ones are validated.</p>
+
+      <h4>Automatic Secret Rotation</h4>
+      <p>Secrets Manager can <strong>automatically rotate</strong> secrets on a configurable schedule (e.g., every 30, 60, or 90 days). Rotation replaces the current secret value with a new one and updates the backend service (such as a database) to accept the new credentials.</p>
+
+      <div class="key-concept">
+        <strong>How rotation works:</strong> Secrets Manager invokes a <strong>Lambda rotation function</strong> that performs four steps: (1)&nbsp;<em>createSecret</em> &mdash; generate new credentials and store them as <code>AWSPENDING</code>; (2)&nbsp;<em>setSecret</em> &mdash; update the backend service (e.g., change the database password); (3)&nbsp;<em>testSecret</em> &mdash; verify the new credentials work; (4)&nbsp;<em>finishSecret</em> &mdash; move the <code>AWSCURRENT</code> label to the new version.
+      </div>
+
+      <p>For <strong>supported databases</strong> (Amazon RDS, Aurora, Redshift, DocumentDB), Secrets Manager provides <strong>managed rotation</strong> with pre-built Lambda functions. You enable rotation, choose a schedule, and Secrets Manager handles the Lambda function automatically. For other secret types (third-party API keys, custom credentials), you must write or customize the Lambda rotation function yourself.</p>
+
+      <p><strong>Important distinctions about rotation:</strong></p>
+      <ul>
+        <li><em>Enabling rotation</em> means turning on the feature and selecting a schedule.</li>
+        <li><em>Configuring the rotation workflow</em> means ensuring the Lambda function can connect to the target service, has the right permissions, and follows the correct rotation strategy (single-user or alternating-user).</li>
+        <li><em>Verifying rotation works</em> means testing that the consuming application correctly picks up new credentials after a rotation event. Rotation can succeed at the database level but still break an application that caches old credentials indefinitely.</li>
+      </ul>
+
+      <p>Not every secret type supports identical built-in rotation. Managed rotation with pre-built functions is available for supported AWS databases. For an external API key, AWS cannot automatically contact the third-party service to update the key &mdash; you would need custom rotation logic that coordinates with the external provider.</p>
+
+      <p><strong>When Secrets Manager is especially useful:</strong></p>
+      <ul>
+        <li>Database credentials that must rotate regularly.</li>
+        <li>External API credentials that require lifecycle management.</li>
+        <li>Any secret where you need versioning, staging labels, and a managed rotation workflow.</li>
+        <li>Cross-region secret replication for disaster recovery.</li>
+      </ul>
+
+      <div class="key-concept">
+        <strong>Key distinction:</strong> Secrets Manager does not just encrypt a value &mdash; it <em>manages the secret lifecycle</em>. It tracks versions, coordinates rotation with backend services, and provides a purpose-built API for secret retrieval. Merely encrypting a configuration value (e.g., with a <code>SecureString</code> parameter) does not give you managed rotation, staging labels, or integrated database credential workflows.
+      </div>
+
+      <!-- Part C: AWS Systems Manager Parameter Store -->
+      <h3>AWS Systems Manager Parameter Store</h3>
+      <p><strong>AWS Systems Manager Parameter Store</strong> is a general-purpose, centralized configuration store for managing application settings, feature flags, license keys, endpoints, and other configuration data. It can also store sensitive values using encrypted <code>SecureString</code> parameters.</p>
+
+      <h4>Parameter Types</h4>
+      <p>Parameter Store supports three parameter types:</p>
+      <ul>
+        <li><strong><code>String</code></strong> &mdash; a plain-text value. Examples: an application endpoint, an environment name, an AMI ID.</li>
+        <li><strong><code>StringList</code></strong> &mdash; a comma-separated list of plain-text values. Example: a list of allowed instance types (<code>t3.micro,t3.small,t3.medium</code>).</li>
+        <li><strong><code>SecureString</code></strong> &mdash; a value encrypted at rest using a KMS key. Examples: a database password, a license key, any value you do not want stored in plaintext.</li>
+      </ul>
+      <p><code>String</code> and <code>StringList</code> parameters are stored in plaintext &mdash; anyone with <code>ssm:GetParameter</code> permission can read them. <code>SecureString</code> parameters are encrypted with KMS, so the caller also needs <code>kms:Decrypt</code> permission on the associated KMS key to retrieve the plaintext value.</p>
+
+      <h4>Hierarchical Organization</h4>
+      <p>Parameters are organized by <strong>name</strong>, which supports a hierarchical path structure using forward slashes. This is one of Parameter Store&rsquo;s most powerful features for managing multiple environments:</p>
+
+      <div class="key-concept">
+        <strong>Example hierarchy:</strong><br>
+        <code>/myapp/dev/DB_HOST</code> &rarr; <code>dev-db.internal</code> (String)<br>
+        <code>/myapp/dev/DB_PORT</code> &rarr; <code>3306</code> (String)<br>
+        <code>/myapp/prod/DB_HOST</code> &rarr; <code>prod-db.internal</code> (String)<br>
+        <code>/myapp/prod/DB_PASSWORD</code> &rarr; <em>[encrypted]</em> (SecureString)<br><br>
+        An application in the <code>dev</code> environment retrieves all parameters under <code>/myapp/dev/</code>. The <code>prod</code> environment retrieves from <code>/myapp/prod/</code>. IAM policies can restrict each environment&rsquo;s role to only its own path.
+      </div>
+
+      <p>Paths help organize configurations and enforce access boundaries. An IAM policy can grant access to <code>arn:aws:ssm:*:*:parameter/myapp/dev/*</code> while denying access to <code>/myapp/prod/*</code>, ensuring that development workloads cannot read production credentials.</p>
+
+      <h4>KMS Integration for SecureString</h4>
+      <p>When you create a <code>SecureString</code> parameter, Parameter Store encrypts the value using a KMS key. By default, it uses the AWS managed key <code>aws/ssm</code>. You can specify a customer managed KMS key for finer control and cross-account scenarios. To retrieve a <code>SecureString</code>, the calling principal needs both <code>ssm:GetParameter</code> and <code>kms:Decrypt</code> on the relevant key.</p>
+
+      <h4>Parameter Versions and History</h4>
+      <p>Every time you update a parameter, Parameter Store creates a new <strong>version</strong>. You can retrieve a specific version or view the parameter&rsquo;s change history. You can also attach <strong>labels</strong> to specific versions (e.g., <code>prod-stable</code>, <code>v2.1</code>) to create meaningful references that don&rsquo;t change when you update the parameter.</p>
+
+      <h4>Retrieving Parameters</h4>
+      <p>Applications retrieve parameters through the AWS SDK or CLI using <code>GetParameter</code>, <code>GetParameters</code>, or <code>GetParametersByPath</code> (which retrieves all parameters under a given path). IAM policies control who can retrieve which parameters. For <code>SecureString</code>, you can request the decrypted value by passing <code>WithDecryption=true</code>.</p>
+
+      <h4>Standard vs Advanced Parameter Tiers</h4>
+      <p>Parameter Store offers two tiers that affect limits, features, and cost:</p>
+
+      <table class="comparison-table" style="width:100%;margin:1rem 0;">
+        <thead>
+          <tr><th>Feature</th><th>Standard Tier</th><th>Advanced Tier</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Maximum parameter value size</td><td>4 KB</td><td>8 KB</td></tr>
+          <tr><td>Maximum parameters per account/Region</td><td>10,000</td><td>100,000</td></tr>
+          <tr><td>Parameter policies (expiration, notification)</td><td>Not available</td><td>Available</td></tr>
+          <tr><td>Cost</td><td>Free (no charge for storage or standard-throughput API calls)</td><td>$0.05 per advanced parameter per month</td></tr>
+          <tr><td>Higher throughput</td><td>Available (additional charge)</td><td>Available (additional charge)</td></tr>
+        </tbody>
+      </table>
+
+      <p><strong>Parameter policies</strong> (advanced tier only) let you assign lifecycle rules such as an expiration date or a notification before expiration. This is useful for enforcing credential rotation timelines at the parameter level. However, parameter policies do not automatically rotate the value &mdash; they only notify you or mark the parameter as expired.</p>
+
+      <div class="key-concept">
+        <strong>Tier selection matters:</strong> Do not choose a tier based only on its name. If you need more than 10,000 parameters, parameter values larger than 4 KB, or parameter policies for lifecycle management, you must use the advanced tier. Always verify current limits against <a href="https://docs.aws.amazon.com/systems-manager/latest/userguide/parameter-store-reference-table.html" target="_blank" rel="noopener">AWS documentation</a>.
+      </div>
+
+      <!-- Part D: Secrets Manager vs Parameter Store Comparison -->
+      <h3>Secrets Manager vs Parameter Store &mdash; Comparison</h3>
+
+      <table class="comparison-table" style="width:100%;margin:1rem 0;">
+        <thead>
+          <tr><th>Dimension</th><th>AWS Secrets Manager</th><th>SSM Parameter Store</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Primary purpose</strong></td><td>Secret lifecycle management</td><td>General-purpose configuration store</td></tr>
+          <tr><td><strong>Secret vs config</strong></td><td>Built for secrets specifically</td><td>Handles both config and encrypted sensitive values</td></tr>
+          <tr><td><strong>Automatic rotation</strong></td><td>Built-in with managed Lambda functions for supported databases; custom Lambda for other secrets</td><td>No built-in rotation mechanism</td></tr>
+          <tr><td><strong>Rotation complexity</strong></td><td>Managed for supported databases; custom Lambda required for others</td><td>You must implement rotation yourself (e.g., via a scheduled Lambda updating the parameter)</td></tr>
+          <tr><td><strong>Encryption</strong></td><td>Always encrypted at rest (mandatory)</td><td>Optional &mdash; only <code>SecureString</code> type is encrypted; <code>String</code> and <code>StringList</code> are plaintext</td></tr>
+          <tr><td><strong>KMS integration</strong></td><td>AWS managed key (<code>aws/secretsmanager</code>) or customer managed key</td><td>AWS managed key (<code>aws/ssm</code>) or customer managed key for <code>SecureString</code></td></tr>
+          <tr><td><strong>IAM access control</strong></td><td>IAM policies + optional resource-based policies on the secret</td><td>IAM policies on parameter ARNs (path-based wildcards supported)</td></tr>
+          <tr><td><strong>Hierarchical organization</strong></td><td>Flat naming (no native path hierarchy, but names can include <code>/</code>)</td><td>Native hierarchical paths with <code>GetParametersByPath</code></td></tr>
+          <tr><td><strong>Versioning</strong></td><td>Staging labels (<code>AWSCURRENT</code>, <code>AWSPREVIOUS</code>, <code>AWSPENDING</code>)</td><td>Numeric versions with optional labels</td></tr>
+          <tr><td><strong>Cross-account access</strong></td><td>Supported via resource-based policies + KMS key policy</td><td>Limited &mdash; requires RAM sharing for advanced parameters or indirect patterns</td></tr>
+          <tr><td><strong>Retrieval pattern</strong></td><td><code>GetSecretValue</code></td><td><code>GetParameter</code> / <code>GetParameters</code> / <code>GetParametersByPath</code></td></tr>
+          <tr><td><strong>Service integrations</strong></td><td>Native RDS, Aurora, Redshift, DocumentDB rotation; ECS/Lambda secret injection; CloudFormation dynamic references</td><td>EC2 Run Command, ECS, Lambda, CloudFormation dynamic references, State Manager</td></tr>
+          <tr><td><strong>Max value size</strong></td><td>65,536 bytes (65 KB)</td><td>4 KB (standard) / 8 KB (advanced)</td></tr>
+          <tr><td><strong>Cost model</strong></td><td>$0.40 per secret per month + $0.05 per 10,000 API calls</td><td>Standard tier: free storage, free standard-throughput API calls. Advanced: $0.05/parameter/month. Higher throughput: additional charge.</td></tr>
+          <tr><td><strong>Common architecture choice</strong></td><td>Database credentials, API keys, OAuth tokens &mdash; anything needing managed rotation</td><td>Feature flags, endpoints, environment config, AMI IDs &mdash; and encrypted sensitive values that don&rsquo;t need rotation</td></tr>
+        </tbody>
+      </table>
+
+      <div class="key-concept">
+        <strong>The most important distinction:</strong> Secrets Manager is purpose-built for managing secrets and supports managed rotation workflows for supported secret types. Parameter Store is a general-purpose configuration and parameter store that can also hold encrypted values through <code>SecureString</code>. Parameter Store&rsquo;s <code>SecureString</code> provides encryption, but it does not provide automatic rotation, staging labels, or integrated database credential management. The appropriate service depends on your rotation requirements, feature needs, access patterns, limits, and total cost.
+      </div>
+
+      <!-- Part E: Standard vs Advanced Parameter Store (expanded) -->
+      <h3>Standard vs Advanced Parameter Store &mdash; Choosing the Right Tier</h3>
+      <p>Choosing a tier requires understanding your actual requirements, not just the tier name:</p>
+      <ul>
+        <li><strong>Parameter count</strong> &mdash; if you have more than 10,000 parameters in a single account and Region, you must use advanced parameters (or a mix).</li>
+        <li><strong>Value size</strong> &mdash; standard parameters hold up to 4 KB. If you store a JSON configuration block or a certificate chain exceeding 4 KB, you need the advanced tier (up to 8 KB) or Secrets Manager (up to 65 KB).</li>
+        <li><strong>Parameter policies</strong> &mdash; only available on advanced parameters. If you need expiration notifications or automated lifecycle management at the parameter level, you must use the advanced tier.</li>
+        <li><strong>Cost sensitivity</strong> &mdash; standard parameters are free for storage and standard-throughput API access. Advanced parameters cost $0.05 per parameter per month. If you have thousands of parameters, the cost difference is significant.</li>
+      </ul>
+      <p>Parameter policies can assign an expiration date to a parameter and send notifications via EventBridge before expiration. This helps enforce lifecycle management &mdash; for example, notifying the team 15 days before a license key expires. However, parameter policies do not automatically rotate or update the value. They provide awareness and enforcement, not automation. Not all policy types apply to every parameter type or tier.</p>
+
+      <!-- Part F: Security and Access Control -->
+      <h3>Security and Access Control</h3>
+      <p>Proper access control for secrets and configuration involves multiple layers:</p>
+
+      <h4>IAM Policies</h4>
+      <p>IAM policies determine who can perform actions on secrets and parameters. Follow the <strong>principle of least privilege</strong>:</p>
+      <ul>
+        <li>Grant access to specific secret ARNs or parameter paths &mdash; never <code>*</code> for all secrets.</li>
+        <li>Use conditions to restrict access by IP, VPC endpoint, or tag.</li>
+        <li>Separate read permissions (<code>GetSecretValue</code>, <code>GetParameter</code>) from management permissions (<code>CreateSecret</code>, <code>PutParameter</code>, <code>DeleteSecret</code>).</li>
+      </ul>
+
+      <h4>KMS Permissions</h4>
+      <p>Encrypted secrets and <code>SecureString</code> parameters require KMS permissions in addition to service-level permissions. This creates a <strong>two-layer authorization model</strong>:</p>
+      <ul>
+        <li><strong>Service authorization</strong> &mdash; permission to call <code>secretsmanager:GetSecretValue</code> or <code>ssm:GetParameter</code>.</li>
+        <li><strong>KMS authorization</strong> &mdash; permission to call <code>kms:Decrypt</code> on the KMS key that protects the value.</li>
+      </ul>
+      <p>Having <code>kms:Decrypt</code> permission alone does not grant access to a secret &mdash; you still need the service-level permission. Conversely, having <code>secretsmanager:GetSecretValue</code> without <code>kms:Decrypt</code> on the key means you cannot read the decrypted value. Both layers must agree.</p>
+
+      <h4>IAM Roles for Application Access</h4>
+      <p>Applications should receive permissions through <strong>IAM roles</strong> (EC2 instance profiles, ECS task roles, Lambda execution roles) rather than embedded access keys. The role&rsquo;s policy grants the minimum permissions needed to retrieve specific secrets or parameters. The application uses the AWS SDK, which automatically discovers the role credentials from the instance metadata service, ECS credential endpoint, or Lambda runtime.</p>
+
+      <h4>Protecting Secret Values</h4>
+      <ul>
+        <li>Secret values must <strong>never</strong> appear in application logs, error messages, console output, or Git commits.</li>
+        <li>Avoid passing secrets through command-line arguments (visible in process lists).</li>
+        <li>When using environment variables, ensure they are set at runtime from a secure source &mdash; not baked into container images or deployment manifests stored in version control.</li>
+      </ul>
+
+      <h4>Auditing and Monitoring</h4>
+      <p><strong>AWS CloudTrail</strong> logs API calls to both Secrets Manager and Parameter Store, creating an audit trail of who accessed what and when. You can set up CloudWatch alarms or EventBridge rules to alert on suspicious access patterns, such as unusual API calls from unexpected principals or Regions.</p>
+      <p>Avoid overly broad permissions like <code>secretsmanager:GetSecretValue</code> on <code>Resource: "*"</code>. An application that can read every secret in the account is a single point of compromise. Scope permissions to specific ARNs or use tag-based conditions.</p>
+
+      <h4>Caching and Availability Considerations</h4>
+      <p>Retrieving a secret at runtime introduces dependencies on network connectivity and service availability. Applications should consider:</p>
+      <ul>
+        <li><strong>Caching</strong> &mdash; use the Secrets Manager or Parameter Store caching libraries to reduce API calls and latency. Cached values reduce costs and protect against transient service issues.</li>
+        <li><strong>Cache invalidation</strong> &mdash; after rotation, cached credentials become stale. Configure cache TTL to align with rotation schedules, or use rotation event notifications to trigger cache refresh.</li>
+        <li><strong>Graceful degradation</strong> &mdash; handle denied access, missing values, and temporary service failures without crashing or exposing error details.</li>
+      </ul>
+
+      <!-- Part G: Application Integration Patterns -->
+      <h3>Application Integration Patterns</h3>
+
+      <h4>EC2-Hosted Application Retrieving a Database Password</h4>
+      <p>An EC2 instance has an <strong>instance profile</strong> with an IAM role that grants <code>secretsmanager:GetSecretValue</code> on the specific database secret. At startup, the application calls <code>GetSecretValue</code> using the AWS SDK, parses the returned JSON, and uses the credentials to connect to the database. No access keys are stored on the instance.</p>
+
+      <h4>ECS or Containerized Application Obtaining Configuration</h4>
+      <p>ECS supports injecting secrets directly into container definitions. In the task definition, you reference a Secrets Manager secret or SSM parameter ARN, and ECS injects the value as an environment variable at task launch. The <strong>ECS task execution role</strong> must have permission to retrieve the referenced secrets. The container never sees the credentials until runtime.</p>
+
+      <h4>Lambda Function Accessing a Secret or Parameter</h4>
+      <p>A Lambda function&rsquo;s <strong>execution role</strong> grants the necessary permissions. The function calls the Secrets Manager or SSM API in its handler code. For frequently invoked functions, use the Secrets Manager caching library to avoid repeated API calls and reduce latency. Lambda also supports referencing SSM parameters and Secrets Manager secrets directly in environment variable configuration.</p>
+
+      <h4>Separating Development and Production Configurations</h4>
+      <p>Use separate parameter paths (<code>/myapp/dev/</code> vs <code>/myapp/prod/</code>) or separate secrets with distinct naming conventions. IAM policies restrict each environment&rsquo;s role to its own path. For stronger isolation, use separate AWS accounts for each environment &mdash; paths alone do not constitute a security boundary since they rely entirely on IAM policy correctness.</p>
+
+      <h4>Using Environment Variables Safely</h4>
+      <p>Environment variables are a common way to pass configuration to applications. They are acceptable when:</p>
+      <ul>
+        <li>The values are injected at runtime from a secure source (Secrets Manager, Parameter Store).</li>
+        <li>The values are not baked into container images, deployment scripts, or source code.</li>
+        <li>The application does not log its environment variables.</li>
+      </ul>
+      <p>However, environment variables alone are not a complete secret management solution. They do not provide rotation, versioning, or access logging. They are a delivery mechanism, not a management system.</p>
+
+      <h4>Caching and Refreshing After Rotation</h4>
+      <p>Applications that cache secret values must refresh them when rotation occurs. Strategies include setting a cache TTL shorter than the rotation interval, subscribing to Secrets Manager rotation events via EventBridge, or implementing retry logic that fetches fresh credentials when a database connection fails after a rotation.</p>
+
+      <h4>Handling Failures</h4>
+      <p>When a secret or parameter cannot be retrieved (access denied, service unavailable, parameter not found), the application should:</p>
+      <ul>
+        <li>Fail securely &mdash; do not fall back to hard-coded defaults or plaintext credentials.</li>
+        <li>Log the failure reason without logging the secret value itself.</li>
+        <li>Use cached values if available and within the acceptable staleness window.</li>
+        <li>Alert operations teams through CloudWatch metrics or alarms.</li>
+      </ul>
+      <p>The exact integration mechanism and automatic retrieval behavior depend on the service and deployment pattern. Not every service provides automatic secret injection &mdash; some require explicit SDK calls in your application code.</p>
+
+    </section>
+
+    <hr class="topic-divider">
+
+    <!-- SM SECTION 2: Real-World Scenarios -->
+    <section class="topic-section" id="sm-real-world">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain1)" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        When Real Architects Actually Use This
+      </h2>
+
+      <!-- Scenario A: Automatically Rotating Database Credentials -->
+      <div class="scenario">
+        <h4>Scenario A: Automatically Rotating Database Credentials</h4>
+        <p><strong>Requirement:</strong> A company runs a production application backed by an Amazon RDS MySQL database. Compliance mandates that database credentials rotate every 30 days without manual intervention. The application runs on EC2 instances behind an Auto Scaling group.</p>
+        <p><strong>Recommended service:</strong> <strong>AWS Secrets Manager</strong> with managed rotation.</p>
+        <p><strong>Why it fits:</strong> Secrets Manager provides managed rotation for RDS MySQL with pre-built Lambda functions. You create a secret containing the database credentials, enable rotation with a 30-day schedule, and Secrets Manager handles generating new credentials, updating the database, and promoting the new version to <code>AWSCURRENT</code>.</p>
+        <p><strong>Access control:</strong> The EC2 instance profile role has <code>secretsmanager:GetSecretValue</code> for the specific secret ARN. The rotation Lambda function has a separate role with permissions to update the RDS credentials and write new secret versions.</p>
+        <p><strong>What must be tested:</strong> Rotation success alone is not enough. The application must handle the credential change &mdash; either by using the Secrets Manager caching library with a TTL shorter than the rotation period, or by implementing retry logic that fetches fresh credentials when a connection fails. An untested rotation can succeed at the database but break every application instance still using cached old credentials.</p>
+        <p><strong>Trade-offs:</strong> Secrets Manager costs $0.40/secret/month plus API call charges. For a single database secret that rotates monthly, this is modest. The main operational risk is a misconfigured rotation Lambda that fails silently, so always monitor rotation events via CloudWatch.</p>
+        <p><strong>Why not Parameter Store?</strong> Parameter Store does not have a built-in rotation mechanism. You would need to build a custom Lambda to generate new credentials, update the database, and update the <code>SecureString</code> parameter &mdash; replicating what Secrets Manager provides natively.</p>
+      </div>
+
+      <!-- Scenario B: Managing Non-Secret Configuration -->
+      <div class="scenario">
+        <h4>Scenario B: Managing Non-Secret Configuration Across Environments</h4>
+        <p><strong>Requirement:</strong> A company runs microservices across development, staging, and production environments. Each environment needs different API endpoints, feature flags, and timeout values. The values are not secrets and do not require encryption or rotation.</p>
+        <p><strong>Recommended service:</strong> <strong>AWS Systems Manager Parameter Store</strong> (standard tier).</p>
+        <p><strong>Why it fits:</strong> Parameter Store&rsquo;s hierarchical paths naturally separate environments: <code>/payments/dev/api_endpoint</code>, <code>/payments/prod/api_endpoint</code>. Applications retrieve their environment&rsquo;s configuration using <code>GetParametersByPath</code>. Standard tier is free for storage and standard-throughput API calls.</p>
+        <p><strong>Access control:</strong> Each environment&rsquo;s IAM role has access to only its own parameter path. The production Lambda execution role can read <code>/payments/prod/*</code> but not <code>/payments/dev/*</code>.</p>
+        <p><strong>Trade-offs:</strong> Standard tier limits you to 4 KB per parameter and 10,000 parameters per account per Region. For plain configuration values, these limits are rarely an issue. If you need larger values, consider the advanced tier or restructuring your configuration.</p>
+        <p><strong>Why not Secrets Manager?</strong> These are non-secret values. Secrets Manager always encrypts, charges per secret per month, and provides rotation capabilities the company does not need. Parameter Store&rsquo;s <code>String</code> type is simpler and free.</p>
+      </div>
+
+      <!-- Scenario C: Securely Storing an API Key -->
+      <div class="scenario">
+        <h4>Scenario C: Securely Storing an External API Key</h4>
+        <p><strong>Requirement:</strong> An application uses a third-party payment gateway. The API key must be stored securely and rotated every 90 days. The payment provider requires manual coordination to issue a new key.</p>
+        <p><strong>Recommended service:</strong> <strong>AWS Secrets Manager</strong>, but with a <strong>custom rotation Lambda</strong>.</p>
+        <p><strong>Why it fits:</strong> Secrets Manager provides the rotation scheduling, versioning, and staging label infrastructure. However, because the payment provider does not offer an API to automatically issue new keys, the rotation Lambda must either call the provider&rsquo;s key management API (if one exists) or notify the operations team that a new key is needed.</p>
+        <p><strong>Access control:</strong> Only the application&rsquo;s Lambda execution role or ECS task role has <code>secretsmanager:GetSecretValue</code> for the API key secret. Developers can view secret metadata but not the secret value.</p>
+        <p><strong>Could Parameter Store work?</strong> You could store the API key as a <code>SecureString</code> parameter. This provides encryption and IAM-based access control. However, you would lose versioning with staging labels, managed rotation scheduling, and the four-step rotation workflow. If the 90-day rotation is a hard compliance requirement, Secrets Manager&rsquo;s built-in rotation scheduling and EventBridge integration make compliance monitoring easier.</p>
+        <p><strong>Key insight:</strong> Do not assume that every API key can be rotated automatically by AWS. If the external service does not support automated key replacement, the rotation function must coordinate with the provider or involve a human step.</p>
+      </div>
+
+      <!-- Scenario D: Cost-Effective Configuration Store -->
+      <div class="scenario">
+        <h4>Scenario D: Choosing a Cost-Effective Configuration Store</h4>
+        <p><strong>Requirement:</strong> A company stores 500 configuration values (feature flags, endpoints, timeouts) and 5 database credentials. They want to minimize costs.</p>
+        <p><strong>Recommended architecture:</strong> Use <strong>Parameter Store (standard tier)</strong> for the 500 non-secret configuration values and <strong>Secrets Manager</strong> for the 5 database credentials that require rotation.</p>
+        <p><strong>Cost analysis:</strong></p>
+        <ul>
+          <li><strong>Parameter Store (standard):</strong> $0 for 500 parameters + free standard-throughput API calls.</li>
+          <li><strong>Secrets Manager:</strong> 5 secrets &times; $0.40/month = $2.00/month + API call charges ($0.05 per 10,000 calls).</li>
+          <li><strong>Total:</strong> ~$2/month for the combined solution.</li>
+        </ul>
+        <p><strong>Why not put everything in Secrets Manager?</strong> Storing 505 values in Secrets Manager would cost 505 &times; $0.40 = $202/month. Most of these values are non-secret and do not benefit from rotation. Using Secrets Manager for feature flags and endpoints wastes money with no security benefit.</p>
+        <p><strong>Why not put everything in Parameter Store?</strong> You could store the database credentials as <code>SecureString</code> parameters for $0/month (standard tier). But you lose managed rotation, and building a custom rotation system adds development and operational overhead that likely exceeds the $2/month Secrets Manager cost.</p>
+        <p><strong>Key insight:</strong> The lowest storage price does not always produce the lowest total operational cost. Factor in development time, rotation automation, monitoring, and the risk of a missed credential rotation.</p>
+      </div>
+
+      <!-- Scenario E: Separating Development and Production -->
+      <div class="scenario">
+        <h4>Scenario E: Separating Development and Production Configurations</h4>
+        <p><strong>Requirement:</strong> A company must ensure that developers cannot access production database credentials, and production workloads cannot accidentally use development endpoints.</p>
+        <p><strong>Recommended approach:</strong> Use parameter paths and IAM policies for logical separation, and separate AWS accounts for security boundaries.</p>
+        <ul>
+          <li><strong>Parameter paths:</strong> <code>/app/dev/*</code> and <code>/app/prod/*</code> with IAM policies restricting each role to its path.</li>
+          <li><strong>Separate accounts:</strong> A <code>Dev</code> account and a <code>Prod</code> account in AWS Organizations. Each account has its own Parameter Store and Secrets Manager. IAM policies and SCPs enforce boundaries.</li>
+          <li><strong>Secret naming:</strong> In the production account, Secrets Manager secrets use a consistent naming convention (e.g., <code>prod/app/db-credentials</code>).</li>
+        </ul>
+        <p><strong>Why paths alone are not enough:</strong> Different path names do not constitute a security boundary by themselves. They depend entirely on correct IAM policy configuration. A single overly broad IAM policy (<code>ssm:GetParameter</code> on <code>Resource: "*"</code>) would defeat the path-based separation. Separate accounts provide a stronger blast radius boundary because resources are physically isolated.</p>
+        <p><strong>Trade-offs:</strong> Multi-account adds organizational overhead (AWS Organizations management, cross-account access patterns). For small teams, well-crafted IAM policies with path-based scoping may be sufficient. For regulated environments, account-level isolation is usually required.</p>
+      </div>
+
+      <!-- Scenario F: Application Running on EC2 or Lambda -->
+      <div class="scenario">
+        <h4>Scenario F: Application Retrieving Credentials Without Hard-Coded Keys</h4>
+        <p><strong>Requirement:</strong> A Lambda function needs the database password to connect to an RDS PostgreSQL instance. The company prohibits hard-coded credentials and permanent IAM access keys.</p>
+        <p><strong>Recommended approach:</strong> Store the database password in <strong>Secrets Manager</strong>. Grant the Lambda <strong>execution role</strong> the permissions <code>secretsmanager:GetSecretValue</code> and <code>kms:Decrypt</code> (if using a customer managed key). The function retrieves the password at invocation time using the AWS SDK.</p>
+        <p><strong>How it works:</strong></p>
+        <ol>
+          <li>Lambda assumes its execution role automatically &mdash; no access keys needed.</li>
+          <li>The SDK call to <code>GetSecretValue</code> uses the role&rsquo;s temporary credentials.</li>
+          <li>Secrets Manager decrypts the secret via KMS and returns the plaintext value.</li>
+          <li>The function uses the password to connect to RDS.</li>
+          <li>The function never logs the password or stores it persistently.</li>
+        </ol>
+        <p><strong>Key distinction:</strong> The IAM role used to <em>retrieve</em> the secret is not the secret itself. Credential storage (Secrets Manager) and credential delivery (IAM role &rarr; temporary credentials &rarr; SDK call) are separate concerns. The role authenticates the Lambda to AWS. The secret provides the database password. Confusing these two is a common exam trap.</p>
+      </div>
+
+      <!-- Scenario G: Cross-Account Secret Access -->
+      <div class="scenario">
+        <h4>Scenario G: Cross-Account Secret Access</h4>
+        <p><strong>Requirement:</strong> A shared-services account stores database connection secrets used by applications in multiple workload accounts. The security team wants centralized secret management while allowing each workload account to retrieve only the secrets it needs.</p>
+        <p><strong>Recommended approach:</strong> Use <strong>Secrets Manager resource-based policies</strong> combined with <strong>KMS key policies</strong> to enable cross-account access.</p>
+        <p><strong>Prerequisites:</strong></p>
+        <ol>
+          <li><strong>Secret resource policy:</strong> Attach a resource-based policy to the secret in the shared-services account granting <code>secretsmanager:GetSecretValue</code> to the specific IAM role ARN in the workload account.</li>
+          <li><strong>KMS key policy:</strong> The KMS key encrypting the secret must grant <code>kms:Decrypt</code> to the workload account role. This requires a <strong>customer managed key</strong> &mdash; AWS managed keys (<code>aws/secretsmanager</code>) cannot be shared cross-account.</li>
+          <li><strong>IAM policy in workload account:</strong> The workload role must also have IAM permissions allowing the cross-account <code>secretsmanager:GetSecretValue</code> and <code>kms:Decrypt</code> actions.</li>
+        </ol>
+        <p><strong>Why this matters for the exam:</strong> Cross-account Secrets Manager access requires alignment of three policy layers: the secret&rsquo;s resource policy, the KMS key policy, and the caller&rsquo;s IAM policy. Missing any one of these results in Access Denied.</p>
+        <p><strong>Parameter Store cross-account:</strong> Parameter Store does not natively support resource-based policies in the same way as Secrets Manager. Cross-account parameter sharing is more limited and typically requires AWS Resource Access Manager (RAM) for advanced parameters or indirect patterns such as copying parameters between accounts. The two services are not interchangeable for cross-account access scenarios.</p>
+      </div>
+    </section>
+
+    <hr class="topic-divider">
+
+    <!-- SM SECTION 3: Architecture Diagram -->
+    <section class="topic-section" id="sm-diagram">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain1)" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+        Application Secret &amp; Configuration Retrieval
+      </h2>
+
+      <svg role="img" aria-label="Diagram showing an application retrieving configuration from Parameter Store and secrets from Secrets Manager, both protected by IAM and KMS" viewBox="0 0 860 520" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:860px;height:auto;margin:1.5rem auto;display:block;font-family:inherit;">
+        <title>Application Secret and Configuration Retrieval Architecture</title>
+        <desc>An application on EC2 or Lambda uses its IAM role to retrieve non-secret configuration from Parameter Store and sensitive credentials from Secrets Manager. KMS protects encrypted values. The application then connects to the backend database without logging the secret.</desc>
+
+        <!-- Background -->
+        <rect x="0" y="0" width="860" height="520" rx="12" fill="var(--card-bg, #1a1a2e)" stroke="var(--border, #333)" stroke-width="1.5"/>
+
+        <!-- Title bar -->
+        <text x="430" y="32" text-anchor="middle" fill="var(--heading, #e0e0e0)" font-size="15" font-weight="600">Application Retrieves Config &amp; Secrets at Runtime</text>
+
+        <!-- 1. Application (EC2/Lambda) -->
+        <rect x="30" y="200" width="150" height="100" rx="10" fill="var(--card-bg, #1a1a2e)" stroke="#60a5fa" stroke-width="2.5" stroke-dasharray="8 4"/>
+        <text x="105" y="238" text-anchor="middle" fill="#60a5fa" font-size="13" font-weight="600">Application</text>
+        <text x="105" y="258" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="11">(EC2 / Lambda / ECS)</text>
+        <text x="105" y="280" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="10">IAM Role attached</text>
+
+        <!-- 2. IAM Role check box -->
+        <rect x="230" y="120" width="130" height="60" rx="8" fill="var(--card-bg, #1a1a2e)" stroke="#f59e0b" stroke-width="2"/>
+        <text x="295" y="147" text-anchor="middle" fill="#f59e0b" font-size="12" font-weight="600">IAM Role</text>
+        <text x="295" y="165" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="10">Temp credentials</text>
+
+        <!-- Arrow: App -> IAM -->
+        <line x1="180" y1="230" x2="230" y2="168" stroke="#60a5fa" stroke-width="2" marker-end="url(#sm-arrow)"/>
+        <text x="188" y="192" fill="var(--text-secondary, #aaa)" font-size="9" transform="rotate(-25,188,192)">assumes role</text>
+
+        <!-- 3. Parameter Store -->
+        <rect x="430" y="70" width="170" height="90" rx="10" fill="var(--card-bg, #1a1a2e)" stroke="#34d399" stroke-width="2.5"/>
+        <text x="515" y="100" text-anchor="middle" fill="#34d399" font-size="13" font-weight="600">Parameter Store</text>
+        <text x="515" y="118" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="10">String &amp; SecureString</text>
+        <text x="515" y="136" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="10">/app/prod/DB_HOST</text>
+        <text x="515" y="150" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="10">/app/prod/FEATURE_FLAG</text>
+
+        <!-- Arrow: IAM -> Parameter Store -->
+        <line x1="360" y1="140" x2="430" y2="120" stroke="#34d399" stroke-width="2" marker-end="url(#sm-arrow)"/>
+        <text x="380" y="118" fill="#34d399" font-size="9">GetParameter</text>
+
+        <!-- 4. Secrets Manager -->
+        <rect x="430" y="210" width="170" height="90" rx="10" fill="var(--card-bg, #1a1a2e)" stroke="#f472b6" stroke-width="2.5"/>
+        <text x="515" y="240" text-anchor="middle" fill="#f472b6" font-size="13" font-weight="600">Secrets Manager</text>
+        <text x="515" y="258" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="10">DB credentials, API keys</text>
+        <text x="515" y="276" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="10">AWSCURRENT version</text>
+        <text x="515" y="290" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="9" font-style="italic">Automatic rotation</text>
+
+        <!-- Arrow: IAM -> Secrets Manager -->
+        <line x1="360" y1="165" x2="430" y2="240" stroke="#f472b6" stroke-width="2" marker-end="url(#sm-arrow)"/>
+        <text x="372" y="212" fill="#f472b6" font-size="9">GetSecretValue</text>
+
+        <!-- 5. KMS -->
+        <rect x="670" y="145" width="150" height="80" rx="10" fill="var(--card-bg, #1a1a2e)" stroke="#a78bfa" stroke-width="2.5"/>
+        <text x="745" y="175" text-anchor="middle" fill="#a78bfa" font-size="13" font-weight="600">AWS KMS</text>
+        <text x="745" y="193" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="10">Encrypts/decrypts</text>
+        <text x="745" y="210" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="10">secret &amp; SecureString values</text>
+
+        <!-- Arrow: Parameter Store -> KMS (SecureString) -->
+        <line x1="600" y1="110" x2="670" y2="165" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#sm-arrow)"/>
+        <text x="620" y="125" fill="#a78bfa" font-size="8">SecureString only</text>
+
+        <!-- Arrow: Secrets Manager -> KMS -->
+        <line x1="600" y1="250" x2="670" y2="200" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#sm-arrow)"/>
+        <text x="625" y="240" fill="#a78bfa" font-size="8">Always encrypted</text>
+
+        <!-- 6. Return arrows (config & secret returned) -->
+        <line x1="430" y1="100" x2="180" y2="235" stroke="#34d399" stroke-width="1.5" stroke-dasharray="4 4" marker-end="url(#sm-arrow)"/>
+        <text x="280" y="155" fill="#34d399" font-size="9">config value</text>
+
+        <line x1="430" y1="260" x2="180" y2="265" stroke="#f472b6" stroke-width="1.5" stroke-dasharray="4 4" marker-end="url(#sm-arrow)"/>
+        <text x="280" y="254" fill="#f472b6" font-size="9">decrypted secret</text>
+
+        <!-- 7. Backend Database -->
+        <rect x="30" y="380" width="150" height="80" rx="10" fill="var(--card-bg, #1a1a2e)" stroke="#fb923c" stroke-width="2.5"/>
+        <text x="105" y="412" text-anchor="middle" fill="#fb923c" font-size="13" font-weight="600">RDS Database</text>
+        <text x="105" y="430" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="10">Backend service</text>
+        <text x="105" y="448" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="10">Accepts rotated creds</text>
+
+        <!-- Arrow: App -> Database -->
+        <line x1="105" y1="300" x2="105" y2="380" stroke="#fb923c" stroke-width="2" marker-end="url(#sm-arrow)"/>
+        <text x="115" y="345" fill="#fb923c" font-size="9">connects with</text>
+        <text x="115" y="358" fill="#fb923c" font-size="9">retrieved credentials</text>
+
+        <!-- 8. Warning: Do not log -->
+        <rect x="260" y="390" width="220" height="55" rx="8" fill="var(--card-bg, #1a1a2e)" stroke="#ef4444" stroke-width="2" stroke-dasharray="6 3"/>
+        <text x="370" y="414" text-anchor="middle" fill="#ef4444" font-size="12" font-weight="600">&#x26A0; Never log secrets</text>
+        <text x="370" y="432" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="10">No secrets in logs, env vars baked</text>
+        <text x="370" y="444" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="10">into images, or Git commits</text>
+
+        <!-- Auth check labels -->
+        <rect x="530" y="350" width="200" height="55" rx="8" fill="var(--card-bg, #1a1a2e)" stroke="var(--border, #444)" stroke-width="1.5"/>
+        <text x="630" y="372" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="10" font-weight="600">Authorization checklist:</text>
+        <text x="630" y="388" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="9">1. IAM allows service API call</text>
+        <text x="630" y="400" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="9">2. KMS key policy allows Decrypt</text>
+
+        <!-- Legend -->
+        <rect x="530" y="430" width="300" height="70" rx="8" fill="var(--card-bg, #1a1a2e)" stroke="var(--border, #444)" stroke-width="1"/>
+        <text x="545" y="450" fill="var(--text-secondary, #aaa)" font-size="10" font-weight="600">Legend:</text>
+        <line x1="545" y1="464" x2="570" y2="464" stroke="#34d399" stroke-width="2"/>
+        <text x="575" y="468" fill="var(--text-secondary, #aaa)" font-size="9">Non-secret config (Parameter Store)</text>
+        <line x1="545" y1="480" x2="570" y2="480" stroke="#f472b6" stroke-width="2"/>
+        <text x="575" y="484" fill="var(--text-secondary, #aaa)" font-size="9">Secrets (Secrets Manager &mdash; always encrypted)</text>
+        <line x1="545" y1="494" x2="570" y2="494" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="5 3"/>
+        <text x="575" y="498" fill="var(--text-secondary, #aaa)" font-size="9">KMS encryption (mandatory for secrets, optional for params)</text>
+
+        <!-- Arrow marker definition -->
+        <defs>
+          <marker id="sm-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 Z" fill="var(--text-secondary, #aaa)"/>
+          </marker>
+        </defs>
+      </svg>
+
+      <p>The diagram shows an application using its IAM role to retrieve non-secret configuration from Parameter Store (<code>String</code> parameters) and sensitive credentials from Secrets Manager. Both services can use KMS for encryption &mdash; Secrets Manager always encrypts, while Parameter Store encrypts only <code>SecureString</code> parameters. KMS protects the encrypted data but does not independently grant access to the secret &mdash; both IAM service permissions and KMS key permissions must be satisfied. The application uses the retrieved credentials to connect to its backend database without logging or permanently storing the secret values.</p>
+    </section>
+
+    <hr class="topic-divider">
+
+    <!-- SM SECTION 4: Exam Gotchas -->
+    <section class="topic-section" id="sm-gotchas">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        Exam Gotchas
+      </h2>
+
+      <div class="gotcha">
+        <h4>1. Parameter Store Cannot Store Sensitive Data</h4>
+        <p><strong>Misconception:</strong> Parameter Store is only for plain-text configuration values.</p>
+        <p><strong>Correct:</strong> Parameter Store supports <code>SecureString</code> parameters that are encrypted at rest with KMS. It absolutely can store sensitive values &mdash; it just lacks the managed rotation workflow that Secrets Manager provides.</p>
+        <p><strong>Exam clue:</strong> "Store an encrypted value without rotation" &rarr; <code>SecureString</code> parameter is valid.</p>
+        <p><strong>Memory rule:</strong> Parameter Store can encrypt with <code>SecureString</code>. It cannot rotate automatically.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>2. SecureString = Same as Secrets Manager</h4>
+        <p><strong>Misconception:</strong> A <code>SecureString</code> parameter gives you the same capabilities as a Secrets Manager secret.</p>
+        <p><strong>Correct:</strong> <code>SecureString</code> provides KMS encryption and IAM access control, but it does not provide automatic rotation, staging labels (<code>AWSCURRENT</code>/<code>AWSPREVIOUS</code>), managed rotation Lambda functions, or native database credential integration.</p>
+        <p><strong>Exam clue:</strong> "Automatic rotation" or "managed rotation" &rarr; Secrets Manager, not Parameter Store.</p>
+        <p><strong>Memory rule:</strong> <code>SecureString</code> encrypts. Secrets Manager encrypts <em>and</em> rotates.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>3. Identical Pricing and Features</h4>
+        <p><strong>Misconception:</strong> Secrets Manager and Parameter Store cost the same and do the same things.</p>
+        <p><strong>Correct:</strong> Parameter Store standard tier is free for storage. Secrets Manager costs $0.40/secret/month. They serve different primary purposes: Secrets Manager for secrets with lifecycle management, Parameter Store for general configuration. Choosing based on price alone ignores features.</p>
+        <p><strong>Exam clue:</strong> "Most cost-effective" + "no rotation needed" + "non-secret values" &rarr; Parameter Store (standard).</p>
+        <p><strong>Memory rule:</strong> Free config &rarr; Parameter Store. Managed rotation &rarr; Secrets Manager. Match service to requirement.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>4. Every Secret Supports the Same Rotation</h4>
+        <p><strong>Misconception:</strong> Enabling rotation in Secrets Manager works identically for all secret types.</p>
+        <p><strong>Correct:</strong> Managed rotation with pre-built Lambda functions is available for supported AWS databases (RDS, Aurora, Redshift, DocumentDB). For other secret types (third-party API keys, custom credentials), you must write or customize the rotation Lambda function. Some external services may not support automated key replacement at all.</p>
+        <p><strong>Exam clue:</strong> "Third-party API key rotation" &rarr; requires custom Lambda, not a one-click setup.</p>
+        <p><strong>Memory rule:</strong> Managed rotation = supported AWS databases. Everything else = custom Lambda.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>5. Secret Storage = Encryption Key Management</h4>
+        <p><strong>Misconception:</strong> Secrets Manager manages your KMS keys.</p>
+        <p><strong>Correct:</strong> Secrets Manager <em>uses</em> KMS to encrypt secrets, but it does not manage your KMS keys. KMS key creation, rotation, policies, and deletion are separate concerns managed through KMS itself. Secrets Manager manages the <em>secret lifecycle</em>; KMS manages the <em>encryption keys</em>.</p>
+        <p><strong>Exam clue:</strong> "Manage encryption keys" &rarr; KMS. "Manage database credentials" &rarr; Secrets Manager.</p>
+        <p><strong>Memory rule:</strong> KMS manages keys. Secrets Manager manages secrets. They work together but are separate services.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>6. Retrieve Secret = Automatic KMS Access</h4>
+        <p><strong>Misconception:</strong> If you can call <code>GetSecretValue</code>, KMS decryption is automatic.</p>
+        <p><strong>Correct:</strong> When using a customer managed KMS key, the calling principal needs both <code>secretsmanager:GetSecretValue</code> and <code>kms:Decrypt</code> on the specific key. With the default AWS managed key in the same account, KMS access is handled implicitly. With a customer managed key or cross-account access, you must explicitly grant KMS permissions.</p>
+        <p><strong>Exam clue:</strong> "Access Denied" + "customer managed key" &rarr; check <code>kms:Decrypt</code> permission.</p>
+        <p><strong>Memory rule:</strong> Customer managed KMS key = explicit <code>kms:Decrypt</code> required.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>7. kms:Decrypt = Access to All Secrets</h4>
+        <p><strong>Misconception:</strong> Having <code>kms:Decrypt</code> on a KMS key means you can read any secret encrypted with that key.</p>
+        <p><strong>Correct:</strong> <code>kms:Decrypt</code> lets you decrypt data encrypted with that key, but you still need <code>secretsmanager:GetSecretValue</code> or <code>ssm:GetParameter</code> to retrieve the encrypted value in the first place. Both service-level and KMS-level authorization must be satisfied.</p>
+        <p><strong>Exam clue:</strong> "Has KMS decrypt permission but cannot read secret" &rarr; missing service-level permission.</p>
+        <p><strong>Memory rule:</strong> Two locks, two keys &mdash; service permission AND KMS permission.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>8. Path Names Automatically Isolate Environments</h4>
+        <p><strong>Misconception:</strong> Naming a parameter <code>/prod/db_password</code> automatically prevents dev from reading it.</p>
+        <p><strong>Correct:</strong> Parameter paths are naming conventions, not security boundaries. Isolation comes from IAM policies that restrict each role to specific paths. A role with <code>ssm:GetParameter</code> on <code>Resource: "*"</code> can read every parameter regardless of path. For stronger isolation, use separate AWS accounts.</p>
+        <p><strong>Exam clue:</strong> "Ensure dev cannot access production parameters" &rarr; IAM policy restricting to specific path ARN, not just path naming.</p>
+        <p><strong>Memory rule:</strong> Paths organize. IAM policies enforce. Accounts isolate.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>9. Environment Variable = Complete Secret Management</h4>
+        <p><strong>Misconception:</strong> Setting a secret as an environment variable is a complete solution.</p>
+        <p><strong>Correct:</strong> Environment variables are a <em>delivery mechanism</em>, not a management system. They do not provide rotation, versioning, access logging, or encryption at rest. Secrets should be retrieved from Secrets Manager or Parameter Store at runtime and injected into the environment &mdash; never baked into images or deployment scripts.</p>
+        <p><strong>Exam clue:</strong> "Secure secret management" &rarr; Secrets Manager or Parameter Store, not just environment variables.</p>
+        <p><strong>Memory rule:</strong> Env vars deliver secrets. They do not manage them.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>10. Applications Automatically Get Updated Secrets After Rotation</h4>
+        <p><strong>Misconception:</strong> After rotation, all applications immediately use the new credentials.</p>
+        <p><strong>Correct:</strong> Applications that cache credentials will continue using the old (now invalid) credentials until their cache expires or is explicitly refreshed. This can cause connection failures after rotation. You must configure appropriate cache TTLs, implement retry logic, or use rotation event notifications to trigger a refresh.</p>
+        <p><strong>Exam clue:</strong> "Application loses database connectivity after credential rotation" &rarr; cached stale credentials.</p>
+        <p><strong>Memory rule:</strong> Rotation updates the secret. The application must refresh its cache.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>11. Stale Cached Credentials After Rotation</h4>
+        <p><strong>Misconception:</strong> Caching secrets is always safe and does not require any special handling.</p>
+        <p><strong>Correct:</strong> Caching reduces API calls and latency, but cached values become stale after rotation. Set cache TTL shorter than the rotation interval. Use the Secrets Manager caching library, which provides built-in TTL management. Without this, your application may fail silently when old credentials expire.</p>
+        <p><strong>Exam clue:</strong> "Intermittent database failures" + "recently enabled rotation" &rarr; cache TTL longer than rotation interval.</p>
+        <p><strong>Memory rule:</strong> Cache TTL &lt; rotation interval. Always.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>12. Every Parameter Belongs in Secrets Manager</h4>
+        <p><strong>Misconception:</strong> For maximum security, store everything in Secrets Manager.</p>
+        <p><strong>Correct:</strong> Non-secret values (feature flags, endpoints, timeout values) do not benefit from Secrets Manager&rsquo;s rotation or encryption. Storing them there costs $0.40/value/month with no added security value. Use Parameter Store (free standard tier) for non-sensitive configuration and Secrets Manager only for actual secrets that benefit from lifecycle management.</p>
+        <p><strong>Exam clue:</strong> "Cost-effective" + "non-sensitive configuration" &rarr; Parameter Store standard tier.</p>
+        <p><strong>Memory rule:</strong> Right tool for the job. Config &rarr; Parameter Store. Secrets &rarr; Secrets Manager.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>13. All Parameters Have the Same Limits</h4>
+        <p><strong>Misconception:</strong> Every Parameter Store parameter has the same size limit and feature set.</p>
+        <p><strong>Correct:</strong> Standard parameters are limited to 4 KB and 10,000 per account/Region, with no parameter policies. Advanced parameters support up to 8 KB, 100,000 per account/Region, and parameter policies (expiration, notification). The advanced tier costs $0.05/parameter/month.</p>
+        <p><strong>Exam clue:</strong> "Store a 6 KB configuration value in Parameter Store" &rarr; requires advanced tier.</p>
+        <p><strong>Memory rule:</strong> Standard: 4 KB, 10K limit, free. Advanced: 8 KB, 100K limit, paid.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>14. IAM Role = The Secret Itself</h4>
+        <p><strong>Misconception:</strong> The IAM role that retrieves a secret is the same as the secret.</p>
+        <p><strong>Correct:</strong> An IAM role provides <em>temporary AWS credentials</em> that authenticate the principal to AWS services. The role lets the application call <code>GetSecretValue</code>. The secret itself is the database password, API key, or token stored in Secrets Manager. These are separate concepts: the role is the key to the vault, not the treasure inside.</p>
+        <p><strong>Exam clue:</strong> "Application needs database credentials" &rarr; IAM role authorizes retrieval; Secrets Manager stores the password.</p>
+        <p><strong>Memory rule:</strong> IAM role = who you are. Secret = what you need.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>15. Cross-Account Access Works Without Extra Configuration</h4>
+        <p><strong>Misconception:</strong> If Account B has IAM permissions, it can automatically read secrets in Account A.</p>
+        <p><strong>Correct:</strong> Cross-account Secrets Manager access requires: (1) a resource-based policy on the secret granting the external account; (2) a KMS key policy granting <code>kms:Decrypt</code> to the external role (must be a customer managed key); (3) an IAM policy in the external account allowing the actions. All three must align. Cross-account Parameter Store access has different, more limited patterns.</p>
+        <p><strong>Exam clue:</strong> "Cross-account secret access" + "Access Denied" &rarr; check resource policy, KMS key policy, and IAM policy.</p>
+        <p><strong>Memory rule:</strong> Cross-account = three policies: secret resource policy + KMS key policy + caller IAM.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>16. Printing Secrets to Logs Is Fine for Debugging</h4>
+        <p><strong>Misconception:</strong> Logging secret values during debugging is acceptable.</p>
+        <p><strong>Correct:</strong> Secret values must never appear in application logs, CloudWatch logs, error messages, or console output. Logs are often stored long-term, shared across teams, and may be accessible by broader audiences than the secret itself. If a log is compromised, every secret ever logged is exposed.</p>
+        <p><strong>Exam clue:</strong> "Secure credential handling" &rarr; never log secret values.</p>
+        <p><strong>Memory rule:</strong> If it is secret, it does not belong in a log. Period.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>17. AWS Can Rotate Any API Key Automatically</h4>
+        <p><strong>Misconception:</strong> Secrets Manager can automatically rotate third-party API keys the same way it rotates RDS credentials.</p>
+        <p><strong>Correct:</strong> Automatic rotation requires the ability to contact the service and replace the credential. For AWS-managed databases, Secrets Manager has built-in Lambda functions that do this. For a third-party API, AWS cannot call the provider to issue a new key unless you build a custom Lambda that integrates with that provider&rsquo;s API. If the provider has no key management API, fully automated rotation is not possible.</p>
+        <p><strong>Exam clue:</strong> "Rotate external API key" &rarr; requires custom Lambda and provider cooperation.</p>
+        <p><strong>Memory rule:</strong> Rotation takes two: AWS must reach the backend, and the backend must accept the new credential.</p>
+      </div>
+
+      <div class="gotcha">
+        <h4>18. Cheapest Storage = Cheapest Total Cost</h4>
+        <p><strong>Misconception:</strong> The service with the lowest per-item storage price is always the cheapest option.</p>
+        <p><strong>Correct:</strong> Total cost includes storage fees, API call charges, development time for custom rotation, monitoring, and the operational risk of missed rotations. Parameter Store is free for standard storage, but building and maintaining custom rotation logic for database credentials may cost more in engineering time than Secrets Manager&rsquo;s $0.40/secret/month with built-in rotation.</p>
+        <p><strong>Exam clue:</strong> "Cost-effective" + "requires rotation" &rarr; evaluate total cost, not just storage price.</p>
+        <p><strong>Memory rule:</strong> Compare total cost of ownership, not just the price tag.</p>
+      </div>
+
+    </section>
+
+    <hr class="topic-divider">
+
+    <!-- SM SECTION 5: Practice Questions -->
+    <section class="topic-section" id="sm-practice">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Scenario-Based Practice Questions
+      </h2>
+
+      <div class="practice-questions">
+        <h4>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          Practice Questions &mdash; Secrets Manager vs Parameter Store
+        </h4>
+
+        <!-- Q1: Automatic Secret Rotation -->
+        <div class="practice-q">
+          <p class="q-text">Q1. A company runs a production application on EC2 instances that connects to an Amazon RDS MySQL database. The security team requires that database credentials rotate every 30 days with no manual intervention and no application downtime. The solution must automatically update the database password and ensure the application uses the new credentials. Which approach meets these requirements with the LEAST operational overhead?</p>
+          <ul class="q-options">
+            <li><span class="q-letter">A.</span> Store the database password in AWS Systems Manager Parameter Store as a <code>SecureString</code> parameter. Create a scheduled Lambda function that generates a new password, updates the RDS database, and writes the new value to Parameter Store every 30 days.</li>
+            <li><span class="q-letter">B.</span> Store the database credentials in AWS Secrets Manager. Enable automatic rotation with a 30-day schedule using the managed rotation Lambda function for RDS MySQL. Configure the application to use the Secrets Manager caching library with a TTL shorter than 30 days.</li>
+            <li><span class="q-letter">C.</span> Store the database password in an encrypted S3 object. Create an EventBridge rule that triggers a Lambda function every 30 days to generate a new password, update RDS, and upload the new password to S3.</li>
+            <li><span class="q-letter">D.</span> Store the database credentials in AWS Secrets Manager. Enable automatic rotation with a 30-day schedule. The application will automatically receive the new credentials without any application-side configuration changes.</li>
+          </ul>
+          <button class="reveal-btn">Show Answer</button>
+          <div class="answer-reveal">
+            <p><strong>Correct Answer: B</strong></p>
+            <p>Secrets Manager provides <strong>managed rotation</strong> for RDS MySQL with pre-built Lambda functions. Enabling rotation on a 30-day schedule automates the entire workflow: Secrets Manager generates new credentials, updates the database, validates the new password, and promotes the new version to <code>AWSCURRENT</code>. The application must be configured to handle credential changes &mdash; using the Secrets Manager caching library with an appropriate TTL ensures the application picks up new credentials before the old ones expire.</p>
+            <p><strong>Why not the others?</strong></p>
+            <ul>
+              <li><strong>A</strong> works but requires building and maintaining a custom Lambda rotation function, error handling, and monitoring &mdash; all of which Secrets Manager provides natively. This adds operational overhead.</li>
+              <li><strong>C</strong> stores credentials in S3, which is not a secret management service. It lacks versioning with staging labels, access audit capabilities specific to secrets, and requires custom implementation for every aspect of the rotation workflow.</li>
+              <li><strong>D</strong> is partially correct about Secrets Manager rotation but incorrectly claims the application needs no configuration changes. Applications must use the SDK to retrieve the current secret value and handle cache refresh &mdash; rotation does not magically push new credentials to running applications.</li>
+            </ul>
+            <p><strong>Key exam clue:</strong> "Automatic rotation" + "RDS database" + "least operational overhead" = Secrets Manager with managed rotation.</p>
+            <p><strong>Takeaway:</strong> Secrets Manager + managed rotation = least overhead for supported databases. But the application must still be configured to refresh cached credentials.</p>
+          </div>
+        </div>
+
+        <!-- Q2: Secure Configuration Parameters -->
+        <div class="practice-q">
+          <p class="q-text">Q2. A company deploys microservices across development, staging, and production environments in the same AWS account. Each environment needs its own set of API endpoints, feature flags, and timeout values. The security team requires that production configuration is inaccessible to development workloads. None of the values are secrets, and no rotation is needed. The company wants the MOST cost-effective solution with centralized management. Which approach should the solutions architect recommend?</p>
+          <ul class="q-options">
+            <li><span class="q-letter">A.</span> Store all configuration values in AWS Secrets Manager with separate secrets per environment. Use IAM policies to restrict each environment&rsquo;s role to its own secrets.</li>
+            <li><span class="q-letter">B.</span> Store all configuration values as environment variables in each service&rsquo;s deployment manifest. Use separate deployment pipelines per environment to inject the correct values.</li>
+            <li><span class="q-letter">C.</span> Store all configuration values in AWS Systems Manager Parameter Store using hierarchical paths (e.g., <code>/myapp/dev/</code>, <code>/myapp/prod/</code>). Use IAM policies to restrict each environment&rsquo;s role to its own parameter path.</li>
+            <li><span class="q-letter">D.</span> Store all configuration values in an encrypted S3 bucket with separate prefixes per environment. Grant each environment read access to its own prefix using bucket policies.</li>
+          </ul>
+          <button class="reveal-btn">Show Answer</button>
+          <div class="answer-reveal">
+            <p><strong>Correct Answer: C</strong></p>
+            <p>Parameter Store&rsquo;s <strong>hierarchical path structure</strong> naturally organizes configuration by environment. IAM policies can restrict each role to its specific path (e.g., the production ECS task role can read <code>/myapp/prod/*</code> but not <code>/myapp/dev/*</code>). Standard tier is <strong>free</strong> for storage and standard-throughput API calls, making it the most cost-effective centralized configuration store for non-secret values.</p>
+            <p><strong>Why not the others?</strong></p>
+            <ul>
+              <li><strong>A</strong> works but uses Secrets Manager for non-secret values. At $0.40/secret/month, storing hundreds of configuration values as secrets is expensive and provides no benefit over Parameter Store for values that do not need rotation or encryption.</li>
+              <li><strong>B</strong> scatters configuration across deployment manifests. Updating a value requires redeployment, and there is no centralized audit trail of configuration access. It is not centralized management.</li>
+              <li><strong>D</strong> is functional but S3 is not designed as a configuration management service. It lacks parameter versioning, <code>GetParametersByPath</code> for hierarchical retrieval, and native integration with ECS/Lambda configuration injection.</li>
+            </ul>
+            <p><strong>Key exam clue:</strong> "Non-secret configuration" + "multiple environments" + "cost-effective" + "centralized" = Parameter Store with hierarchical paths.</p>
+            <p><strong>Takeaway:</strong> Parameter Store standard tier is the go-to for non-secret, centralized configuration. Paths + IAM = environment isolation. Free tier = cost-effective.</p>
+          </div>
+        </div>
+
+        <!-- Q3: Secret Retrieval and KMS Permissions -->
+        <div class="practice-q">
+          <p class="q-text">Q3. A company stores an application&rsquo;s payment gateway API key in AWS Secrets Manager, encrypted with a customer managed KMS key. Application A&rsquo;s IAM role has <code>secretsmanager:GetSecretValue</code> on the secret ARN and <code>kms:Decrypt</code> on the KMS key ARN. Application B&rsquo;s IAM role has only <code>kms:Decrypt</code> on the same KMS key ARN. Application B attempts to retrieve the secret and receives an Access Denied error. What is the cause, and which MINIMAL change resolves it?</p>
+          <ul class="q-options">
+            <li><span class="q-letter">A.</span> Application B needs the KMS key policy updated to grant it <code>kms:GenerateDataKey</code> in addition to <code>kms:Decrypt</code>. Add the <code>kms:GenerateDataKey</code> permission to Application B&rsquo;s IAM policy.</li>
+            <li><span class="q-letter">B.</span> Application B needs <code>secretsmanager:GetSecretValue</code> permission on the secret ARN added to its IAM policy. KMS decrypt permission alone does not grant access to the secret.</li>
+            <li><span class="q-letter">C.</span> The KMS key is region-locked and Application B is in a different Region. Replicate the KMS key as a multi-Region key.</li>
+            <li><span class="q-letter">D.</span> Application B needs to be added to the Secrets Manager secret&rsquo;s resource-based policy. IAM policies cannot grant Secrets Manager access when a customer managed KMS key is used.</li>
+          </ul>
+          <button class="reveal-btn">Show Answer</button>
+          <div class="answer-reveal">
+            <p><strong>Correct Answer: B</strong></p>
+            <p>Retrieving a secret from Secrets Manager requires <strong>two layers of authorization</strong>: (1) <code>secretsmanager:GetSecretValue</code> on the secret and (2) <code>kms:Decrypt</code> on the KMS key (when using a customer managed key). Application B has only the KMS permission. Without <code>secretsmanager:GetSecretValue</code>, it cannot call the Secrets Manager API at all &mdash; the KMS key permission is irrelevant if the service-level call is denied. The minimal fix is to add <code>secretsmanager:GetSecretValue</code> for the specific secret ARN to Application B&rsquo;s IAM policy.</p>
+            <p><strong>Why not the others?</strong></p>
+            <ul>
+              <li><strong>A</strong> is wrong because <code>kms:GenerateDataKey</code> is used for <em>encryption</em>, not decryption. Retrieving a secret requires <code>kms:Decrypt</code>, which Application B already has. The missing permission is at the Secrets Manager level, not the KMS level.</li>
+              <li><strong>C</strong> is wrong because the scenario does not mention multiple Regions. KMS keys are regional, but the Access Denied error in this scenario is caused by a missing service-level permission, not a regional key issue.</li>
+              <li><strong>D</strong> is wrong because IAM policies <em>can</em> grant Secrets Manager access even with customer managed KMS keys. A resource-based policy on the secret is one way to grant access but is not required when the caller&rsquo;s IAM policy includes the necessary permission. The missing permission is the service-level action, not a resource policy requirement.</li>
+            </ul>
+            <p><strong>Key exam clue:</strong> "Has KMS Decrypt but gets Access Denied on secret retrieval" = missing <code>secretsmanager:GetSecretValue</code> in IAM policy.</p>
+            <p><strong>Takeaway:</strong> Two locks, two keys. Service permission (Secrets Manager) + encryption permission (KMS) must both be present. Having one without the other results in Access Denied.</p>
           </div>
         </div>
       </div>

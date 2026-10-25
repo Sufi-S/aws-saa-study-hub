@@ -358,5 +358,75 @@
     "term": "Security Groups vs NACLs Summary",
     "definition": "SG: ENI-level, stateful, allow-only, all rules evaluated (union), can reference other SGs. NACL: subnet-level, stateless, allow+deny, first-match by rule number, CIDR only. Traffic must pass BOTH.",
     "gotcha": "SG allow does NOT override NACL deny. They are independent filters. If either blocks traffic, it's blocked. For the exam: 'block specific IP' = NACL. 'Control per-resource access' = SG. 'Defense in depth' = use both."
+  },
+  {
+    "term": "Secrets Manager Lifecycle Management",
+    "definition": "Secrets Manager doesn't just encrypt — it manages the full secret lifecycle: storage, versioning (AWSCURRENT/AWSPREVIOUS/AWSPENDING staging labels), automatic rotation via Lambda, cross-region replication, and resource-based policies for cross-account sharing.",
+    "gotcha": "Managed rotation with pre-built Lambda functions works only for supported AWS databases (RDS, Aurora, Redshift, DocumentDB). Other secret types require custom Lambda rotation functions. Merely storing a value in Secrets Manager does not mean rotation is configured."
+  },
+  {
+    "term": "Systems Manager Parameter Store",
+    "definition": "A centralized configuration store for application parameters. Supports String, StringList, and SecureString types. Hierarchical paths (/app/prod/DB_HOST) enable organized, environment-separated configuration. Standard tier is free.",
+    "gotcha": "Parameter Store does NOT have built-in rotation. SecureString encrypts with KMS but does not provide staging labels or managed rotation workflows. Don't confuse encrypted storage with secret lifecycle management."
+  },
+  {
+    "term": "SecureString Parameter",
+    "definition": "A Parameter Store parameter type encrypted at rest using a KMS key (default: aws/ssm or a customer managed key). Retrieving the plaintext requires both ssm:GetParameter and kms:Decrypt permissions.",
+    "gotcha": "SecureString provides encryption and access control, but NOT automatic rotation, staging labels, or managed credential workflows. If the exam says 'automatic rotation,' the answer is Secrets Manager, not SecureString."
+  },
+  {
+    "term": "String vs SecureString (Parameter Store)",
+    "definition": "String: stored in plaintext, readable by anyone with ssm:GetParameter. SecureString: encrypted with KMS, requires both ssm:GetParameter and kms:Decrypt to read the plaintext. Use SecureString for any sensitive value.",
+    "gotcha": "Choosing String for a password means it's stored in plaintext — visible in the console and API responses. Always use SecureString for passwords, keys, and tokens, even if you 'trust' the account."
+  },
+  {
+    "term": "Secrets Manager Automatic Rotation",
+    "definition": "Secrets Manager can rotate secrets on a schedule (e.g., every 30 days) using a Lambda function. The four-step process: createSecret (generate new creds) → setSecret (update backend) → testSecret (verify) → finishSecret (promote to AWSCURRENT).",
+    "gotcha": "Rotation succeeding at the database does NOT mean your app works. Applications must refresh cached credentials. If cache TTL > rotation interval, the app will use expired credentials and fail."
+  },
+  {
+    "term": "Secret Versions and Staging Labels",
+    "definition": "Secrets Manager tracks versions using staging labels: AWSCURRENT (active version), AWSPREVIOUS (previous active), AWSPENDING (being created during rotation). GetSecretValue returns AWSCURRENT by default.",
+    "gotcha": "During rotation, both AWSCURRENT and AWSPENDING exist briefly. The alternating-user rotation strategy uses two database users to ensure zero-downtime rotation — one is always valid."
+  },
+  {
+    "term": "KMS Integration (Secrets & Parameters)",
+    "definition": "Both services use KMS for encryption. Secrets Manager always encrypts (aws/secretsmanager or CMK). Parameter Store encrypts only SecureString (aws/ssm or CMK). Cross-account access requires a customer managed key — AWS managed keys cannot be shared.",
+    "gotcha": "Permission to call GetSecretValue or GetParameter is separate from kms:Decrypt permission. Both must be granted. AWS managed keys handle decryption implicitly within the same account, but customer managed keys require explicit kms:Decrypt grants."
+  },
+  {
+    "term": "Parameter Hierarchies",
+    "definition": "Parameter Store names support hierarchical paths (/app/env/key). GetParametersByPath retrieves all parameters under a path. IAM policies can scope access to specific paths (arn:aws:ssm:*:*:parameter/app/prod/*).",
+    "gotcha": "Paths organize parameters but do NOT create security boundaries by themselves. A role with ssm:GetParameter on Resource:'*' can read every parameter. Security comes from correctly scoped IAM policies, not path naming alone."
+  },
+  {
+    "term": "Standard vs Advanced Parameter Tier",
+    "definition": "Standard: 4 KB max, 10,000 per account/Region, no parameter policies, free. Advanced: 8 KB max, 100,000 per account/Region, parameter policies (expiration, notification), $0.05/parameter/month.",
+    "gotcha": "Parameter policies (advanced only) notify about expiration but do NOT automatically rotate values. If the exam mentions 'parameter expiration notification,' think advanced tier. If it says 'automatic rotation,' think Secrets Manager."
+  },
+  {
+    "term": "IAM Roles for Secret Retrieval",
+    "definition": "Applications should use IAM roles (instance profiles, task roles, execution roles) to retrieve secrets — never embedded access keys. The role provides temporary credentials; the application calls GetSecretValue or GetParameter via the SDK.",
+    "gotcha": "The IAM role is NOT the secret. The role authenticates the caller to AWS (who are you?). The secret is the database password or API key (what do you need?). Confusing these is a common exam trap."
+  },
+  {
+    "term": "Secrets Manager vs Parameter Store",
+    "definition": "Secrets Manager: purpose-built for secrets, managed rotation, staging labels, $0.40/secret/month, 65 KB max. Parameter Store: general config store, no built-in rotation, hierarchical paths, free standard tier, 4 KB (std) / 8 KB (adv).",
+    "gotcha": "Use Secrets Manager when you need rotation. Use Parameter Store for non-secret config. They can be used together: Parameter Store for endpoints and flags, Secrets Manager for database credentials and API keys."
+  },
+  {
+    "term": "Cached Secrets and Rotation",
+    "definition": "Applications should cache retrieved secrets to reduce API calls and latency. But cached values become stale after rotation. Cache TTL must be shorter than the rotation interval to ensure timely credential refresh.",
+    "gotcha": "The #1 cause of post-rotation outages: the application caches the old password longer than the rotation interval. Use the Secrets Manager caching library with a configured TTL, or subscribe to rotation events via EventBridge."
+  },
+  {
+    "term": "Cross-Account Secrets Manager Access",
+    "definition": "Requires three aligned policies: (1) resource-based policy on the secret granting the external role, (2) KMS key policy granting kms:Decrypt to the external role (must use a customer managed key), (3) IAM policy in the external account allowing the actions.",
+    "gotcha": "AWS managed keys (aws/secretsmanager) CANNOT be shared cross-account. You must use a customer managed KMS key. Missing any one of the three policies results in Access Denied."
+  },
+  {
+    "term": "Least-Privilege Secret Retrieval",
+    "definition": "Grant access to specific secret ARNs or parameter paths — never Resource:'*'. Separate read permissions (GetSecretValue) from management permissions (CreateSecret, DeleteSecret). Use conditions (IP, VPC endpoint, tags) for additional restriction.",
+    "gotcha": "An overly broad policy like secretsmanager:GetSecretValue on Resource:'*' lets the application read EVERY secret in the account. One compromised application = all secrets exposed. Always scope to specific ARNs."
   }
 ]
