@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Domain 2: Resilient Architectures — SAA-C03 Study Hub</title>
+  <link rel="stylesheet" href="../assets/css/style.css">
+  <script src="../assets/js/theme.js"></script>
+</head>
+<body>
+
+<nav class="navbar">
+  <a href="../index.html" class="nav-brand">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+    SAA-C03 Hub
+  </a>
+  <ul class="nav-links">
+    <li><a href="../index.html">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      Home</a></li>
+    <li><a href="domain1.html" class="active">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      Domains</a></li>
+    <li><a href="../flashcards.html">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+      Flashcards</a></li>
+    <li><a href="../quiz.html">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      Quiz Mode</a></li>
+    <li><a href="../interview/index.html">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Interview Prep</a></li>
+  </ul>
+  <div class="nav-right">
+    <button class="theme-toggle" aria-label="Toggle theme"></button>
+    <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+  </div>
+</nav>
+
+<div class="page-wrapper">
+  <div class="container page-content">
+
+    <div class="page-header">
+      <div class="breadcrumb">
+        <a href="../index.html">Home</a> <span>/</span> <a href="domain2.html">Domain 2</a> <span>/</span> <span>Resilient Architectures</span>
+      </div>
+      <h1 style="display:flex;align-items:center;gap:0.6rem;">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--domain2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+        Design Resilient Architectures
+      </h1>
+      <p>26% of exam &mdash; Scalable, loosely-coupled, multi-tier, event-driven, and highly-available designs.</p>
+    </div>
+
+    <!-- Table of Contents -->
+    <nav class="toc" aria-label="Table of contents">
+      <h3>On This Page</h3>
+      <ol>
+        <li><a href="#vpc-learn"><strong>VPC Design</strong> &mdash; Learn from Zero</a></li>
+        <li><a href="#vpc-real-world">VPC Design &mdash; Real-World Scenarios</a></li>
+        <li><a href="#vpc-diagram">VPC Design &mdash; Two-AZ Architecture Diagram</a></li>
+        <li><a href="#vpc-gotchas">VPC Design &mdash; Exam Gotchas</a></li>
+        <li><a href="#vpc-practice">VPC Design &mdash; Practice Questions</a></li>
+      </ol>
+    </nav>
+
+    <!-- ============================================= -->
+    <!-- TOPIC 8: VPC Design                           -->
+    <!-- ============================================= -->
+
+    <hr class="topic-divider" style="margin-top:4rem;">
+    <div class="page-header" style="border-bottom:none;padding-bottom:0;margin-bottom:1.5rem;">
+      <h1 style="display:flex;align-items:center;gap:0.6rem;font-size:1.75rem;">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--domain2)" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="3"/><path d="M2 12h20"/><path d="M12 2v20"/></svg>
+        VPC Design: Subnets, Route Tables, Internet Gateway &amp; NAT
+      </h1>
+      <p>How architects design reliable AWS network foundations &mdash; IP addressing, routing, internet connectivity, and resilient outbound paths.</p>
+    </div>
+
+    <!-- VPC SECTION 1: Learn from Zero -->
+    <section class="topic-section" id="vpc-learn">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain2)" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        Learn from Zero
+      </h2>
+
+      <h3>Part 1A &mdash; VPC Fundamentals</h3>
+
+      <p><strong>What is an Amazon VPC?</strong> A Virtual Private Cloud (VPC) is your own logically isolated network inside AWS. Think of it as renting an empty building in a data center &mdash; you decide the floor plan (IP addresses), which rooms are public-facing (public subnets), which are internal-only (private subnets), and how traffic moves between them (route tables).</p>
+
+      <p><strong>Why do AWS applications use VPCs?</strong> Every production workload needs network isolation, controlled access, and predictable addressing. A VPC provides all three. Without a VPC, your resources would share a flat network with no boundaries &mdash; no control over who can reach what.</p>
+
+      <p><strong>VPC CIDR block.</strong> When you create a VPC, you assign it an IPv4 CIDR block such as <code>10.0.0.0/16</code>. This defines the pool of private IP addresses available inside the VPC. The <code>/16</code> means the first 16 bits are fixed, leaving 65,536 total addresses. This is the maximum a single primary CIDR provides.</p>
+
+      <p><strong>Subnets.</strong> A subnet is a smaller slice of the VPC CIDR placed in one specific Availability Zone. You divide the VPC range into non-overlapping subnets &mdash; for example, <code>10.0.1.0/24</code> (256 addresses) in AZ-a and <code>10.0.2.0/24</code> in AZ-b. Every EC2 instance, Lambda ENI, or RDS instance lives inside a subnet.</p>
+
+      <p><strong>Availability Zones and distribution.</strong> An Availability Zone (AZ) is one or more physically separate data centers within a region. Distributing resources across at least two AZs protects against single-AZ failures &mdash; if AZ-a goes down, resources in AZ-b keep running. This is the foundation of resilient AWS architecture.</p>
+
+      <p><strong>Public vs. private subnet.</strong> The words &ldquo;public&rdquo; and &ldquo;private&rdquo; are not labels you assign. A subnet is effectively public when its route table sends internet-bound traffic (<code>0.0.0.0/0</code>) to an Internet Gateway <em>and</em> the resources in it have public IPv4 addresses (or Elastic IPs). A subnet is private when it has no such route &mdash; or its route points to a NAT Gateway instead. Naming a subnet &ldquo;public&rdquo; in the console proves nothing about its actual connectivity.</p>
+
+      <p><strong>Route tables.</strong> A route table is a set of rules (routes) that tells the VPC where to send traffic based on the destination IP. Every subnet is associated with exactly one route table. The route table decides whether traffic goes to the local VPC, the internet, a NAT Gateway, a VPC endpoint, or nowhere at all.</p>
+
+      <p><strong>Network interfaces and private IPs.</strong> Every instance gets at least one elastic network interface (ENI) with a private IPv4 address drawn from its subnet&rsquo;s CIDR. This private IP is how resources communicate within the VPC. It never changes for the life of the interface.</p>
+
+      <p><strong>Public IPv4 and Elastic IPs.</strong> A public IPv4 address maps to the instance&rsquo;s private IP through the Internet Gateway. It changes if you stop and start the instance. An Elastic IP (EIP) is a static public IPv4 address you allocate and associate explicitly &mdash; it persists across stops.</p>
+
+      <p><strong>The relationship between routing, addressing, security groups, and NACLs.</strong> For internet connectivity to work, <em>all four</em> must cooperate:</p>
+      <ol>
+        <li><strong>Routing</strong> &mdash; the subnet&rsquo;s route table must have a path to the destination.</li>
+        <li><strong>Addressing</strong> &mdash; the resource must have a suitable IP (public IPv4 for direct internet access).</li>
+        <li><strong>Security groups</strong> &mdash; the instance&rsquo;s stateful firewall must allow the traffic direction and port.</li>
+        <li><strong>NACLs</strong> &mdash; the subnet&rsquo;s stateless firewall must allow both the request and the response.</li>
+      </ol>
+      <p>A missing route means traffic has no path. A missing security-group rule means traffic is dropped at the instance. A missing NACL rule means traffic is dropped at the subnet boundary. These are independent checks &mdash; satisfying one does not bypass the others.</p>
+
+      <p><strong>Network reachability does not imply permission.</strong> Even if all networking layers allow the connection, IAM policies, resource policies, and application-level authentication still control whether the AWS resource accepts the request. A network path is necessary but not sufficient.</p>
+
+      <div class="card" style="margin:1.5rem 0;">
+        <h4>Practical Example: Three-Tier Web Application</h4>
+        <table>
+          <thead><tr><th>Tier</th><th>Subnet type</th><th>Why</th></tr></thead>
+          <tbody>
+            <tr><td>Web servers (ALB)</td><td>Public</td><td>Must receive HTTP/HTTPS from the internet</td></tr>
+            <tr><td>Application servers (EC2)</td><td>Private</td><td>Only the ALB should reach them &mdash; no direct internet exposure</td></tr>
+            <tr><td>Database (RDS)</td><td>Private</td><td>Only the application tier should reach the database &mdash; zero internet exposure</td></tr>
+          </tbody>
+        </table>
+        <p>The ALB lives in a public subnet with a route to the IGW. Application and database instances live in private subnets with no IGW route. If the application tier needs outbound internet (e.g., software updates), it routes through a NAT Gateway.</p>
+      </div>
+
+      <hr style="border:none;border-top:1px dashed var(--border);margin:2rem 0;">
+
+      <h3>Part 1B &mdash; CIDR Blocks and Subnet Design</h3>
+
+      <p><strong>CIDR notation.</strong> CIDR (Classless Inter-Domain Routing) describes an IP range as a base address plus a prefix length. <code>10.0.0.0/16</code> means &ldquo;all addresses where the first 16 bits match&rdquo; &mdash; that gives you <code>10.0.0.0</code> through <code>10.0.255.255</code> (65,536 addresses). <code>10.0.1.0/24</code> means the first 24 bits are fixed, giving 256 addresses (<code>10.0.1.0</code>&ndash;<code>10.0.1.255</code>).</p>
+
+      <p><strong>How prefix length determines range.</strong> Shorter prefix = larger range. <code>/16</code> = 65,536 addresses. <code>/24</code> = 256 addresses. <code>/28</code> = 16 addresses. Each additional bit halves the range.</p>
+
+      <p><strong>Dividing a VPC CIDR into subnets.</strong> You carve the VPC CIDR into smaller, non-overlapping subnet CIDRs. If your VPC is <code>10.0.0.0/16</code>, you might create <code>10.0.1.0/24</code>, <code>10.0.2.0/24</code>, <code>10.0.3.0/24</code>, etc. The ranges must not overlap &mdash; AWS rejects a subnet CIDR that overlaps with an existing one.</p>
+
+      <p><strong>Planning for growth.</strong> Good architects reserve address space for future subnets. If you use only <code>10.0.1.0/24</code> through <code>10.0.4.0/24</code> today, you still have <code>10.0.5.0/24</code> through <code>10.0.255.0/24</code> available for expansion. Using a <code>/16</code> VPC CIDR gives you room; a <code>/24</code> VPC CIDR does not.</p>
+
+      <p><strong>AWS-reserved addresses.</strong> AWS reserves <strong>5 IP addresses</strong> in every subnet:</p>
+      <table>
+        <thead><tr><th>Address</th><th>Reserved for</th></tr></thead>
+        <tbody>
+          <tr><td><code>.0</code></td><td>Network address</td></tr>
+          <tr><td><code>.1</code></td><td>VPC router</td></tr>
+          <tr><td><code>.2</code></td><td>DNS server</td></tr>
+          <tr><td><code>.3</code></td><td>Reserved for future use</td></tr>
+          <tr><td>Last address (<code>.255</code> for /24)</td><td>Network broadcast (not supported, but reserved)</td></tr>
+        </tbody>
+      </table>
+      <p>A <code>/24</code> subnet has 256 total addresses minus 5 reserved = <strong>251 usable</strong> host addresses. A <code>/28</code> subnet (16 total) has only <strong>11 usable</strong>.</p>
+
+      <p><strong>Why capacity matters.</strong> Every ENI consumes an IP. ECS tasks, Lambda functions in a VPC, and managed services like RDS all consume IPs. Under-sized subnets can cause launch failures when you run out of addresses.</p>
+
+      <p><strong>IPv6 addressing.</strong> You can optionally assign a <code>/56</code> IPv6 CIDR to a VPC (from Amazon&rsquo;s pool or your own). IPv6 subnets are <code>/64</code>, providing an enormous address space. IPv6 addresses are globally unique &mdash; there is no concept of &ldquo;private&rdquo; IPv6 NAT in the same way as IPv4. IPv6 connectivity uses an Internet Gateway (for full bidirectional) or an Egress-Only Internet Gateway (for outbound-only). IPv6 NAT and IPv4 NAT are not interchangeable &mdash; they serve different protocol stacks and have different design patterns.</p>
+
+      <div class="card" style="margin:1.5rem 0;">
+        <h4>Worked Example: Dividing a VPC Across Two AZs</h4>
+        <p>VPC CIDR: <code>10.0.0.0/16</code></p>
+        <table>
+          <thead><tr><th>Subnet</th><th>CIDR</th><th>AZ</th><th>Usable IPs</th><th>Purpose</th></tr></thead>
+          <tbody>
+            <tr><td>Public-A</td><td><code>10.0.1.0/24</code></td><td>us-east-1a</td><td>251</td><td>ALB, NAT GW</td></tr>
+            <tr><td>Public-B</td><td><code>10.0.2.0/24</code></td><td>us-east-1b</td><td>251</td><td>ALB, NAT GW</td></tr>
+            <tr><td>Private-App-A</td><td><code>10.0.11.0/24</code></td><td>us-east-1a</td><td>251</td><td>App servers</td></tr>
+            <tr><td>Private-App-B</td><td><code>10.0.12.0/24</code></td><td>us-east-1b</td><td>251</td><td>App servers</td></tr>
+            <tr><td>Private-DB-A</td><td><code>10.0.21.0/24</code></td><td>us-east-1a</td><td>251</td><td>RDS</td></tr>
+            <tr><td>Private-DB-B</td><td><code>10.0.22.0/24</code></td><td>us-east-1b</td><td>251</td><td>RDS</td></tr>
+            <tr><td><em>Reserved</em></td><td><code>10.0.100.0/22</code>&ndash;etc.</td><td>&mdash;</td><td>&mdash;</td><td>Future expansion</td></tr>
+          </tbody>
+        </table>
+        <p>The numbering scheme groups public (<code>10.0.1-2</code>), application (<code>10.0.11-12</code>), and database (<code>10.0.21-22</code>) subnets. Ranges don&rsquo;t overlap, and plenty of space remains for future services.</p>
+      </div>
+
+      <hr style="border:none;border-top:1px dashed var(--border);margin:2rem 0;">
+
+      <h3>Part 1C &mdash; Route Tables and Route Selection</h3>
+
+      <p><strong>What a route table does.</strong> A route table is a list of rules evaluated whenever traffic leaves a resource in the subnet. Each rule (route) has a <strong>destination</strong> (a CIDR range) and a <strong>target</strong> (where to send matching traffic).</p>
+
+      <p><strong>The VPC local route.</strong> Every route table automatically includes a <code>local</code> route for the VPC CIDR. For a <code>10.0.0.0/16</code> VPC, this route is: destination <code>10.0.0.0/16</code>, target <code>local</code>. It allows all subnets in the VPC to communicate with each other. You cannot remove this route.</p>
+
+      <p><strong>Main vs. custom route tables.</strong> Every VPC has a <em>main route table</em> that is the implicit default. Any subnet without an explicit association uses the main route table. <em>Custom route tables</em> are ones you create and explicitly associate with specific subnets. Best practice: leave the main route table restrictive (private) and create custom public route tables only for subnets that need internet access.</p>
+
+      <p><strong>Route table association.</strong> Each subnet is associated with exactly one route table at a time. If you don&rsquo;t explicitly associate a custom route table, the subnet uses the main route table. Different subnets can use different route tables &mdash; this is how public and private subnets get different routing behavior.</p>
+
+      <p><strong>Longest-prefix matching.</strong> When multiple routes match a destination, AWS uses the most specific (longest prefix) route. A packet to <code>10.0.1.5</code> matches both <code>10.0.0.0/16</code> (local) and <code>10.0.1.0/24</code> if such a route exists. The <code>/24</code> wins because it&rsquo;s more specific. For internet traffic, <code>0.0.0.0/0</code> is the least specific route possible &mdash; it only matches when nothing more specific applies.</p>
+
+      <p><strong>A missing route prevents connectivity.</strong> If there is no route matching the destination, the packet is dropped. Security groups and NACLs cannot compensate for a missing route &mdash; without a path, there is no traffic to allow or deny.</p>
+
+      <div class="card" style="margin:1.5rem 0;">
+        <h4>Worked Example: Route Tables for Public and Private Subnets</h4>
+        <p><strong>Public subnet route table:</strong></p>
+        <table>
+          <thead><tr><th>Destination</th><th>Target</th><th>Purpose</th></tr></thead>
+          <tbody>
+            <tr><td><code>10.0.0.0/16</code></td><td><code>local</code></td><td>Traffic within the VPC</td></tr>
+            <tr><td><code>0.0.0.0/0</code></td><td><code>igw-xxxx</code></td><td>All other IPv4 traffic &rarr; Internet Gateway</td></tr>
+          </tbody>
+        </table>
+        <p><strong>Private application subnet route table:</strong></p>
+        <table>
+          <thead><tr><th>Destination</th><th>Target</th><th>Purpose</th></tr></thead>
+          <tbody>
+            <tr><td><code>10.0.0.0/16</code></td><td><code>local</code></td><td>Traffic within the VPC</td></tr>
+            <tr><td><code>0.0.0.0/0</code></td><td><code>nat-xxxx</code></td><td>Outbound internet via NAT Gateway</td></tr>
+          </tbody>
+        </table>
+        <p><strong>Private database subnet route table:</strong></p>
+        <table>
+          <thead><tr><th>Destination</th><th>Target</th><th>Purpose</th></tr></thead>
+          <tbody>
+            <tr><td><code>10.0.0.0/16</code></td><td><code>local</code></td><td>Traffic within the VPC</td></tr>
+          </tbody>
+        </table>
+        <p>The database subnet has <em>only</em> the local route &mdash; no internet access at all. It communicates with the application tier through VPC-internal routing. If it needs access to AWS services like S3, a VPC endpoint can be added without adding an internet route.</p>
+      </div>
+
+      <hr style="border:none;border-top:1px dashed var(--border);margin:2rem 0;">
+
+      <h3>Part 1D &mdash; Internet Gateway (IGW)</h3>
+
+      <p><strong>What an Internet Gateway is.</strong> An IGW is a horizontally scaled, redundant, highly available VPC component that enables communication between your VPC and the internet. It performs network address translation for instances that have public IPv4 addresses.</p>
+
+      <p><strong>Attachment model.</strong> You attach an IGW to a VPC, not to a subnet or instance. One VPC can have one IGW. The IGW serves the entire VPC, but only subnets with a route pointing to it can use it.</p>
+
+      <p><strong>What makes a resource internet-accessible.</strong> Four conditions must be met for an EC2 instance to communicate directly with the internet:</p>
+      <ol>
+        <li>An IGW is attached to the VPC.</li>
+        <li>The subnet&rsquo;s route table has a route to the IGW (e.g., <code>0.0.0.0/0 &rarr; igw-xxxx</code>).</li>
+        <li>The instance has a public IPv4 address or Elastic IP (or an appropriate IPv6 address).</li>
+        <li>Security groups and NACLs permit the traffic.</li>
+      </ol>
+      <p>Removing any one of these breaks the connection. Adding an IGW alone does <em>not</em> make resources internet-accessible &mdash; routing, addressing, and security must all cooperate.</p>
+
+      <p><strong>Unsolicited inbound vs. response traffic.</strong> When a security group allows inbound traffic on port 443, external clients can initiate HTTPS connections. When an instance initiates an outbound connection, the security group automatically allows the response (stateful). NACLs, being stateless, require explicit rules for both directions.</p>
+
+      <p><strong>Why private resources should not be directly internet-exposed.</strong> A database server has no reason to accept connections from arbitrary internet addresses. Placing it in a private subnet with no IGW route eliminates this attack surface entirely at the network layer.</p>
+
+      <div class="card" style="margin:1.5rem 0;">
+        <h4>Worked Example: Public EC2 Web Server</h4>
+        <ol>
+          <li>VPC <code>10.0.0.0/16</code> with IGW <code>igw-abc123</code> attached.</li>
+          <li>Public subnet <code>10.0.1.0/24</code> in AZ-a with route table: <code>0.0.0.0/0 &rarr; igw-abc123</code>.</li>
+          <li>EC2 instance launched with auto-assign public IP enabled &rarr; gets private IP <code>10.0.1.15</code> and public IP <code>54.x.x.x</code>.</li>
+          <li>Security group allows inbound TCP 443 from <code>0.0.0.0/0</code>.</li>
+          <li>Default NACL allows all traffic (or custom NACL allows 443 inbound + ephemeral port outbound).</li>
+        </ol>
+        <p>An internet user sends HTTPS to <code>54.x.x.x:443</code>. The IGW translates the public IP to the private IP, the route table delivers the packet to the subnet, the NACL allows it, and the security group allows it. The response follows the reverse path &mdash; the security group is stateful so the response is automatically allowed.</p>
+      </div>
+
+      <hr style="border:none;border-top:1px dashed var(--border);margin:2rem 0;">
+
+      <h3>Part 1E &mdash; NAT Gateway</h3>
+
+      <p><strong>What a NAT Gateway is.</strong> A NAT (Network Address Translation) Gateway allows instances in private subnets to initiate outbound connections to the internet (or other external destinations) over IPv4, while preventing unsolicited inbound connections from reaching those instances. It translates private source IPs to the NAT Gateway&rsquo;s own public Elastic IP.</p>
+
+      <p><strong>Why private workloads need outbound access.</strong> Private EC2 instances often need to download OS patches, pull container images, call external APIs, or reach AWS service endpoints. They need outbound connectivity without being directly reachable from the internet.</p>
+
+      <p><strong>How it works &mdash; placement and routing.</strong></p>
+      <ol>
+        <li>The NAT Gateway lives in a <strong>public subnet</strong> (a subnet with a route to the IGW).</li>
+        <li>The NAT Gateway has an <strong>Elastic IP</strong> for the standard public NAT pattern.</li>
+        <li>The <strong>private subnet&rsquo;s</strong> route table has <code>0.0.0.0/0 &rarr; nat-xxxx</code>.</li>
+        <li>When a private instance sends traffic to the internet, the packet goes to the NAT GW, which replaces the source IP with its own EIP, forwards the packet through the IGW, and maps the response back.</li>
+      </ol>
+
+      <p><strong>NAT Gateway vs. Internet Gateway.</strong></p>
+      <table>
+        <thead><tr><th>Feature</th><th>Internet Gateway</th><th>NAT Gateway</th></tr></thead>
+        <tbody>
+          <tr><td>Scope</td><td>VPC-level</td><td>AZ-level (per subnet)</td></tr>
+          <tr><td>Enables</td><td>Bidirectional internet access</td><td>Outbound-initiated only</td></tr>
+          <tr><td>Addressing</td><td>Instance needs public IP/EIP</td><td>NAT GW has EIP; instances stay private</td></tr>
+          <tr><td>Inbound from internet</td><td>Yes, if security rules allow</td><td>No unsolicited inbound</td></tr>
+          <tr><td>Cost</td><td>Free (data transfer charges apply)</td><td>Hourly charge + per-GB processing</td></tr>
+        </tbody>
+      </table>
+
+      <p><strong>NAT Gateway vs. NAT instance.</strong> A NAT instance is an EC2 instance you manage yourself running NAT software. A NAT Gateway is a managed service &mdash; no patching, automatic bandwidth scaling up to 100 Gbps, and built-in redundancy within its AZ. The exam almost always prefers NAT Gateway over NAT instance for production workloads.</p>
+
+      <p><strong>Security rules still apply.</strong> Even though the NAT Gateway handles address translation, security groups on the private instances and NACLs on both the private and public subnets still control what traffic is allowed.</p>
+
+      <p><strong>VPC endpoints as an alternative.</strong> For traffic to supported AWS services (S3, DynamoDB, CloudWatch, etc.), a VPC endpoint can route traffic directly without going through the NAT Gateway. This can reduce NAT costs and keep traffic on the AWS network.</p>
+
+      <div class="card" style="margin:1.5rem 0;">
+        <h4>Worked Example: Private EC2 Downloads a Software Package</h4>
+        <p><strong>Outbound path:</strong></p>
+        <ol>
+          <li>Private EC2 (<code>10.0.11.20</code>) sends HTTPS request to <code>packages.example.com</code>.</li>
+          <li>Private route table: <code>0.0.0.0/0 &rarr; nat-gw-a</code>. Packet goes to the NAT Gateway in the public subnet.</li>
+          <li>NAT Gateway replaces source IP <code>10.0.11.20</code> with its EIP <code>52.x.x.x</code> and forwards via the public subnet&rsquo;s route: <code>0.0.0.0/0 &rarr; igw-abc123</code>.</li>
+          <li>Packet exits through the IGW to the internet.</li>
+        </ol>
+        <p><strong>Return path:</strong></p>
+        <ol>
+          <li>Response arrives at the IGW addressed to the NAT Gateway&rsquo;s EIP.</li>
+          <li>NAT Gateway maps the response back to <code>10.0.11.20</code> and forwards to the private subnet.</li>
+          <li>The private instance receives the response.</li>
+        </ol>
+        <p>The private instance never had a public IP. The internet only sees the NAT Gateway&rsquo;s EIP.</p>
+      </div>
+
+      <hr style="border:none;border-top:1px dashed var(--border);margin:2rem 0;">
+
+      <h3>Part 1F &mdash; NAT Gateway High Availability and Resiliency</h3>
+
+      <p><strong>A NAT Gateway is an AZ resource.</strong> When you create a NAT Gateway, you place it in a specific subnet in a specific AZ. It is redundant <em>within</em> that AZ (AWS manages the underlying instances), but it does not span AZs. If AZ-a becomes unavailable, a NAT Gateway in AZ-a becomes unavailable too.</p>
+
+      <p><strong>The single-NAT-Gateway risk.</strong> If you route all private subnets (across both AZs) through one NAT Gateway in AZ-a:</p>
+      <ul>
+        <li>AZ-a failure takes down the NAT Gateway.</li>
+        <li>Private subnets in AZ-b lose outbound internet connectivity even though AZ-b is healthy.</li>
+        <li>Cross-AZ traffic from AZ-b to the NAT Gateway in AZ-a also incurs data-transfer charges.</li>
+      </ul>
+
+      <p><strong>The resilient pattern: one NAT Gateway per AZ.</strong></p>
+      <ul>
+        <li>Deploy a NAT Gateway in each AZ&rsquo;s public subnet.</li>
+        <li>Each private subnet&rsquo;s route table points to the NAT Gateway in its own AZ.</li>
+        <li>If AZ-a fails, AZ-b&rsquo;s private subnets still reach the internet through AZ-b&rsquo;s NAT Gateway.</li>
+        <li>No cross-AZ data-transfer charges for NAT traffic.</li>
+      </ul>
+
+      <p><strong>Cost trade-off.</strong> Each NAT Gateway costs ~$0.045/hour (~$32/month). A two-AZ design doubles this to ~$64/month. For development environments, a single NAT Gateway may be acceptable. For production, the per-AZ pattern is the standard recommendation.</p>
+
+      <p><strong>There is no automatic failover.</strong> If a NAT Gateway in AZ-a goes down and you have a second in AZ-b, the private subnets in AZ-a do <em>not</em> automatically reroute to AZ-b&rsquo;s NAT Gateway. You would need to manually (or via automation) update AZ-a&rsquo;s route table to point to AZ-b&rsquo;s NAT Gateway. This is why the per-AZ design is preferred &mdash; it avoids the need for failover entirely.</p>
+
+      <div class="card" style="margin:1.5rem 0;">
+        <h4>Failure Scenario: Single NAT Gateway</h4>
+        <p><strong>Setup:</strong> One NAT Gateway in AZ-a public subnet. Both AZ-a and AZ-b private subnets route <code>0.0.0.0/0 &rarr; nat-gw-a</code>.</p>
+        <p><strong>AZ-a goes down:</strong></p>
+        <ol>
+          <li>NAT Gateway in AZ-a becomes unreachable.</li>
+          <li>Private instances in AZ-a are already affected by the AZ failure.</li>
+          <li>Private instances in AZ-b are <em>healthy</em> but lose outbound internet &mdash; their route still points to the now-unavailable <code>nat-gw-a</code>.</li>
+          <li>To recover AZ-b connectivity, an operator must update AZ-b&rsquo;s route table to point to a different NAT Gateway.</li>
+        </ol>
+        <p><strong>With per-AZ NAT Gateways:</strong> AZ-b&rsquo;s private subnets use <code>nat-gw-b</code> in AZ-b. When AZ-a fails, AZ-b connectivity is unaffected. No manual intervention required.</p>
+      </div>
+
+      <hr style="border:none;border-top:1px dashed var(--border);margin:2rem 0;">
+
+      <h3>Part 1G &mdash; IPv6 and Egress-Only Internet Gateways</h3>
+
+      <p><strong>IPv4 vs. IPv6 routes.</strong> IPv4 uses <code>0.0.0.0/0</code> for the default route. IPv6 uses <code>::/0</code>. They are separate entries in the route table and evaluated independently.</p>
+
+      <p><strong>Egress-Only Internet Gateway (EIGW).</strong> For IPv6, AWS provides an Egress-Only Internet Gateway. It allows instances to initiate outbound IPv6 connections to the internet but prevents the internet from initiating unsolicited inbound IPv6 connections. It serves a similar purpose to a NAT Gateway for IPv4 outbound &mdash; but the mechanism is different because IPv6 addresses are globally routable (no address translation needed).</p>
+
+      <p><strong>Why an EIGW is not a NAT Gateway.</strong></p>
+      <table>
+        <thead><tr><th>Feature</th><th>NAT Gateway (IPv4)</th><th>Egress-Only IGW (IPv6)</th></tr></thead>
+        <tbody>
+          <tr><td>Protocol</td><td>IPv4 only</td><td>IPv6 only</td></tr>
+          <tr><td>Translation</td><td>Yes &mdash; rewrites source IP</td><td>No &mdash; IPv6 addresses are globally unique</td></tr>
+          <tr><td>Elastic IP required</td><td>Yes</td><td>No</td></tr>
+          <tr><td>Cost</td><td>Hourly + per-GB</td><td>No hourly charge (data transfer charges apply)</td></tr>
+          <tr><td>Prevents inbound initiation</td><td>Yes</td><td>Yes</td></tr>
+        </tbody>
+      </table>
+
+      <p><strong>When to use which.</strong> If your workloads are IPv4 and need outbound internet from private subnets, use a NAT Gateway. If your workloads are IPv6 and need outbound-only internet access, use an Egress-Only Internet Gateway. They are not interchangeable &mdash; each handles its protocol stack only.</p>
+
+      <hr style="border:none;border-top:1px dashed var(--border);margin:2rem 0;">
+
+      <h3>Part 1H &mdash; Putting the Pieces Together</h3>
+
+      <p><strong>Complete three-tier network design:</strong></p>
+
+      <p><strong>Inbound user request path:</strong></p>
+      <ol>
+        <li>Internet user sends HTTPS request.</li>
+        <li>Request reaches the <strong>Internet Gateway</strong>.</li>
+        <li>IGW routes to the <strong>public subnet</strong> where the ALB lives.</li>
+        <li>ALB forwards the request to a target in the <strong>private application subnet</strong> (via VPC-internal routing, the <code>local</code> route).</li>
+        <li>Application instance queries the <strong>private database subnet</strong> (again via the <code>local</code> route).</li>
+        <li>Response flows back: database &rarr; app &rarr; ALB &rarr; IGW &rarr; internet user.</li>
+      </ol>
+
+      <p><strong>Independent outbound path (private instance to internet):</strong></p>
+      <ol>
+        <li>Private app instance (<code>10.0.11.20</code>) needs to reach a public API.</li>
+        <li>Private route table: <code>0.0.0.0/0 &rarr; nat-gw-a</code>.</li>
+        <li>NAT Gateway in the public subnet translates source IP to its EIP.</li>
+        <li>Public subnet route table: <code>0.0.0.0/0 &rarr; igw-abc123</code>.</li>
+        <li>Packet exits through the IGW to the internet destination.</li>
+      </ol>
+
+      <p><strong>Route-table comparison:</strong></p>
+      <table>
+        <thead><tr><th>Subnet tier</th><th>Destination</th><th>Target</th><th>Why</th></tr></thead>
+        <tbody>
+          <tr><td rowspan="2">Public</td><td><code>10.0.0.0/16</code></td><td><code>local</code></td><td>VPC-internal communication</td></tr>
+          <tr><td><code>0.0.0.0/0</code></td><td><code>igw-xxxx</code></td><td>Direct internet access</td></tr>
+          <tr><td rowspan="2">Private App</td><td><code>10.0.0.0/16</code></td><td><code>local</code></td><td>VPC-internal communication</td></tr>
+          <tr><td><code>0.0.0.0/0</code></td><td><code>nat-xxxx</code></td><td>Outbound internet via NAT</td></tr>
+          <tr><td>Private DB</td><td><code>10.0.0.0/16</code></td><td><code>local</code></td><td>VPC-internal only &mdash; no internet</td></tr>
+        </tbody>
+      </table>
+
+      <p><strong>VPC endpoints for AWS services.</strong> If the application tier frequently accesses S3 or DynamoDB, adding a gateway endpoint (free, no hourly charge) keeps that traffic off the NAT Gateway &mdash; reducing cost and latency. For services like Secrets Manager or CloudWatch Logs, an interface endpoint (powered by PrivateLink) provides a similar private path. This was covered in detail in Topic 6 (VPC Endpoints &amp; PrivateLink).</p>
+
+      <p>The correct architecture depends on requirements. Not every subnet needs a default internet route, and not every workload needs NAT. Assign routes based on what each tier actually needs to communicate with.</p>
+
+      <hr style="border:none;border-top:1px dashed var(--border);margin:2rem 0;">
+
+      <h3>Part 1I &mdash; Troubleshooting and Architecture Decisions</h3>
+
+      <p>When connectivity fails, work through this systematic checklist:</p>
+
+      <table>
+        <thead><tr><th>Symptom</th><th>Likely cause</th><th>Check</th></tr></thead>
+        <tbody>
+          <tr><td>Public instance unreachable from internet</td><td>Missing IGW, missing route, no public IP, SG/NACL blocking</td><td>Verify IGW attached &rarr; route table has <code>0.0.0.0/0 &rarr; igw</code> &rarr; instance has public IP &rarr; SG allows inbound port &rarr; NACL allows inbound + ephemeral outbound</td></tr>
+          <tr><td>Private instance can&rsquo;t reach internet</td><td>Missing NAT GW, wrong route, NAT GW in wrong subnet</td><td>Verify NAT GW exists in a public subnet &rarr; private route table has <code>0.0.0.0/0 &rarr; nat</code> &rarr; NAT GW&rsquo;s subnet has route to IGW</td></tr>
+          <tr><td>Private instance gets timeout to S3</td><td>No route to S3 (no NAT, no endpoint)</td><td>Add a VPC gateway endpoint for S3, or ensure NAT path is working</td></tr>
+          <tr><td>Connectivity works in AZ-a but not AZ-b</td><td>Different route-table associations, NAT GW only in AZ-a</td><td>Compare route tables for each AZ &rarr; verify NAT GW exists per AZ or shared route is correct</td></tr>
+          <tr><td>Instance reachable but gets 403 / Access Denied</td><td>Network path works, but IAM or resource policy denies</td><td>This is an authorization failure, not a networking failure &mdash; check IAM policies, bucket policies, or resource-based policies</td></tr>
+          <tr><td>New instances fail to launch in subnet</td><td>Subnet out of IP addresses</td><td>Check subnet&rsquo;s available IP count &mdash; resize or add a new subnet</td></tr>
+          <tr><td>Traffic to <code>10.0.x.x</code> works but traffic to <code>172.16.x.x</code> does not</td><td>Missing route for the destination CIDR</td><td>Check if a route exists for the peered VPC or on-premises CIDR in the route table</td></tr>
+          <tr><td>DNS resolution fails</td><td>VPC DNS settings disabled</td><td>Verify <code>enableDnsSupport</code> and <code>enableDnsHostnames</code> are set to <code>true</code></td></tr>
+        </tbody>
+      </table>
+
+      <p><strong>Key principle:</strong> Diagnose layer by layer. Route first (does a path exist?), then addressing (does the resource have the right IP?), then security (are SGs and NACLs allowing the traffic?), then authorization (does IAM permit the action?). A routing failure looks like a timeout. A security-group block looks like a timeout. An IAM denial returns an explicit error message. The symptom tells you which layer to investigate.</p>
+    </section>
+
+    <hr class="topic-divider">
+
+    <!-- VPC SECTION 2: Real-World Scenarios -->
+    <section class="topic-section" id="vpc-real-world">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain2)" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        When Real Architects Actually Use This
+      </h2>
+
+      <div class="scenario-card">
+        <h3>Scenario A &mdash; Public Web Servers and a Private Database</h3>
+        <p><strong>Business requirement:</strong> A company runs a public-facing e-commerce site backed by application servers and an RDS PostgreSQL database. The database must not be accessible from the internet.</p>
+        <p><strong>Architecture:</strong></p>
+        <ul>
+          <li>VPC <code>10.0.0.0/16</code> with two AZs.</li>
+          <li>Public subnets (<code>10.0.1.0/24</code>, <code>10.0.2.0/24</code>) host the ALB. Route table: <code>0.0.0.0/0 &rarr; igw</code>.</li>
+          <li>Private app subnets (<code>10.0.11.0/24</code>, <code>10.0.12.0/24</code>) host EC2 application instances. Route table: <code>0.0.0.0/0 &rarr; nat-gw</code> (for outbound patches).</li>
+          <li>Private DB subnets (<code>10.0.21.0/24</code>, <code>10.0.22.0/24</code>) host RDS in a Multi-AZ deployment. Route table: only the <code>local</code> route.</li>
+          <li>RDS security group allows inbound PostgreSQL (5432) only from the app-tier security group.</li>
+        </ul>
+        <p><strong>Why not put the database in a public subnet?</strong> Even with a restrictive security group, a public subnet with an IGW route gives the database an attack surface it doesn&rsquo;t need. A private subnet with no internet route eliminates this risk at the network layer.</p>
+        <p><strong>Exam clue:</strong> &ldquo;Database must not be directly accessible from the internet&rdquo; &rarr; private subnet, no IGW route, security group restricted to the app tier.</p>
+      </div>
+
+      <div class="scenario-card">
+        <h3>Scenario B &mdash; Private EC2 Needs Software Updates</h3>
+        <p><strong>Business requirement:</strong> EC2 instances in private subnets must download OS patches from public repositories. They must not have public IP addresses.</p>
+        <p><strong>Architecture:</strong></p>
+        <ul>
+          <li>NAT Gateway deployed in the public subnet with an Elastic IP.</li>
+          <li>Private subnet route table: <code>0.0.0.0/0 &rarr; nat-gw</code>.</li>
+          <li>Instance security group allows outbound HTTPS (443) to <code>0.0.0.0/0</code> (or a more specific range).</li>
+          <li>The instance initiates the connection &mdash; responses flow back through the NAT Gateway.</li>
+        </ul>
+        <p><strong>Alternative for AWS services:</strong> If the instance needs to reach S3 (e.g., for yum repos hosted in S3), a gateway endpoint for S3 avoids NAT entirely &mdash; free, lower latency, and traffic stays on the AWS network.</p>
+        <p><strong>Why not assign a public IP?</strong> A public IP makes the instance directly reachable from the internet, violating the requirement. The NAT Gateway provides outbound-only connectivity &mdash; the instance initiates, but the internet cannot initiate back.</p>
+        <p><strong>Exam clue:</strong> &ldquo;Private instances need outbound internet, no public IPs&rdquo; &rarr; NAT Gateway in public subnet.</p>
+      </div>
+
+      <div class="scenario-card">
+        <h3>Scenario C &mdash; Multi-AZ Production Application</h3>
+        <p><strong>Business requirement:</strong> A production application spans two AZs. Private workloads must maintain outbound internet access even if one AZ fails.</p>
+        <p><strong>Option 1 &mdash; Single NAT Gateway (lower cost, lower resilience):</strong></p>
+        <ul>
+          <li>One NAT Gateway in AZ-a&rsquo;s public subnet.</li>
+          <li>Both AZ-a and AZ-b private subnets route through it.</li>
+          <li>Cost: ~$32/month for the gateway.</li>
+          <li>Risk: AZ-a failure kills outbound internet for AZ-b private subnets. Cross-AZ data transfer charges apply.</li>
+        </ul>
+        <p><strong>Option 2 &mdash; NAT Gateway per AZ (recommended for production):</strong></p>
+        <ul>
+          <li>NAT Gateway in AZ-a&rsquo;s public subnet + NAT Gateway in AZ-b&rsquo;s public subnet.</li>
+          <li>AZ-a private subnets route to <code>nat-gw-a</code>. AZ-b private subnets route to <code>nat-gw-b</code>.</li>
+          <li>Cost: ~$64/month for two gateways.</li>
+          <li>Benefit: AZ-independent. No cross-AZ data transfer for NAT. No failover needed.</li>
+        </ul>
+        <p><strong>Exam clue:</strong> &ldquo;Highly available outbound internet from private subnets&rdquo; &rarr; NAT Gateway in each AZ.</p>
+      </div>
+
+      <div class="scenario-card">
+        <h3>Scenario D &mdash; Public EC2 Is Not Reachable</h3>
+        <p><strong>Business requirement:</strong> An EC2 instance is in a subnet named &ldquo;public,&rdquo; but users cannot SSH into it.</p>
+        <p><strong>Troubleshooting checklist:</strong></p>
+        <ol>
+          <li><strong>IGW attached?</strong> Verify the VPC has an IGW and it&rsquo;s in the <code>attached</code> state.</li>
+          <li><strong>Route table?</strong> Check the subnet&rsquo;s associated route table for <code>0.0.0.0/0 &rarr; igw-xxxx</code>. If the subnet uses the main route table (which may not have this route), it&rsquo;s effectively private.</li>
+          <li><strong>Public IP?</strong> Check whether the instance has a public IPv4 address or EIP. Without one, the IGW cannot translate traffic.</li>
+          <li><strong>Security group?</strong> Verify inbound rule allows SSH (TCP 22) from the user&rsquo;s IP.</li>
+          <li><strong>NACL?</strong> Verify the subnet&rsquo;s NACL allows inbound TCP 22 and outbound ephemeral ports (1024&ndash;65535).</li>
+          <li><strong>Service listening?</strong> Confirm SSHD is running on the instance.</li>
+        </ol>
+        <p><strong>Key lesson:</strong> The name &ldquo;public&rdquo; is just a label. What makes it public is the route to the IGW, a public IP on the instance, and security rules that permit the traffic.</p>
+        <p><strong>Exam clue:</strong> &ldquo;Instance in public subnet is unreachable&rdquo; &rarr; check route table, public IP, security group, NACL.</p>
+      </div>
+
+      <div class="scenario-card">
+        <h3>Scenario E &mdash; Designing CIDR Ranges for Growth</h3>
+        <p><strong>Business requirement:</strong> A company needs a VPC for an application that will grow to include application, database, caching, and shared-service subnets across three AZs.</p>
+        <p><strong>Architecture:</strong></p>
+        <ul>
+          <li>Choose a <code>/16</code> VPC CIDR (65,536 addresses) to leave room for growth.</li>
+          <li>Assign <code>/24</code> subnets (251 usable each) for standard tiers.</li>
+          <li>Use a numbering scheme: public = <code>10.0.1-3</code>, app = <code>10.0.11-13</code>, DB = <code>10.0.21-23</code>, cache = <code>10.0.31-33</code>.</li>
+          <li>Leave <code>10.0.100.0/22</code> and above unallocated for future services.</li>
+          <li>Avoid <code>172.31.0.0/16</code> (default VPC range) if you might peer VPCs later.</li>
+        </ul>
+        <p><strong>Why overlap matters:</strong> VPC peering and Transit Gateway cannot work with overlapping CIDRs. If two VPCs both use <code>10.0.0.0/16</code>, they cannot peer. Plan unique ranges across your organization.</p>
+        <p><strong>Exam clue:</strong> &ldquo;Plan for future growth and VPC connectivity&rdquo; &rarr; use a large CIDR, non-overlapping ranges, structured subnet numbering.</p>
+      </div>
+
+      <div class="scenario-card">
+        <h3>Scenario F &mdash; Reduce Unnecessary NAT Costs</h3>
+        <p><strong>Business requirement:</strong> A company processes large data volumes. Most outbound traffic from private subnets goes to S3 and DynamoDB, costing hundreds of dollars monthly in NAT Gateway data-processing fees.</p>
+        <p><strong>Architecture:</strong></p>
+        <ul>
+          <li>Add a <strong>gateway VPC endpoint for S3</strong> &mdash; free, no hourly charge, no per-GB processing fee.</li>
+          <li>Add a <strong>gateway VPC endpoint for DynamoDB</strong> &mdash; same benefits.</li>
+          <li>S3 and DynamoDB traffic now routes directly via the endpoint, bypassing NAT entirely.</li>
+          <li>Keep the NAT Gateway for traffic to destinations that don&rsquo;t have endpoints (external APIs, third-party services).</li>
+        </ul>
+        <p><strong>Limitations:</strong> Gateway endpoints only work for S3 and DynamoDB. For other AWS services, interface endpoints (PrivateLink) are available but have their own hourly + per-GB charges &mdash; evaluate whether the cost trade-off makes sense for each service.</p>
+        <p><strong>Exam clue:</strong> &ldquo;Reduce NAT costs for AWS service traffic&rdquo; &rarr; VPC gateway endpoints for S3/DynamoDB.</p>
+      </div>
+
+      <div class="scenario-card">
+        <h3>Scenario G &mdash; Secure IPv6 Outbound Connectivity</h3>
+        <p><strong>Business requirement:</strong> A company uses dual-stack (IPv4 + IPv6) instances. IPv6-enabled resources need outbound internet access for external API calls, but must not accept unsolicited inbound connections over IPv6.</p>
+        <p><strong>Architecture:</strong></p>
+        <ul>
+          <li>Assign an IPv6 CIDR to the VPC and <code>/64</code> IPv6 CIDRs to each subnet.</li>
+          <li>Create an <strong>Egress-Only Internet Gateway</strong> (EIGW).</li>
+          <li>Private subnet IPv6 route: <code>::/0 &rarr; eigw-xxxx</code>.</li>
+          <li>The EIGW allows outbound-initiated IPv6 traffic but blocks unsolicited inbound initiation.</li>
+        </ul>
+        <p><strong>Why not a NAT Gateway?</strong> NAT Gateways handle IPv4 address translation. IPv6 addresses are globally unique and don&rsquo;t need translation. An EIGW provides the outbound-only behavior without the cost and complexity of NAT. They are separate tools for separate protocols.</p>
+        <p><strong>Exam clue:</strong> &ldquo;IPv6 outbound-only internet access&rdquo; &rarr; Egress-Only Internet Gateway, not a NAT Gateway.</p>
+      </div>
+
+      <div class="scenario-card">
+        <h3>Scenario H &mdash; Troubleshooting Multi-AZ Connectivity</h3>
+        <p><strong>Business requirement:</strong> An application works perfectly in AZ-a but private instances in AZ-b cannot reach the internet.</p>
+        <p><strong>Investigation:</strong></p>
+        <ol>
+          <li><strong>Route-table association:</strong> AZ-b&rsquo;s private subnet may be associated with the main route table (which has only the <code>local</code> route) instead of a custom route table with a NAT route.</li>
+          <li><strong>NAT Gateway placement:</strong> There may be no NAT Gateway in AZ-b, and AZ-b&rsquo;s route table may point to a NAT Gateway in AZ-a that has been deleted or is in a failed state.</li>
+          <li><strong>Wrong route target:</strong> AZ-b&rsquo;s route table may point to a NAT Gateway ID that doesn&rsquo;t exist anymore (shows as a &ldquo;blackhole&rdquo; route).</li>
+          <li><strong>NACL difference:</strong> AZ-b&rsquo;s subnet may have a different NACL that blocks the required traffic.</li>
+        </ol>
+        <p><strong>Resolution:</strong> Compare route-table associations, route targets, NAT Gateway status, and NACL rules between the two AZs. The most common cause is a missing or incorrect route-table association &mdash; the subnet is using the wrong route table.</p>
+        <p><strong>Exam clue:</strong> &ldquo;Works in one AZ, fails in another&rdquo; &rarr; check route-table associations and NAT Gateway placement per AZ.</p>
+      </div>
+    </section>
+
+    <hr class="topic-divider">
+
+    <!-- VPC SECTION 3: Architecture Diagram -->
+    <section class="topic-section" id="vpc-diagram">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain2)" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+        Two-AZ VPC Architecture
+      </h2>
+
+      <svg role="img" aria-label="Diagram showing a two-AZ VPC with public and private subnets, Internet Gateway, NAT Gateways per AZ, ALB in public subnets, application instances in private subnets, and database tier in isolated private subnets" viewBox="0 0 920 680" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:920px;height:auto;margin:1.5rem auto;display:block;font-family:inherit;">
+        <title>Two-AZ VPC Architecture with Public and Private Subnets</title>
+        <desc>A VPC spanning two Availability Zones. Each AZ has a public subnet with a NAT Gateway and an ALB node, a private application subnet with EC2 instances, and a private database subnet. The Internet Gateway connects the VPC to the internet. Inbound traffic flows through the IGW to the ALB to the app tier to the database. Outbound traffic from private instances flows through NAT Gateways to the IGW.</desc>
+
+        <defs>
+          <marker id="vpc-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 Z" fill="var(--text-secondary, #aaa)"/>
+          </marker>
+          <marker id="vpc-arrow-blue" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 Z" fill="#60a5fa"/>
+          </marker>
+          <marker id="vpc-arrow-green" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 Z" fill="#34d399"/>
+          </marker>
+        </defs>
+
+        <!-- Background -->
+        <rect x="0" y="0" width="920" height="680" rx="12" fill="var(--card-bg, #1a1a2e)" stroke="var(--border, #333)" stroke-width="1.5"/>
+
+        <!-- Title -->
+        <text x="460" y="24" text-anchor="middle" fill="var(--heading, #e0e0e0)" font-size="13" font-weight="600">Two-AZ VPC Architecture &mdash; 10.0.0.0/16</text>
+
+        <!-- Internet -->
+        <rect x="385" y="38" width="150" height="40" rx="20" fill="var(--card-bg, #1a1a2e)" stroke="var(--text-secondary, #aaa)" stroke-width="2"/>
+        <text x="460" y="62" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="11" font-weight="600">Internet Users</text>
+
+        <!-- Internet Gateway -->
+        <rect x="395" y="100" width="130" height="38" rx="8" fill="var(--card-bg, #1a1a2e)" stroke="#f59e0b" stroke-width="2.5"/>
+        <text x="460" y="123" text-anchor="middle" fill="#f59e0b" font-size="11" font-weight="600">Internet Gateway</text>
+
+        <!-- Arrow: Internet -> IGW -->
+        <line x1="460" y1="78" x2="460" y2="100" stroke="var(--text-secondary, #aaa)" stroke-width="2" marker-end="url(#vpc-arrow)"/>
+
+        <!-- VPC boundary -->
+        <rect x="20" y="155" width="880" height="500" rx="10" fill="none" stroke="#06b6d4" stroke-width="2" stroke-dasharray="8 4"/>
+        <text x="35" y="175" fill="#06b6d4" font-size="11" font-weight="600">VPC 10.0.0.0/16</text>
+
+        <!-- ===== AZ-a (left) ===== -->
+        <rect x="35" y="185" width="420" height="455" rx="8" fill="none" stroke="var(--border, #555)" stroke-width="1.5" stroke-dasharray="5 3"/>
+        <text x="245" y="203" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="10" font-weight="600">Availability Zone A (us-east-1a)</text>
+
+        <!-- Public subnet A -->
+        <rect x="50" y="215" width="390" height="95" rx="6" fill="#34d399" opacity="0.06" stroke="#34d399" stroke-width="1.5"/>
+        <text x="60" y="232" fill="#34d399" font-size="9" font-weight="600">Public Subnet &mdash; 10.0.1.0/24</text>
+        <text x="60" y="244" fill="var(--text-secondary, #aaa)" font-size="8">Route: 0.0.0.0/0 &rarr; igw</text>
+
+        <!-- ALB node A -->
+        <rect x="70" y="255" width="95" height="40" rx="6" fill="var(--card-bg, #1a1a2e)" stroke="#60a5fa" stroke-width="2"/>
+        <text x="118" y="275" text-anchor="middle" fill="#60a5fa" font-size="10" font-weight="600">ALB</text>
+        <text x="118" y="288" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="7">Public entry</text>
+
+        <!-- NAT GW A -->
+        <rect x="290" y="255" width="130" height="40" rx="6" fill="var(--card-bg, #1a1a2e)" stroke="#f59e0b" stroke-width="2"/>
+        <text x="355" y="275" text-anchor="middle" fill="#f59e0b" font-size="10" font-weight="600">NAT Gateway A</text>
+        <text x="355" y="288" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="7">EIP: 52.x.x.x</text>
+
+        <!-- Private App subnet A -->
+        <rect x="50" y="325" width="390" height="95" rx="6" fill="#60a5fa" opacity="0.06" stroke="#60a5fa" stroke-width="1.5"/>
+        <text x="60" y="342" fill="#60a5fa" font-size="9" font-weight="600">Private App Subnet &mdash; 10.0.11.0/24</text>
+        <text x="60" y="354" fill="var(--text-secondary, #aaa)" font-size="8">Route: 0.0.0.0/0 &rarr; nat-gw-a</text>
+
+        <!-- EC2 App A -->
+        <rect x="140" y="365" width="110" height="40" rx="6" fill="var(--card-bg, #1a1a2e)" stroke="#60a5fa" stroke-width="2"/>
+        <text x="195" y="385" text-anchor="middle" fill="#60a5fa" font-size="10" font-weight="600">EC2 App</text>
+        <text x="195" y="398" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="7">10.0.11.20</text>
+
+        <!-- Private DB subnet A -->
+        <rect x="50" y="435" width="390" height="90" rx="6" fill="#a78bfa" opacity="0.06" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="60" y="452" fill="#a78bfa" font-size="9" font-weight="600">Private DB Subnet &mdash; 10.0.21.0/24</text>
+        <text x="60" y="464" fill="var(--text-secondary, #aaa)" font-size="8">Route: local only (no internet)</text>
+
+        <!-- RDS A -->
+        <rect x="140" y="475" width="110" height="38" rx="6" fill="var(--card-bg, #1a1a2e)" stroke="#a78bfa" stroke-width="2"/>
+        <text x="195" y="495" text-anchor="middle" fill="#a78bfa" font-size="10" font-weight="600">RDS Primary</text>
+        <text x="195" y="507" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="7">10.0.21.10</text>
+
+        <!-- ===== AZ-b (right) ===== -->
+        <rect x="465" y="185" width="420" height="455" rx="8" fill="none" stroke="var(--border, #555)" stroke-width="1.5" stroke-dasharray="5 3"/>
+        <text x="675" y="203" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="10" font-weight="600">Availability Zone B (us-east-1b)</text>
+
+        <!-- Public subnet B -->
+        <rect x="480" y="215" width="390" height="95" rx="6" fill="#34d399" opacity="0.06" stroke="#34d399" stroke-width="1.5"/>
+        <text x="490" y="232" fill="#34d399" font-size="9" font-weight="600">Public Subnet &mdash; 10.0.2.0/24</text>
+        <text x="490" y="244" fill="var(--text-secondary, #aaa)" font-size="8">Route: 0.0.0.0/0 &rarr; igw</text>
+
+        <!-- ALB node B -->
+        <rect x="500" y="255" width="95" height="40" rx="6" fill="var(--card-bg, #1a1a2e)" stroke="#60a5fa" stroke-width="2"/>
+        <text x="548" y="275" text-anchor="middle" fill="#60a5fa" font-size="10" font-weight="600">ALB</text>
+        <text x="548" y="288" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="7">Public entry</text>
+
+        <!-- NAT GW B -->
+        <rect x="720" y="255" width="130" height="40" rx="6" fill="var(--card-bg, #1a1a2e)" stroke="#f59e0b" stroke-width="2"/>
+        <text x="785" y="275" text-anchor="middle" fill="#f59e0b" font-size="10" font-weight="600">NAT Gateway B</text>
+        <text x="785" y="288" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="7">EIP: 54.x.x.x</text>
+
+        <!-- Private App subnet B -->
+        <rect x="480" y="325" width="390" height="95" rx="6" fill="#60a5fa" opacity="0.06" stroke="#60a5fa" stroke-width="1.5"/>
+        <text x="490" y="342" fill="#60a5fa" font-size="9" font-weight="600">Private App Subnet &mdash; 10.0.12.0/24</text>
+        <text x="490" y="354" fill="var(--text-secondary, #aaa)" font-size="8">Route: 0.0.0.0/0 &rarr; nat-gw-b</text>
+
+        <!-- EC2 App B -->
+        <rect x="570" y="365" width="110" height="40" rx="6" fill="var(--card-bg, #1a1a2e)" stroke="#60a5fa" stroke-width="2"/>
+        <text x="625" y="385" text-anchor="middle" fill="#60a5fa" font-size="10" font-weight="600">EC2 App</text>
+        <text x="625" y="398" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="7">10.0.12.20</text>
+
+        <!-- Private DB subnet B -->
+        <rect x="480" y="435" width="390" height="90" rx="6" fill="#a78bfa" opacity="0.06" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="490" y="452" fill="#a78bfa" font-size="9" font-weight="600">Private DB Subnet &mdash; 10.0.22.0/24</text>
+        <text x="490" y="464" fill="var(--text-secondary, #aaa)" font-size="8">Route: local only (no internet)</text>
+
+        <!-- RDS B -->
+        <rect x="570" y="475" width="110" height="38" rx="6" fill="var(--card-bg, #1a1a2e)" stroke="#a78bfa" stroke-width="2"/>
+        <text x="625" y="495" text-anchor="middle" fill="#a78bfa" font-size="10" font-weight="600">RDS Standby</text>
+        <text x="625" y="507" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="7">10.0.22.10</text>
+
+        <!-- ===== Arrows: Inbound traffic flow (blue) ===== -->
+        <!-- IGW -> ALB A -->
+        <line x1="430" y1="138" x2="118" y2="255" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#vpc-arrow-blue)"/>
+        <!-- IGW -> ALB B -->
+        <line x1="490" y1="138" x2="548" y2="255" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#vpc-arrow-blue)"/>
+        <!-- ALB A -> EC2 App A -->
+        <line x1="118" y1="295" x2="195" y2="365" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#vpc-arrow-blue)"/>
+        <!-- ALB B -> EC2 App B -->
+        <line x1="548" y1="295" x2="625" y2="365" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#vpc-arrow-blue)"/>
+        <!-- EC2 App A -> RDS A -->
+        <line x1="195" y1="405" x2="195" y2="475" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#vpc-arrow)"/>
+        <!-- EC2 App B -> RDS B -->
+        <line x1="625" y1="405" x2="625" y2="475" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#vpc-arrow)"/>
+
+        <!-- ===== Arrows: Outbound NAT traffic (green) ===== -->
+        <!-- EC2 App A -> NAT GW A -->
+        <line x1="250" y1="378" x2="290" y2="280" stroke="#34d399" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#vpc-arrow-green)"/>
+        <!-- NAT GW A -> IGW -->
+        <line x1="355" y1="255" x2="430" y2="138" stroke="#34d399" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#vpc-arrow-green)"/>
+        <!-- EC2 App B -> NAT GW B -->
+        <line x1="680" y1="378" x2="720" y2="280" stroke="#34d399" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#vpc-arrow-green)"/>
+        <!-- NAT GW B -> IGW -->
+        <line x1="785" y1="255" x2="490" y2="138" stroke="#34d399" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#vpc-arrow-green)"/>
+
+        <!-- ===== Legend ===== -->
+        <rect x="35" y="545" width="850" height="95" rx="6" fill="var(--card-bg, #1a1a2e)" stroke="var(--border, #444)" stroke-width="1"/>
+        <text x="50" y="565" fill="var(--text-secondary, #aaa)" font-size="10" font-weight="600">Traffic Flows:</text>
+
+        <line x1="50" y1="580" x2="80" y2="580" stroke="#60a5fa" stroke-width="2"/>
+        <text x="88" y="584" fill="#60a5fa" font-size="9" font-weight="600">Inbound</text>
+        <text x="135" y="584" fill="var(--text-secondary, #aaa)" font-size="8">&mdash; Internet &rarr; IGW &rarr; ALB &rarr; App tier &rarr; DB tier</text>
+
+        <line x1="50" y1="598" x2="80" y2="598" stroke="#34d399" stroke-width="2" stroke-dasharray="5 3"/>
+        <text x="88" y="602" fill="#34d399" font-size="9" font-weight="600">Outbound</text>
+        <text x="142" y="602" fill="var(--text-secondary, #aaa)" font-size="8">&mdash; Private instance &rarr; NAT GW (same AZ) &rarr; IGW &rarr; Internet</text>
+
+        <text x="50" y="625" fill="var(--text-secondary, #aaa)" font-size="8" font-style="italic">Note: A single shared NAT Gateway can reduce cost but creates an AZ dependency and may introduce cross-AZ data-transfer charges. The per-AZ design shown above is recommended for production.</text>
+      </svg>
+
+      <p><strong>Inbound:</strong> Internet traffic enters through the Internet Gateway, reaches the ALB in public subnets, which forwards to application instances in private subnets. The app tier queries the database tier via VPC-internal routing. <strong>Outbound:</strong> When private instances need internet access (dashed green lines), traffic routes through the NAT Gateway in the same AZ, then through the IGW. Each AZ has its own NAT Gateway for independent resilience. The database tier has no internet route &mdash; it communicates only within the VPC.</p>
+    </section>
+
+    <hr class="topic-divider">
+
+    <!-- VPC SECTION 4: Exam Gotchas -->
+    <section class="topic-section" id="vpc-gotchas">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain2)" stroke-width="2"><path d="M12 9v4m0 4h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+        22 Exam Gotchas
+      </h2>
+      <ol class="gotcha-list">
+        <li><strong>A subnet named &ldquo;public&rdquo; is not automatically public</strong> &mdash; what makes a subnet public is a route to an Internet Gateway in its associated route table, not its name. The exam will test whether you know the difference.</li>
+        <li><strong>Attaching an IGW does not make every resource internet-accessible</strong> &mdash; the IGW must be attached, the subnet needs a route to it, the instance needs a public IPv4 address, and security groups/NACLs must allow the traffic. All four conditions are required.</li>
+        <li><strong>A public IPv4 address or EIP is required for direct internet access</strong> &mdash; a resource in a public subnet with a route to the IGW still cannot communicate with the internet if it has no public IP. The IGW needs a public IP to perform NAT translation.</li>
+        <li><strong>An IGW is not a NAT Gateway</strong> &mdash; the IGW enables bidirectional internet access for resources with public IPs. A NAT Gateway enables outbound-only internet access for private instances. They are different components with different purposes.</li>
+        <li><strong>A NAT Gateway does not provide unsolicited inbound access</strong> &mdash; if the exam says &ldquo;users must access an EC2 instance from the internet,&rdquo; a NAT Gateway is the wrong answer. You need a public subnet with IGW access or a load balancer.</li>
+        <li><strong>A standard public NAT Gateway belongs in a public subnet</strong> &mdash; it needs a route to the IGW and an Elastic IP. Placing it in a private subnet breaks the outbound path because the NAT Gateway itself cannot reach the internet.</li>
+        <li><strong>Private instances do not need public IPs to use NAT</strong> &mdash; the NAT Gateway has the EIP, not the instance. The instance stays fully private. If the exam suggests assigning public IPs to private instances to enable outbound access, that contradicts the purpose of NAT.</li>
+        <li><strong>The private subnet&rsquo;s default route goes to NAT, not to the IGW</strong> &mdash; <code>0.0.0.0/0 &rarr; nat-gw</code> in a private subnet. <code>0.0.0.0/0 &rarr; igw</code> in a public subnet. Swapping these is a common exam trap.</li>
+        <li><strong>Route-table associations determine routing, not subnet names</strong> &mdash; if a subnet has no explicit custom route-table association, it uses the main route table. A subnet you intended to be public may behave as private if it inherited the main route table without an IGW route.</li>
+        <li><strong>Longest-prefix matching selects routes</strong> &mdash; a packet destined for <code>10.0.1.5</code> matches <code>10.0.0.0/16</code> (local) and <code>10.0.1.0/24</code> (more specific). The <code>/24</code> wins. For internet traffic, <code>0.0.0.0/0</code> is the least specific route and only matches when nothing else does.</li>
+        <li><strong>Security groups cannot compensate for a missing route</strong> &mdash; if no route exists for the destination, the packet is dropped before any security-group evaluation. A permissive security group with no route is useless.</li>
+        <li><strong>Routing does not override security rules</strong> &mdash; a route to the IGW creates a path, but security groups and NACLs still control whether traffic is permitted. Having a route and having permission are independent checks.</li>
+        <li><strong>One NAT Gateway does not provide AZ-independent redundancy</strong> &mdash; a NAT Gateway is an AZ-scoped resource. If that AZ fails, all subnets routing through it lose outbound internet &mdash; including subnets in healthy AZs.</li>
+        <li><strong>NAT Gateway failover is not automatic</strong> &mdash; AWS does not redirect private-subnet routes to a different NAT Gateway if one becomes unavailable. You must update route tables manually or via automation. The per-AZ design avoids the need for failover entirely.</li>
+        <li><strong>Cross-AZ NAT traffic incurs extra cost</strong> &mdash; routing AZ-b&rsquo;s private subnets through a NAT Gateway in AZ-a adds cross-AZ data-transfer charges on top of NAT processing fees. The per-AZ pattern eliminates this.</li>
+        <li><strong>An Egress-Only IGW is not an IPv4 NAT Gateway</strong> &mdash; the Egress-Only IGW handles IPv6 outbound-only traffic. It does not perform address translation (IPv6 addresses are globally unique). It cannot replace a NAT Gateway for IPv4 traffic.</li>
+        <li><strong>IPv6 outbound design should not default to IPv4 NAT</strong> &mdash; if the exam specifies IPv6 outbound-only internet access, the answer is an Egress-Only Internet Gateway, not a NAT Gateway.</li>
+        <li><strong>Overlapping CIDRs prevent VPC peering and Transit Gateway connections</strong> &mdash; plan unique, non-overlapping CIDR ranges across all VPCs that might need to communicate. The <code>172.31.0.0/16</code> default VPC range is commonly duplicated and causes peering conflicts.</li>
+        <li><strong>AWS reserves 5 addresses per subnet</strong> &mdash; <code>.0</code> (network), <code>.1</code> (router), <code>.2</code> (DNS), <code>.3</code> (reserved), and last address (broadcast). A <code>/24</code> has 251 usable IPs, not 256. A <code>/28</code> has 11, not 16.</li>
+        <li><strong>Not every destination requires NAT</strong> &mdash; traffic to supported AWS services (S3, DynamoDB) can use a free VPC gateway endpoint, bypassing NAT entirely. The exam frequently tests this as a cost-optimization answer.</li>
+        <li><strong>A private database subnet does not need a default internet route</strong> &mdash; databases communicate with the application tier via VPC-internal routing (the <code>local</code> route). Adding <code>0.0.0.0/0</code> to a database subnet introduces unnecessary attack surface.</li>
+        <li><strong>A missing route produces a timeout, not an access-denied error</strong> &mdash; if traffic times out, check routes first. If traffic returns a 403 or Access Denied, the network path works but IAM or resource policies are blocking. The error type tells you which layer to investigate.</li>
+      </ol>
+    </section>
+
+    <hr class="topic-divider">
+
+    <!-- VPC SECTION 5: Practice Questions -->
+    <section class="topic-section" id="vpc-practice">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain2)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3m.08 4h.01"/></svg>
+        Quick-Fire Practice
+      </h2>
+
+      <div class="practice-q">
+        <p class="q-text">Q1. A company runs EC2 instances in private subnets that need to download software updates from public internet repositories. The instances must not have public IP addresses. The VPC has an Internet Gateway attached. What additional configuration is required?</p>
+        <ul class="q-options">
+          <li><span class="q-letter">A.</span> Enable auto-assign public IP on the private subnets so the instances can reach the internet through the IGW.</li>
+          <li><span class="q-letter">B.</span> Create a NAT Gateway in a private subnet and update the private route table to route 0.0.0.0/0 to the NAT Gateway.</li>
+          <li><span class="q-letter">C.</span> Create a NAT Gateway in a public subnet with an Elastic IP. Update the private subnet route table to route 0.0.0.0/0 to the NAT Gateway.</li>
+          <li><span class="q-letter">D.</span> Add a route for 0.0.0.0/0 pointing to the Internet Gateway in the private subnet route table.</li>
+        </ul>
+        <button class="reveal-btn">Show Answer</button>
+        <div class="answer-reveal">
+          <p><strong>Correct Answer: C</strong></p>
+          <p>A NAT Gateway must be placed in a <em>public</em> subnet (one with a route to the IGW) and needs an Elastic IP for the standard public NAT pattern. The private subnet&rsquo;s route table then sends <code>0.0.0.0/0</code> to the NAT Gateway. A is wrong because assigning public IPs violates the requirement. B is wrong because a NAT Gateway in a private subnet cannot reach the internet. D is wrong because routing private instances directly to the IGW requires public IP addresses, which the instances don&rsquo;t have.</p>
+          <p><strong>Memory rule:</strong> NAT Gateway lives in public, serves private. Private route points to NAT, not to IGW.</p>
+        </div>
+      </div>
+
+      <div class="practice-q">
+        <p class="q-text">Q2. A production application runs in private subnets across two Availability Zones. A single NAT Gateway in AZ-a provides outbound internet access for both AZs. The operations team is concerned about resilience. What change provides the MOST highly available outbound internet design?</p>
+        <ul class="q-options">
+          <li><span class="q-letter">A.</span> Deploy a NAT Gateway in each AZ. Update each AZ&rsquo;s private route table to use the NAT Gateway in its own AZ.</li>
+          <li><span class="q-letter">B.</span> Add a second route in AZ-b&rsquo;s route table pointing to the NAT Gateway in AZ-a as a backup path.</li>
+          <li><span class="q-letter">C.</span> Replace the NAT Gateway with a NAT instance in an Auto Scaling group spanning both AZs.</li>
+          <li><span class="q-letter">D.</span> Configure an AWS Lambda function to update route tables automatically when the NAT Gateway health check fails.</li>
+        </ul>
+        <button class="reveal-btn">Show Answer</button>
+        <div class="answer-reveal">
+          <p><strong>Correct Answer: A</strong></p>
+          <p>Deploying a NAT Gateway in each AZ and routing each AZ&rsquo;s private subnets to its own NAT Gateway provides AZ-independent resilience. If AZ-a fails, AZ-b&rsquo;s connectivity is unaffected. B doesn&rsquo;t help because a route table can only have one route per destination &mdash; you can&rsquo;t add a backup <code>0.0.0.0/0</code> route. C introduces operational complexity; NAT instances require patching and don&rsquo;t scale as well as managed NAT Gateways. D adds custom automation that still depends on detecting the failure first, introducing delay and complexity.</p>
+          <p><strong>Memory rule:</strong> One NAT Gateway per AZ = AZ-independent. One shared NAT Gateway = single point of failure.</p>
+        </div>
+      </div>
+
+      <div class="practice-q">
+        <p class="q-text">Q3. An EC2 instance in a subnet named &ldquo;public-web&rdquo; cannot be reached from the internet over HTTPS. The instance has a security group allowing inbound TCP 443 from 0.0.0.0/0. The VPC has an Internet Gateway attached. What should the solutions architect check FIRST?</p>
+        <ul class="q-options">
+          <li><span class="q-letter">A.</span> Whether the instance&rsquo;s security group allows outbound traffic on ephemeral ports.</li>
+          <li><span class="q-letter">B.</span> Whether the subnet&rsquo;s route table has a route to the Internet Gateway and whether the instance has a public IPv4 address.</li>
+          <li><span class="q-letter">C.</span> Whether AWS Shield Standard is enabled for the VPC to allow inbound HTTPS traffic.</li>
+          <li><span class="q-letter">D.</span> Whether the VPC&rsquo;s DNS hostnames setting is enabled so the instance can receive external connections.</li>
+        </ul>
+        <button class="reveal-btn">Show Answer</button>
+        <div class="answer-reveal">
+          <p><strong>Correct Answer: B</strong></p>
+          <p>A subnet name is just a label. For an instance to be reachable from the internet, the subnet&rsquo;s route table must have <code>0.0.0.0/0 &rarr; igw</code> and the instance must have a public IPv4 address or Elastic IP. These are the most common missing pieces when a &ldquo;public&rdquo; instance isn&rsquo;t reachable. A is wrong because security groups are stateful &mdash; response traffic is automatically allowed. C is wrong because Shield Standard is always enabled automatically and does not control HTTPS access. D is wrong because DNS hostnames are unrelated to network reachability.</p>
+          <p><strong>Memory rule:</strong> &ldquo;Public subnet&rdquo; = name only. Check route table + public IP first.</p>
+        </div>
+      </div>
+    </section>
+
+  </div>
+  <footer class="site-footer">
+    <p>AWS SAA-C03 Study Hub &mdash; Personal study material, not affiliated with AWS.</p>
+  </footer>
+</div>
+
+<script src="../assets/js/nav.js"></script>
+<script src="../assets/js/reveal.js"></script>
+<script src="../assets/js/progress.js"></script>
+</body>
+</html>

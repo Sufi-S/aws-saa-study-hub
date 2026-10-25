@@ -578,5 +578,85 @@
     "term": "Web ACL Capacity Units (WCU)",
     "definition": "WCU is a measure of the operational resources required to run WAF rules. Each web ACL has a default limit of 1,500 WCU. Simple match rules cost 1 WCU; complex regex or managed rule groups cost more. WCU is calculated at rule creation time, not at request time.",
     "gotcha": "Running out of WCU means you cannot add more rules to that web ACL. Plan capacity before adding multiple managed rule groups. You can request a WCU limit increase through AWS Support, but the default 1,500 handles most use cases."
+  },
+  {
+    "term": "Amazon VPC (Virtual Private Cloud)",
+    "definition": "A logically isolated virtual network in AWS where you launch resources. You define the IP address range (CIDR), create subnets, configure route tables, and control access with security groups and NACLs.",
+    "gotcha": "Every AWS account gets a default VPC in each region with a /16 CIDR, default subnets in each AZ, an attached IGW, and auto-assign public IP enabled. Non-default VPCs require manual configuration."
+  },
+  {
+    "term": "CIDR Block (VPC Addressing)",
+    "definition": "Classless Inter-Domain Routing notation defines the IP range for a VPC or subnet. Example: 10.0.0.0/16 gives 65,536 addresses. The prefix length determines range size — shorter prefix = more addresses.",
+    "gotcha": "VPC CIDR can be /16 (max 65,536) to /28 (min 16). Subnet CIDRs must fit within the VPC CIDR and cannot overlap with each other. Plan non-overlapping ranges if you might peer VPCs later."
+  },
+  {
+    "term": "Public vs Private Subnet",
+    "definition": "A public subnet has a route table entry sending 0.0.0.0/0 to an Internet Gateway, enabling direct internet access for instances with public IPs. A private subnet either has no default route or routes 0.0.0.0/0 to a NAT Gateway.",
+    "gotcha": "The subnet name ('public' or 'private') proves nothing. What matters is the route table association and whether resources have public addressing. A subnet named 'public' with no IGW route is effectively private."
+  },
+  {
+    "term": "Route Table",
+    "definition": "A set of rules (routes) that determine where network traffic is directed. Each route has a destination (CIDR) and a target (IGW, NAT GW, local, endpoint, etc.). Every subnet is associated with exactly one route table.",
+    "gotcha": "If no custom route table is explicitly associated, the subnet uses the main route table. This is a common source of 'why isn't my subnet public' problems — the main route table typically has no IGW route."
+  },
+  {
+    "term": "Main vs Custom Route Table",
+    "definition": "The main route table is the default for a VPC — subnets without an explicit association use it. Custom route tables are created and explicitly associated with specific subnets for different routing behavior.",
+    "gotcha": "Best practice: keep the main route table restrictive (private, local-only) and create custom route tables for public subnets with IGW routes. This way, new subnets default to private behavior."
+  },
+  {
+    "term": "Longest-Prefix Match Routing",
+    "definition": "When multiple routes match a packet's destination, the most specific route (longest prefix / largest number after the slash) wins. A /24 route beats a /16 route for the same destination. 0.0.0.0/0 is the least specific possible.",
+    "gotcha": "The VPC local route (e.g., 10.0.0.0/16) always wins over 0.0.0.0/0 for VPC-internal traffic because /16 is more specific than /0. You cannot override VPC-internal routing with a default route."
+  },
+  {
+    "term": "Internet Gateway (IGW)",
+    "definition": "A horizontally scaled, redundant VPC component that enables communication between VPC resources and the internet. It performs 1:1 NAT between an instance's private IP and its public IP. Attached at the VPC level, not per subnet.",
+    "gotcha": "An IGW alone doesn't make resources internet-accessible. You also need: a route to the IGW, a public IPv4/EIP on the instance, and security groups/NACLs allowing the traffic. All four conditions are required."
+  },
+  {
+    "term": "NAT Gateway Placement and Routing",
+    "definition": "A standard public NAT Gateway is placed in a public subnet with an Elastic IP. Private subnets route 0.0.0.0/0 to the NAT Gateway. The NAT GW translates private source IPs to its EIP and forwards through the IGW.",
+    "gotcha": "Placing a public NAT Gateway in a private subnet breaks it — the NAT GW needs IGW access. Private instances do NOT need public IPs to use NAT; the NAT Gateway has the EIP, not the instances."
+  },
+  {
+    "term": "Elastic IP (EIP)",
+    "definition": "A static public IPv4 address you allocate to your account and can associate with an instance or NAT Gateway. Unlike auto-assigned public IPs, an EIP persists across instance stop/start cycles.",
+    "gotcha": "An EIP costs money when NOT associated with a running instance (to discourage hoarding). Each account has a default limit of 5 EIPs per region. NAT Gateways require an EIP for the public NAT pattern."
+  },
+  {
+    "term": "NAT Gateway AZ Resilience",
+    "definition": "A NAT Gateway is redundant within its AZ but does not span AZs. For production, deploy one NAT Gateway per AZ and route each AZ's private subnets to the local NAT Gateway for AZ-independent resilience.",
+    "gotcha": "A shared NAT Gateway creates cross-AZ dependency: if its AZ fails, private subnets in other AZs lose outbound internet. There is no automatic failover — route tables must be updated manually or via automation."
+  },
+  {
+    "term": "Public vs Private Routing",
+    "definition": "Public subnet: 0.0.0.0/0 → IGW (direct internet). Private app subnet: 0.0.0.0/0 → NAT Gateway (outbound-only internet). Private DB subnet: local route only (no internet). The route target defines the subnet's connectivity behavior.",
+    "gotcha": "Swapping the targets (IGW in private, NAT in public) is a common exam trap. The IGW route goes in public subnets; the NAT route goes in private subnets. Database subnets typically need no default route at all."
+  },
+  {
+    "term": "IPv4 vs IPv6 Egress Design",
+    "definition": "IPv4 private subnets use a NAT Gateway for outbound internet (address translation required). IPv6 uses an Egress-Only Internet Gateway (no translation needed — IPv6 addresses are globally unique). They are separate tools for separate protocols.",
+    "gotcha": "A NAT Gateway handles IPv4 only. An Egress-Only IGW handles IPv6 only. If the exam specifies 'IPv6 outbound-only access,' the answer is EIGW, not NAT Gateway. They are not interchangeable."
+  },
+  {
+    "term": "Egress-Only Internet Gateway",
+    "definition": "A VPC component that allows outbound IPv6 internet traffic from instances while preventing unsolicited inbound IPv6 connections. Unlike a NAT Gateway, it does not translate addresses — IPv6 addresses are globally routable.",
+    "gotcha": "No hourly charge (unlike NAT Gateway). Only for IPv6 — cannot help IPv4 traffic. Route: ::/0 → eigw-xxxx. Does not replace a NAT Gateway for IPv4 private subnet internet access."
+  },
+  {
+    "term": "AWS Reserved Subnet Addresses",
+    "definition": "AWS reserves 5 IP addresses in every subnet: .0 (network), .1 (VPC router), .2 (DNS), .3 (future use), and the last address (broadcast). A /24 subnet has 251 usable IPs, not 256.",
+    "gotcha": "A /28 subnet (16 total) has only 11 usable IPs. Under-sized subnets run out of IPs when scaling, since ENIs, ECS tasks, Lambda functions, and managed services all consume IPs."
+  },
+  {
+    "term": "VPC Gateway Endpoint vs NAT for AWS Services",
+    "definition": "A gateway VPC endpoint (S3 and DynamoDB) routes AWS service traffic directly without NAT — free, no hourly charge. This reduces NAT Gateway costs for high-volume S3/DynamoDB traffic. Interface endpoints cover other services via PrivateLink.",
+    "gotcha": "Gateway endpoints are free but only support S3 and DynamoDB. Interface endpoints support hundreds of services but have hourly + per-GB charges. The exam tests cost optimization: 'reduce NAT costs for S3 traffic' → gateway endpoint."
+  },
+  {
+    "term": "Routing Failure vs Permission Denial",
+    "definition": "A routing failure (missing route, wrong target) causes a timeout — the packet has no path. A permission denial (IAM, resource policy) returns an explicit error like 403 or Access Denied. The error type tells you which layer to troubleshoot.",
+    "gotcha": "Timeout → check routes, then security groups, then NACLs. Access Denied → the network path works, check IAM policies and resource policies. A security group block also looks like a timeout, not a denial."
   }
 ]

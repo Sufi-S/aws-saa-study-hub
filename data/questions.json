@@ -682,5 +682,47 @@
     ],
     "correctAnswer": 3,
     "explanation": "AWS Firewall Manager is purpose-built for centrally managing WAF rules across multiple accounts in an AWS Organization. A WAF policy in Firewall Manager automatically creates web ACLs and attaches them to in-scope resources in all member accounts. SCPs cannot force WAF attachment and web ACLs cannot be shared via RAM (A). StackSets with EventBridge works but requires significant custom automation (B). Shield Advanced does not automatically create WAF rules (C)."
+  },
+  {
+    "id": "d2-vpc-03",
+    "domain": "domain2",
+    "topic": "vpc-design",
+    "question": "A company runs EC2 instances in private subnets that need to download software updates from public internet repositories. The instances must not have public IP addresses. The VPC has an Internet Gateway attached. What additional configuration is required?",
+    "options": [
+      "Enable auto-assign public IP on the private subnets so the instances can reach the internet through the IGW.",
+      "Create a NAT Gateway in a private subnet and update the private route table to route 0.0.0.0/0 to the NAT Gateway.",
+      "Create a NAT Gateway in a public subnet with an Elastic IP. Update the private subnet route table to route 0.0.0.0/0 to the NAT Gateway.",
+      "Add a route for 0.0.0.0/0 pointing to the Internet Gateway in the private subnet route table."
+    ],
+    "correctAnswer": 2,
+    "explanation": "A NAT Gateway must be placed in a public subnet (one with a route to the IGW) and needs an Elastic IP. The private subnet route table then routes 0.0.0.0/0 to the NAT Gateway. Assigning public IPs (A) violates the requirement. A NAT Gateway in a private subnet (B) cannot reach the internet. Routing directly to the IGW (D) requires public IPs, which the instances don't have."
+  },
+  {
+    "id": "d2-vpc-04",
+    "domain": "domain2",
+    "topic": "vpc-design",
+    "question": "A production application runs in private subnets across two Availability Zones. A single NAT Gateway in AZ-a provides outbound internet access for both AZs. The operations team is concerned about resilience. What change provides the MOST highly available outbound internet design?",
+    "options": [
+      "Deploy a NAT Gateway in each AZ. Update each AZ's private route table to use the NAT Gateway in its own AZ.",
+      "Add a second route in AZ-b's route table pointing to the NAT Gateway in AZ-a as a backup path.",
+      "Replace the NAT Gateway with a NAT instance in an Auto Scaling group spanning both AZs.",
+      "Configure an AWS Lambda function to update route tables automatically when the NAT Gateway health check fails."
+    ],
+    "correctAnswer": 0,
+    "explanation": "Deploying a NAT Gateway per AZ with each AZ's private subnets routing to its own NAT Gateway provides AZ-independent resilience. A route table cannot have two routes for the same destination as a backup (B). NAT instances require patching and don't scale as well (C). Lambda-based failover adds complexity and detection delay (D)."
+  },
+  {
+    "id": "d2-vpc-05",
+    "domain": "domain2",
+    "topic": "vpc-design",
+    "question": "An EC2 instance in a subnet named 'public-web' cannot be reached from the internet over HTTPS. The instance has a security group allowing inbound TCP 443 from 0.0.0.0/0 and the VPC has an Internet Gateway attached. What should the solutions architect check FIRST?",
+    "options": [
+      "Whether the instance's security group allows outbound traffic on ephemeral ports.",
+      "Whether the subnet's route table has a route to the Internet Gateway and whether the instance has a public IPv4 address.",
+      "Whether AWS Shield Standard is enabled for the VPC to allow inbound HTTPS traffic.",
+      "Whether the VPC's DNS hostnames setting is enabled so the instance can receive external connections."
+    ],
+    "correctAnswer": 1,
+    "explanation": "A subnet name is just a label — for internet reachability, the route table must have 0.0.0.0/0 -> igw and the instance must have a public IPv4 or Elastic IP. Security groups are stateful, so outbound ephemeral ports are automatically allowed (A). Shield Standard is always on and doesn't control HTTPS access (C). DNS hostnames don't affect network reachability (D)."
   }
 ]
