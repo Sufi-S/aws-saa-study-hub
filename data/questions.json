@@ -724,5 +724,47 @@
     ],
     "correctAnswer": 1,
     "explanation": "A subnet name is just a label — for internet reachability, the route table must have 0.0.0.0/0 -> igw and the instance must have a public IPv4 or Elastic IP. Security groups are stateful, so outbound ephemeral ports are automatically allowed (A). Shield Standard is always on and doesn't control HTTPS access (C). DNS hostnames don't affect network reachability (D)."
+  },
+  {
+    "id": "d2-mar-01",
+    "domain": "domain2",
+    "topic": "multi-az-multi-region",
+    "question": "A company runs a web application on EC2 instances behind an ALB. The application must remain available if one Availability Zone experiences a disruption. The database is Amazon RDS MySQL in a single AZ. Which change provides the MOST resilient architecture?",
+    "options": [
+      "Add more EC2 instances in the same AZ and increase the instance size for higher throughput.",
+      "Deploy EC2 instances across two AZs, configure the ALB to span both AZs, and enable RDS Multi-AZ.",
+      "Create a cross-Region read replica and configure Route 53 failover routing.",
+      "Move all resources to a larger instance type in a single AZ with enhanced monitoring."
+    ],
+    "correctAnswer": 1,
+    "explanation": "Multi-AZ distributes instances across AZs and RDS Multi-AZ provides automatic database failover. Adding instances in the same AZ (A) or using larger instances (D) does not address AZ-level failure. Cross-Region DR (C) is overkill for AZ-level HA and doesn't fix the single-AZ app tier."
+  },
+  {
+    "id": "d2-mar-02",
+    "domain": "domain2",
+    "topic": "multi-az-multi-region",
+    "question": "A company requires a disaster recovery solution with an RTO of 30 minutes and RPO of 5 minutes in a different AWS Region. Which DR strategy BEST meets these requirements at the lowest cost?",
+    "options": [
+      "Backup and restore: copy daily RDS snapshots to the DR Region and redeploy from CloudFormation.",
+      "Pilot light: continuously replicate the database but keep application servers off.",
+      "Warm standby: run a scaled-down but fully functional environment with continuous replication.",
+      "Multi-site active/active: run full production in both Regions with DynamoDB global tables."
+    ],
+    "correctAnswer": 2,
+    "explanation": "Backup and restore (A) has hours of RTO and up to 24 hours of RPO with daily snapshots — too slow. Pilot light (B) may not meet 30-min RTO for complex apps due to provisioning time. Warm standby (C) meets both targets: continuous replication for near-zero RPO, all tiers already running for minutes-level RTO. Active/active (D) meets targets but is far more expensive than needed."
+  },
+  {
+    "id": "d2-mar-03",
+    "domain": "domain2",
+    "topic": "multi-az-multi-region",
+    "question": "A company uses an Aurora global database with primary in us-east-1 and secondary in eu-west-1. During a DR drill, the secondary is promoted and Route 53 redirects traffic, but the application in eu-west-1 returns authentication errors. What is the MOST likely cause?",
+    "options": [
+      "Route 53 failover routing does not work with Aurora global database endpoints.",
+      "Aurora global database does not support cross-Region failover.",
+      "The application's database connection strings are hardcoded to the us-east-1 endpoint.",
+      "Secrets in AWS Secrets Manager were not replicated to eu-west-1."
+    ],
+    "correctAnswer": 3,
+    "explanation": "Aurora global database supports cross-Region promotion (B is wrong). Route 53 works with any endpoint (A is wrong). DNS was redirected successfully, so the app reaches the DR Region — hardcoded endpoints (C) are less likely. Authentication errors specifically indicate missing credentials: Secrets Manager secrets are Regional and must be replicated to the DR Region."
   }
 ]

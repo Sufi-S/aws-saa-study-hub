@@ -62,6 +62,11 @@
         <li><a href="#vpc-diagram">VPC Design &mdash; Two-AZ Architecture Diagram</a></li>
         <li><a href="#vpc-gotchas">VPC Design &mdash; Exam Gotchas</a></li>
         <li><a href="#vpc-practice">VPC Design &mdash; Practice Questions</a></li>
+        <li><a href="#mar-learn"><strong>Multi-AZ vs Multi-Region</strong> &mdash; Learn from Zero</a></li>
+        <li><a href="#mar-real-world">Multi-AZ vs Multi-Region &mdash; Real-World Scenarios</a></li>
+        <li><a href="#mar-diagram">Multi-AZ vs Multi-Region &mdash; Architecture Diagram</a></li>
+        <li><a href="#mar-gotchas">Multi-AZ vs Multi-Region &mdash; Exam Gotchas</a></li>
+        <li><a href="#mar-practice">Multi-AZ vs Multi-Region &mdash; Practice Questions</a></li>
       </ol>
     </nav>
 
@@ -816,6 +821,736 @@
           <p><strong>Correct Answer: B</strong></p>
           <p>A subnet name is just a label. For an instance to be reachable from the internet, the subnet&rsquo;s route table must have <code>0.0.0.0/0 &rarr; igw</code> and the instance must have a public IPv4 address or Elastic IP. These are the most common missing pieces when a &ldquo;public&rdquo; instance isn&rsquo;t reachable. A is wrong because security groups are stateful &mdash; response traffic is automatically allowed. C is wrong because Shield Standard is always enabled automatically and does not control HTTPS access. D is wrong because DNS hostnames are unrelated to network reachability.</p>
           <p><strong>Memory rule:</strong> &ldquo;Public subnet&rdquo; = name only. Check route table + public IP first.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================= -->
+    <!-- TOPIC 9: Multi-AZ vs Multi-Region             -->
+    <!-- ============================================= -->
+
+    <hr class="topic-divider" style="margin-top:4rem;">
+    <div class="page-header" style="border-bottom:none;padding-bottom:0;margin-bottom:1.5rem;">
+      <h1 style="display:flex;align-items:center;gap:0.6rem;font-size:1.75rem;">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--domain2)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10A15.3 15.3 0 0 1 12 2z"/></svg>
+        Multi-AZ vs Multi-Region: High Availability &amp; Disaster Recovery
+      </h1>
+      <p>How architects design for AZ-level resilience, Regional disaster recovery, and everything in between.</p>
+    </div>
+
+    <!-- MAR SECTION 1: Learn from Zero -->
+    <section class="topic-section" id="mar-learn">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain2)" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        Learn from Zero
+      </h2>
+
+      <h3>Part 1A &mdash; What Is Resilience?</h3>
+
+      <p><strong>Resilience</strong> is the ability of a system to continue providing its intended function even when components fail. In cloud architecture, failure is not a question of &ldquo;if&rdquo; but &ldquo;when&rdquo; &mdash; hardware degrades, networks experience issues, entire data centers can be disrupted. A resilient system is designed so that these failures do not take down the application.</p>
+
+      <p><strong>Why systems fail even when code is correct.</strong> Your application code might be perfect, but it runs on servers, disks, network links, and power supplies that can fail independently. A database server might restart, a network switch might drop packets, or an entire facility might lose power. Resilience means your architecture handles these events gracefully.</p>
+
+      <p><strong>Key resilience concepts:</strong></p>
+      <table>
+        <thead><tr><th>Concept</th><th>Definition</th><th>Example</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Availability</strong></td><td>The percentage of time a system is operational and accessible</td><td>99.99% availability = ~4.3 minutes of downtime per month</td></tr>
+          <tr><td><strong>Reliability</strong></td><td>The ability to perform the intended function correctly and consistently</td><td>A payment system that processes every transaction without errors</td></tr>
+          <tr><td><strong>Durability</strong></td><td>The likelihood that stored data will not be lost</td><td>S3 provides 99.999999999% (11 nines) durability</td></tr>
+          <tr><td><strong>Fault tolerance</strong></td><td>The ability to continue operating despite specific component failures</td><td>An application that keeps serving requests when one server crashes</td></tr>
+          <tr><td><strong>Disaster recovery</strong></td><td>The process of restoring a system after a major disruption</td><td>Rebuilding an application in another Region after a Regional outage</td></tr>
+        </tbody>
+      </table>
+
+      <p><strong>Redundancy is necessary but not sufficient.</strong> Simply copying a server does not guarantee resilience. You also need health checks (to detect failures), load balancing (to route away from failed resources), data replication (so the replacement has current data), and tested recovery procedures (so the team knows what to do).</p>
+
+      <p><strong>Small failure vs. major disruption.</strong> Keeping an application running when a single EC2 instance crashes (high availability) is fundamentally different from restoring service after an entire AWS Region becomes unavailable (disaster recovery). Both require planning, but at different scales and costs.</p>
+
+      <div class="card" style="margin:1.5rem 0;">
+        <h4>Example: Online Shopping Application</h4>
+        <p><strong>Small failure:</strong> One of three web servers crashes. The load balancer detects the failure via health checks and routes traffic to the remaining two servers. Users never notice. This is high availability.</p>
+        <p><strong>Major disruption:</strong> The primary Region experiences a widespread outage. The team activates their disaster recovery plan, promoting a database replica in another Region and redirecting DNS. Service is restored within the targeted recovery time. This is disaster recovery.</p>
+      </div>
+
+      <hr style="border:none;border-top:1px dashed var(--border);margin:2rem 0;">
+
+      <h3>Part 1B &mdash; Availability, RTO, and RPO</h3>
+
+      <p><strong>High Availability (HA)</strong> means designing a system so that it continues operating when individual components fail. Key ingredients:</p>
+      <ul>
+        <li><strong>Redundant resources</strong> across multiple Availability Zones eliminate single points of failure.</li>
+        <li><strong>Health checks</strong> detect unhealthy instances automatically.</li>
+        <li><strong>Load balancing</strong> distributes requests only to healthy targets.</li>
+        <li><strong>Data availability</strong> &mdash; the database must also be resilient, not just the application servers.</li>
+      </ul>
+      <p>HA depends on the entire stack &mdash; servers, data, networking, and health detection &mdash; not just server count.</p>
+
+      <p><strong>Fault Tolerance</strong> goes further: the system continues operating with zero interruption despite a failure. True fault tolerance often requires more redundancy and automation than a standard HA design &mdash; for example, synchronous data replication so no transactions are lost, and instant failover with no observable downtime.</p>
+
+      <p><strong>Recovery Time Objective (RTO)</strong> is the maximum acceptable time to restore service after an interruption. RTO = 10 minutes means the business requires the application to be operational within 10 minutes of an outage. Lower RTO demands faster detection, more prepared standby environments, and greater operational readiness.</p>
+
+      <p><strong>Recovery Point Objective (RPO)</strong> is the maximum acceptable amount of recent data loss, measured in time. RPO = 1 minute means you can lose at most 1 minute of committed data. Lower RPO demands more frequent replication or continuous synchronous replication.</p>
+
+      <div class="card" style="margin:1.5rem 0;">
+        <h4>Concrete Examples</h4>
+        <table>
+          <thead><tr><th>Application</th><th>RTO</th><th>RPO</th><th>What this means</th></tr></thead>
+          <tbody>
+            <tr><td>E-commerce website</td><td>10 minutes</td><td>1 minute</td><td>Must recover fast; can lose at most 1 minute of orders. Needs warm standby + near-real-time replication.</td></tr>
+            <tr><td>Internal reporting tool</td><td>24 hours</td><td>12 hours</td><td>Can tolerate a day of downtime and half a day of data loss. Backup and restore is likely sufficient.</td></tr>
+          </tbody>
+        </table>
+        <p>These are business requirements, not AWS guarantees. The architecture must be designed, implemented, and tested to meet them.</p>
+      </div>
+
+      <p><strong>Remember:</strong> RTO measures <em>recovery time</em> (how fast you&rsquo;re back). RPO measures <em>data loss</em> (how much you lose). They are independent &mdash; you can have a short RTO with a long RPO, or vice versa.</p>
+
+      <hr style="border:none;border-top:1px dashed var(--border);margin:2rem 0;">
+
+      <h3>Part 1C &mdash; Availability Zones vs AWS Regions</h3>
+
+      <p><strong>Availability Zones (AZs)</strong> are one or more discrete data centers with independent power, cooling, and networking within a Region. They are connected to each other through low-latency links but are physically separated to reduce correlated failures. Deploying across AZs protects against single-AZ disruptions like power outages or network failures in one facility.</p>
+
+      <p><strong>AWS Regions</strong> are separate geographic locations, each with multiple AZs. Regions are fully independent infrastructure &mdash; a disruption in us-east-1 does not affect eu-west-1. Multi-Region architecture protects against the rare scenario of a complete Regional outage and can serve users closer to their geographic location.</p>
+
+      <table>
+        <thead><tr><th>Characteristic</th><th>Multi-AZ (within one Region)</th><th>Multi-Region</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Failure domain</strong></td><td>Individual AZ</td><td>Entire Region</td></tr>
+          <tr><td><strong>Typical purpose</strong></td><td>High availability</td><td>Disaster recovery, global reach</td></tr>
+          <tr><td><strong>Data replication</strong></td><td>Synchronous (within Region, low latency)</td><td>Usually asynchronous (cross-Region latency)</td></tr>
+          <tr><td><strong>Failover</strong></td><td>Automatic (ELB, RDS Multi-AZ, ASG)</td><td>Often requires DNS changes, manual steps, or orchestration</td></tr>
+          <tr><td><strong>Latency between zones</strong></td><td>Single-digit milliseconds</td><td>Tens to hundreds of milliseconds</td></tr>
+          <tr><td><strong>Complexity</strong></td><td>Moderate</td><td>High</td></tr>
+          <tr><td><strong>Cost</strong></td><td>Some cross-AZ data transfer</td><td>Duplicate infrastructure + cross-Region transfer</td></tr>
+          <tr><td><strong>Recovery scope</strong></td><td>AZ-level failures</td><td>Regional failures, compliance, latency</td></tr>
+          <tr><td><strong>Common use cases</strong></td><td>Standard production workloads</td><td>Business-critical systems, global applications</td></tr>
+        </tbody>
+      </table>
+
+      <p>Multi-AZ and multi-Region solve different problems and can be combined. A production application might use multi-AZ for daily HA and multi-Region for catastrophic DR.</p>
+
+      <hr style="border:none;border-top:1px dashed var(--border);margin:2rem 0;">
+
+      <h3>Part 1D &mdash; Single-AZ, Multi-AZ, and Multi-Region Architectures</h3>
+
+      <p><strong>Single-AZ</strong></p>
+      <ul>
+        <li>All resources in one AZ. Simplest and cheapest.</li>
+        <li>Acceptable for development, testing, or low-criticality workloads.</li>
+        <li>An AZ disruption can affect every resource in that deployment.</li>
+        <li>No AZ-level redundancy by design.</li>
+      </ul>
+
+      <p><strong>Multi-AZ</strong></p>
+      <ul>
+        <li>Application, data, and networking resources distributed across 2+ AZs in one Region.</li>
+        <li>Load balancers route traffic to healthy targets; health checks detect failures.</li>
+        <li>Database tier uses Multi-AZ replication (e.g., RDS Multi-AZ) or distributed storage (Aurora).</li>
+        <li>Can survive most AZ-level failures without manual intervention.</li>
+        <li>Does <em>not</em> protect against a complete Regional outage.</li>
+      </ul>
+
+      <p><strong>Multi-Region</strong></p>
+      <ul>
+        <li>Application environments in 2+ AWS Regions.</li>
+        <li>Data must be replicated, backed up, or otherwise recoverable across Regions.</li>
+        <li>Failover may require DNS changes (Route 53), traffic shifting (Global Accelerator), or manual procedures.</li>
+        <li>Supports Regional DR, data residency requirements, and global latency optimization.</li>
+        <li>Significantly higher cost and operational complexity.</li>
+      </ul>
+
+      <p><strong>Multi-Region is not automatically better.</strong> Choose based on business requirements: What is the RTO? What is the RPO? What are the compliance constraints? What can the budget support? A well-designed multi-AZ architecture covers the vast majority of production workloads.</p>
+
+      <hr style="border:none;border-top:1px dashed var(--border);margin:2rem 0;">
+
+      <h3>Part 1E &mdash; Disaster Recovery Strategies</h3>
+
+      <p>AWS teaches four DR strategies, ordered from lower to higher preparedness and cost:</p>
+
+      <p><strong>1. Backup and Restore</strong></p>
+      <ul>
+        <li><strong>Before disaster:</strong> Data is backed up to another Region (S3 cross-Region replication, RDS snapshots, AWS Backup). Infrastructure is defined as code (CloudFormation) but not deployed.</li>
+        <li><strong>During recovery:</strong> Deploy infrastructure from templates, restore data from backups, configure networking, start application.</li>
+        <li><strong>RTO:</strong> Hours (provisioning + restoration time).</li>
+        <li><strong>RPO:</strong> Depends on backup frequency &mdash; minutes to hours.</li>
+        <li><strong>Cost:</strong> Lowest &mdash; you pay only for backup storage until a disaster occurs.</li>
+        <li><strong>Best for:</strong> Non-critical workloads where hours of downtime are acceptable.</li>
+      </ul>
+
+      <p><strong>2. Pilot Light</strong></p>
+      <ul>
+        <li><strong>Before disaster:</strong> Core data infrastructure (database replicas, data stores) runs continuously in the DR Region. Application servers and other non-core resources are <em>not deployed</em> (or are stopped).</li>
+        <li><strong>During recovery:</strong> Provision/start application servers, scale up, switch traffic.</li>
+        <li><strong>RTO:</strong> Tens of minutes (provisioning app servers takes time).</li>
+        <li><strong>RPO:</strong> Near-zero if using continuous replication; depends on replication lag.</li>
+        <li><strong>Cost:</strong> Low to moderate &mdash; data tier is always running, but compute is off.</li>
+        <li><strong>Best for:</strong> Workloads needing faster recovery than backup/restore but not immediate.</li>
+      </ul>
+
+      <p><strong>3. Warm Standby</strong></p>
+      <ul>
+        <li><strong>Before disaster:</strong> A scaled-down but <em>fully functional</em> copy of the production environment runs in the DR Region. All tiers are live &mdash; just at reduced capacity.</li>
+        <li><strong>During recovery:</strong> Scale up to production capacity and switch traffic.</li>
+        <li><strong>RTO:</strong> Minutes (scaling up, not provisioning from scratch).</li>
+        <li><strong>RPO:</strong> Near-zero with continuous replication.</li>
+        <li><strong>Cost:</strong> Moderate to high &mdash; a smaller version of production is always running.</li>
+        <li><strong>Best for:</strong> Business-critical workloads needing fast recovery.</li>
+      </ul>
+
+      <p><strong>4. Multi-Site Active/Active</strong></p>
+      <ul>
+        <li><strong>Before disaster:</strong> Full production environments run in multiple Regions simultaneously, serving traffic concurrently.</li>
+        <li><strong>During recovery:</strong> Traffic is already distributed. A failing Region is removed from rotation. Remaining Regions absorb the load.</li>
+        <li><strong>RTO:</strong> Near-zero for infrastructure failures (traffic shifts automatically).</li>
+        <li><strong>RPO:</strong> Near-zero with synchronous or near-synchronous replication (but data corruption still requires backups).</li>
+        <li><strong>Cost:</strong> Highest &mdash; full production infrastructure in multiple Regions.</li>
+        <li><strong>Best for:</strong> Mission-critical global applications with near-zero downtime tolerance.</li>
+      </ul>
+
+      <table>
+        <thead><tr><th>Strategy</th><th>Readiness</th><th>Relative cost</th><th>Indicative RTO</th><th>Indicative RPO</th><th>Use case</th></tr></thead>
+        <tbody>
+          <tr><td>Backup &amp; Restore</td><td>Data backed up</td><td>$</td><td>Hours</td><td>Hours</td><td>Non-critical, cost-sensitive</td></tr>
+          <tr><td>Pilot Light</td><td>Data tier live</td><td>$$</td><td>Tens of minutes</td><td>Minutes</td><td>Important but not real-time</td></tr>
+          <tr><td>Warm Standby</td><td>All tiers live (reduced)</td><td>$$$</td><td>Minutes</td><td>Near-zero</td><td>Business-critical</td></tr>
+          <tr><td>Active/Active</td><td>Full production</td><td>$$$$</td><td>Near-zero</td><td>Near-zero*</td><td>Mission-critical, global</td></tr>
+        </tbody>
+      </table>
+      <p><em>* Data corruption events may still require point-in-time recovery from backups, resulting in non-zero RPO. RTO/RPO values are indicative and depend on implementation, replication, automation, and testing.</em></p>
+
+      <hr style="border:none;border-top:1px dashed var(--border);margin:2rem 0;">
+
+      <h3>Part 1F &mdash; Active/Passive vs Active/Active</h3>
+
+      <p><strong>Active/Passive</strong></p>
+      <ul>
+        <li>One environment (primary) serves all production traffic.</li>
+        <li>A second environment (standby) is ready for recovery &mdash; ranging from backups to a warm standby.</li>
+        <li>Failover involves redirecting traffic to the standby and ensuring it is ready.</li>
+        <li>Simpler to reason about data ownership &mdash; writes happen in one place.</li>
+        <li>Requires a tested failover process; the standby is useless if recovery has never been practiced.</li>
+      </ul>
+
+      <p><strong>Active/Active</strong></p>
+      <ul>
+        <li>Multiple environments serve production traffic simultaneously.</li>
+        <li>Better utilization and potentially lower latency for geographically distributed users.</li>
+        <li>Introduces challenges: data consistency, conflicting writes, session management, eventual consistency.</li>
+        <li>Write strategies: <strong>write global</strong> (all writes to one Region), <strong>write local</strong> (writes to nearest Region with conflict resolution), or <strong>write partitioned</strong> (writes routed by partition key).</li>
+        <li>Not inherently better &mdash; the added complexity must be justified by the business requirement.</li>
+      </ul>
+
+      <table>
+        <thead><tr><th>Pattern</th><th>Multi-AZ example</th><th>Multi-Region example</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Active/Passive</strong></td><td>RDS Multi-AZ: primary in AZ-a, standby in AZ-b, automatic failover</td><td>Primary Region serves traffic; DR Region has warm standby, failover via Route 53</td></tr>
+          <tr><td><strong>Active/Active</strong></td><td>ALB distributes traffic to targets in both AZs simultaneously</td><td>Both Regions serve users; DynamoDB global tables or Aurora global database for data</td></tr>
+        </tbody>
+      </table>
+
+      <p><strong>When to choose active/passive:</strong> The application has a single authoritative data source, the team wants simpler operations, or the DR Region is purely for recovery. <strong>When to choose active/active:</strong> The business needs global low latency, the data model supports multi-Region writes, and the team can handle the operational complexity.</p>
+
+      <hr style="border:none;border-top:1px dashed var(--border);margin:2rem 0;">
+
+      <h3>Part 1G &mdash; Data Replication and Consistency</h3>
+
+      <p>Failover is only useful when the data and dependencies are ready at the recovery site. Infrastructure without data is an empty shell.</p>
+
+      <p><strong>Synchronous vs. asynchronous replication:</strong></p>
+      <table>
+        <thead><tr><th>Type</th><th>How it works</th><th>Data loss risk</th><th>Latency impact</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Synchronous</strong></td><td>Write is acknowledged only after both primary and replica confirm</td><td>Near-zero (both copies are identical)</td><td>Higher &mdash; write waits for both confirmations</td></tr>
+          <tr><td><strong>Asynchronous</strong></td><td>Write is acknowledged after primary confirms; replica updated later</td><td>Possible &mdash; replica may lag behind primary</td><td>Lower &mdash; write returns quickly</td></tr>
+        </tbody>
+      </table>
+
+      <p><strong>Replication lag.</strong> With asynchronous replication, the replica is always some amount of time behind the primary. If the primary fails and you promote the replica, any transactions committed on the primary but not yet replicated are lost. This gap is the practical RPO.</p>
+
+      <p><strong>Backups vs. replicas.</strong> A replica mirrors the primary, including unwanted changes (accidental deletes, data corruption). A point-in-time backup lets you restore to a moment <em>before</em> the corruption. Both are needed &mdash; replicas for fast failover, backups for data recovery.</p>
+
+      <p><strong>Beyond the database.</strong> Application state, user sessions, uploaded files, configuration, secrets, message queues, and caches all need replication or recovery strategies. Failing over the database alone may leave the application broken if other dependencies are missing.</p>
+
+      <p><strong>Cross-Region replication is not instant readiness.</strong> Having a database replica in another Region does not mean the entire application stack is ready to serve traffic. Application servers, networking, secrets, permissions, service quotas, and DNS must all be prepared.</p>
+
+      <p><em>Note: Detailed RDS Multi-AZ and read-replica behavior will be covered in Topic 11.</em></p>
+
+      <hr style="border:none;border-top:1px dashed var(--border);margin:2rem 0;">
+
+      <h3>Part 1H &mdash; Traffic Management and Failover</h3>
+
+      <p>Resilience requires directing users to healthy resources. This happens at multiple levels:</p>
+
+      <p><strong>Within a Region &mdash; load balancing and health checks:</strong></p>
+      <ul>
+        <li>An ALB or NLB distributes traffic across targets in multiple AZs.</li>
+        <li>Health checks detect unhealthy targets and stop sending traffic to them.</li>
+        <li>Auto Scaling replaces failed instances automatically.</li>
+      </ul>
+
+      <p><strong>Across Regions &mdash; DNS and global routing:</strong></p>
+      <ul>
+        <li><strong>Route 53 failover routing:</strong> Health checks monitor the primary Region endpoint. If it becomes unhealthy, Route 53 returns the DR Region&rsquo;s endpoint instead.</li>
+        <li><strong>AWS Global Accelerator:</strong> Uses anycast IPs to route traffic to the nearest healthy endpoint, including cross-Region failover.</li>
+        <li><strong>CloudFront origin failover:</strong> If the primary origin returns errors, CloudFront tries a secondary origin on a per-request basis.</li>
+      </ul>
+
+      <p><strong>DNS caching and TTL.</strong> When Route 53 switches a DNS record, clients using cached DNS responses continue reaching the old endpoint until the TTL expires. Lower TTLs enable faster failover but increase DNS query volume. DNS failover is not instantaneous for all clients.</p>
+
+      <p><strong>Failover is more than DNS.</strong> Switching traffic to a second Region only works if that Region is ready:</p>
+      <ul>
+        <li>Database promoted and accepting writes.</li>
+        <li>Application servers running and configured.</li>
+        <li>Secrets, certificates, and IAM roles in place.</li>
+        <li>Network paths (VPC, subnets, security groups) configured.</li>
+        <li>Service quotas sufficient for production load.</li>
+        <li>Downstream dependencies (APIs, queues, caches) available.</li>
+      </ul>
+
+      <div class="card" style="margin:1.5rem 0;">
+        <h4>Example: Two-Region Failover</h4>
+        <p><strong>Normal operation:</strong> Route 53 points <code>app.example.com</code> to the ALB in us-east-1 (primary). Health checks monitor the primary endpoint every 30 seconds.</p>
+        <p><strong>Primary fails:</strong> Health checks detect failure. Route 53 returns the us-west-2 (DR) ALB IP. Clients with expired DNS cache connect to us-west-2. The DR environment&rsquo;s database replica is promoted to primary. Application servers in us-west-2 begin handling requests.</p>
+        <p><strong>Reality check:</strong> Clients with cached DNS may take minutes to switch. Database promotion takes seconds to minutes depending on the engine. Application startup, secret loading, and dependency verification add time. The actual RTO is the sum of all these steps.</p>
+      </div>
+
+      <hr style="border:none;border-top:1px dashed var(--border);margin:2rem 0;">
+
+      <h3>Part 1I &mdash; Cost, Complexity, and Design Decisions</h3>
+
+      <p>Every resilience improvement adds cost and complexity. The right architecture balances business requirements against budget and operational capacity.</p>
+
+      <table>
+        <thead><tr><th>Factor</th><th>Single-AZ</th><th>Multi-AZ</th><th>Multi-Region</th></tr></thead>
+        <tbody>
+          <tr><td>Infrastructure cost</td><td>Lowest</td><td>Moderate (cross-AZ resources)</td><td>High (duplicate everything)</td></tr>
+          <tr><td>Data transfer</td><td>None extra</td><td>Cross-AZ charges</td><td>Cross-Region charges</td></tr>
+          <tr><td>Operational complexity</td><td>Simple</td><td>Moderate</td><td>High (replication, failover, testing)</td></tr>
+          <tr><td>Monitoring needed</td><td>Basic</td><td>Health checks per AZ</td><td>Regional health, replication lag, DR readiness</td></tr>
+          <tr><td>Recovery testing</td><td>Minimal</td><td>Periodic</td><td>Regular DR drills essential</td></tr>
+          <tr><td>Protects against</td><td>Instance failure only</td><td>AZ-level disruptions</td><td>Regional outages, compliance needs</td></tr>
+        </tbody>
+      </table>
+
+      <div class="card" style="margin:1.5rem 0;">
+        <h4>Decision Guide: Matching Requirements to Architecture</h4>
+        <table>
+          <thead><tr><th>Requirement</th><th>Recommended approach</th><th>Why</th></tr></thead>
+          <tbody>
+            <tr><td>Dev/test environment, downtime OK</td><td>Single-AZ</td><td>Cheapest; no business impact if down</td></tr>
+            <tr><td>Production app, survive AZ failure</td><td>Multi-AZ</td><td>Standard HA; handles most failures</td></tr>
+            <tr><td>Business-critical, Regional DR needed</td><td>Multi-AZ + pilot light or warm standby</td><td>HA for daily ops + DR for rare Regional failure</td></tr>
+            <tr><td>Global app, low-latency everywhere</td><td>Multi-Region active/active</td><td>Serve users from nearest Region</td></tr>
+            <tr><td>Strict compliance, data in specific geography</td><td>Multi-Region with data residency controls</td><td>Legal/regulatory requirement</td></tr>
+            <tr><td>Cost is primary concern, RTO of hours OK</td><td>Multi-AZ + backup and restore DR</td><td>HA daily, cheap DR with longer recovery</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p><strong>Overengineering warning:</strong> A multi-Region active/active architecture for an internal dashboard used by 50 people wastes money and engineering effort. Match the resilience investment to the actual business impact of downtime.</p>
+    </section>
+
+    <hr class="topic-divider">
+
+    <!-- MAR SECTION 2: Real-World Scenarios -->
+    <section class="topic-section" id="mar-real-world">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain2)" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        When Real Architects Actually Use This
+      </h2>
+
+      <div class="scenario-card">
+        <h3>Scenario A &mdash; Web Application Must Survive an AZ Failure</h3>
+        <p><strong>Business requirement:</strong> An e-commerce application must remain available if one AZ experiences a disruption.</p>
+        <p><strong>Architecture:</strong></p>
+        <ul>
+          <li>EC2 instances across at least two AZs behind an Application Load Balancer with health checks.</li>
+          <li>Auto Scaling Group spans both AZs &mdash; replaces failed instances automatically.</li>
+          <li>RDS Multi-AZ provides a synchronous standby with automatic failover (60&ndash;120 seconds).</li>
+          <li>ElastiCache Multi-AZ (Redis) for session storage so sessions survive an AZ failure.</li>
+        </ul>
+        <p><strong>Why not two instances in the same AZ?</strong> If the AZ itself is disrupted, both go down. Multi-AZ distributes across independent failure domains.</p>
+        <p><strong>Exam clue:</strong> &ldquo;Remain available during an AZ failure&rdquo; &rarr; resources in multiple AZs + load balancer + Multi-AZ database.</p>
+      </div>
+
+      <div class="scenario-card">
+        <h3>Scenario B &mdash; Regional Disaster Recovery</h3>
+        <p><strong>Business requirement:</strong> Production runs in us-east-1. If the Region becomes unavailable, recover in us-west-2 within 30 minutes (RTO) with at most 5 minutes of data loss (RPO).</p>
+        <p><strong>Architecture:</strong></p>
+        <ul>
+          <li><strong>Strategy: Warm standby.</strong> Scaled-down but fully functional environment in us-west-2.</li>
+          <li>Aurora global database replicates with typical lag under 1 second.</li>
+          <li>Application servers at reduced capacity in us-west-2.</li>
+          <li>Route 53 failover routing with health checks on the primary endpoint.</li>
+          <li>On failover: promote Aurora secondary (&lt;1 min), scale ASG, Route 53 shifts traffic.</li>
+        </ul>
+        <p><strong>Why not pilot light?</strong> Pilot light requires provisioning app servers during recovery, adding time. Warm standby is faster for the 30-minute target.</p>
+        <p><strong>Exam clue:</strong> &ldquo;RTO 30 min, RPO 5 min, Regional DR&rdquo; &rarr; warm standby + continuous replication.</p>
+      </div>
+
+      <div class="scenario-card">
+        <h3>Scenario C &mdash; Minimize Recovery Time</h3>
+        <p><strong>Business requirement:</strong> A financial application has near-zero RTO. Any downtime causes regulatory failures.</p>
+        <p><strong>Architecture:</strong></p>
+        <ul>
+          <li><strong>Strategy: Multi-site active/active.</strong> Both Regions serve traffic simultaneously.</li>
+          <li>Route 53 latency-based routing or Global Accelerator distributes traffic.</li>
+          <li>DynamoDB global tables for multi-Region read/write.</li>
+          <li>If one Region fails, the other absorbs all traffic &mdash; no failover delay.</li>
+        </ul>
+        <p><strong>Trade-off:</strong> Highest cost, most complex data model, requires write-conflict handling.</p>
+        <p><strong>Exam clue:</strong> &ldquo;Near-zero RTO, cannot tolerate any downtime&rdquo; &rarr; multi-site active/active.</p>
+      </div>
+
+      <div class="scenario-card">
+        <h3>Scenario D &mdash; Minimize Disaster Recovery Cost</h3>
+        <p><strong>Business requirement:</strong> An analytics platform can tolerate 8 hours of downtime (RTO) and 4 hours of data loss (RPO). Cheapest DR approach needed.</p>
+        <p><strong>Architecture:</strong></p>
+        <ul>
+          <li><strong>Strategy: Backup and restore.</strong></li>
+          <li>RDS snapshots every 4 hours, copied to DR Region via AWS Backup.</li>
+          <li>S3 cross-Region replication for data files.</li>
+          <li>CloudFormation templates ready in DR Region.</li>
+          <li>On disaster: deploy stack, restore RDS, update DNS.</li>
+        </ul>
+        <p><strong>Critical:</strong> Test the restore procedure regularly. An untested backup is not a recovery plan.</p>
+        <p><strong>Exam clue:</strong> &ldquo;Lowest cost DR, hours of downtime acceptable&rdquo; &rarr; backup and restore.</p>
+      </div>
+
+      <div class="scenario-card">
+        <h3>Scenario E &mdash; Global Low-Latency Application</h3>
+        <p><strong>Business requirement:</strong> Users across three continents need sub-100ms responses. The app must survive a Regional failure.</p>
+        <p><strong>Architecture:</strong></p>
+        <ul>
+          <li>Multi-Region active/active in us-east-1, eu-west-1, ap-northeast-1.</li>
+          <li>Route 53 latency-based routing sends users to the nearest Region.</li>
+          <li>DynamoDB global tables replicate across all three Regions.</li>
+          <li>CloudFront for static content caching at edge locations.</li>
+        </ul>
+        <p><strong>Data consistency:</strong> DynamoDB global tables use eventual consistency across Regions. The application must tolerate brief inconsistency windows.</p>
+        <p><strong>Exam clue:</strong> &ldquo;Global users, low latency, multi-Region&rdquo; &rarr; active/active with latency-based routing.</p>
+      </div>
+
+      <div class="scenario-card">
+        <h3>Scenario F &mdash; Application Database Has Replication Lag</h3>
+        <p><strong>Business requirement:</strong> After failing over to a cross-Region replica, users report missing recent orders.</p>
+        <p><strong>Root cause:</strong> The cross-Region read replica uses asynchronous replication. At failover, the replica was 45 seconds behind. Those 45 seconds of transactions were lost.</p>
+        <p><strong>Lessons:</strong></p>
+        <ul>
+          <li>Asynchronous replication always has a lag window. RPO = replication lag at time of failure.</li>
+          <li>Monitor <code>ReplicaLag</code> in CloudWatch continuously.</li>
+          <li>Aurora global database typically replicates under 1 second.</li>
+          <li>Point-in-time backups protect against data corruption that replication would propagate.</li>
+        </ul>
+        <p><strong>Exam clue:</strong> &ldquo;Recent data missing after failover&rdquo; &rarr; asynchronous replication lag.</p>
+      </div>
+
+      <div class="scenario-card">
+        <h3>Scenario G &mdash; Active/Active Design With Conflicting Writes</h3>
+        <p><strong>Business requirement:</strong> Both us-east-1 and eu-west-1 must accept user profile updates simultaneously.</p>
+        <p><strong>Options:</strong></p>
+        <ul>
+          <li><strong>DynamoDB global tables:</strong> Last-writer-wins. Simple but may silently discard a concurrent update.</li>
+          <li><strong>Aurora global database (write global):</strong> All writes to one Region. No conflicts but adds write latency for remote users.</li>
+          <li><strong>Write partitioned:</strong> Each user writes to their &ldquo;home&rdquo; Region. Eliminates same-record conflicts but requires routing logic.</li>
+        </ul>
+        <p><strong>Key lesson:</strong> Multi-Region infrastructure does not solve data consistency. The data model and conflict resolution strategy must be designed explicitly.</p>
+        <p><strong>Exam clue:</strong> &ldquo;Active/active writes&rdquo; &rarr; address conflict resolution strategy.</p>
+      </div>
+
+      <div class="scenario-card">
+        <h3>Scenario H &mdash; Failover Does Not Restore the Application</h3>
+        <p><strong>Business requirement:</strong> DNS failover to DR Region succeeds, but the application returns errors.</p>
+        <p><strong>Root causes found:</strong></p>
+        <ul>
+          <li>Database replica not promoted &mdash; app could not write.</li>
+          <li>Secrets not replicated to DR Region &mdash; app could not authenticate.</li>
+          <li>IAM roles had stale policies.</li>
+          <li>Service quotas at default limits &mdash; ASG could not scale.</li>
+          <li>External API had only primary Region IP whitelisted.</li>
+        </ul>
+        <p><strong>Key lesson:</strong> DNS failover is just traffic redirection. The entire stack &mdash; database, secrets, permissions, quotas, networking, external dependencies &mdash; must be ready and tested.</p>
+        <p><strong>Exam clue:</strong> &ldquo;Failover succeeds but app still fails&rdquo; &rarr; check all dependencies, not just DNS.</p>
+      </div>
+    </section>
+
+    <hr class="topic-divider">
+
+    <!-- MAR SECTION 3: Architecture Diagram -->
+    <section class="topic-section" id="mar-diagram">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain2)" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+        Multi-AZ vs Multi-Region Architecture
+      </h2>
+
+      <svg role="img" aria-label="Diagram comparing a Multi-AZ architecture within one Region for high availability with a Multi-Region architecture for disaster recovery, showing traffic flow, data replication, and DR strategy spectrum" viewBox="0 0 920 620" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:920px;height:auto;margin:1.5rem auto;display:block;font-family:inherit;">
+        <title>Multi-AZ vs Multi-Region Architecture Comparison</title>
+        <desc>Left side shows a single Region with two AZs, a load balancer, application instances, and a Multi-AZ database for high availability. Right side shows a primary Region and a recovery Region connected by data replication and DNS failover, illustrating disaster recovery. A bottom legend shows the DR strategy spectrum from backup and restore to active/active.</desc>
+
+        <defs>
+          <marker id="mar-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 Z" fill="var(--text-secondary, #aaa)"/>
+          </marker>
+          <marker id="mar-arrow-cyan" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 Z" fill="#06b6d4"/>
+          </marker>
+          <marker id="mar-arrow-orange" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 Z" fill="#f59e0b"/>
+          </marker>
+        </defs>
+
+        <!-- Background -->
+        <rect x="0" y="0" width="920" height="620" rx="12" fill="var(--card-bg, #1a1a2e)" stroke="var(--border, #333)" stroke-width="1.5"/>
+
+        <!-- ===== LEFT: Multi-AZ ===== -->
+        <text x="225" y="24" text-anchor="middle" fill="#06b6d4" font-size="13" font-weight="600">Multi-AZ &mdash; High Availability</text>
+
+        <!-- Region boundary -->
+        <rect x="15" y="35" width="430" height="345" rx="10" fill="none" stroke="#06b6d4" stroke-width="2" stroke-dasharray="8 4"/>
+        <text x="30" y="55" fill="#06b6d4" font-size="10" font-weight="600">Region: us-east-1</text>
+
+        <!-- Users -->
+        <rect x="170" y="42" width="110" height="28" rx="14" fill="var(--card-bg, #1a1a2e)" stroke="var(--text-secondary, #aaa)" stroke-width="1.5"/>
+        <text x="225" y="61" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="9" font-weight="600">Users</text>
+
+        <!-- ALB -->
+        <rect x="175" y="85" width="100" height="32" rx="6" fill="var(--card-bg, #1a1a2e)" stroke="#60a5fa" stroke-width="2"/>
+        <text x="225" y="105" text-anchor="middle" fill="#60a5fa" font-size="10" font-weight="600">ALB</text>
+        <line x1="225" y1="70" x2="225" y2="85" stroke="var(--text-secondary, #aaa)" stroke-width="1.5" marker-end="url(#mar-arrow)"/>
+
+        <!-- AZ-a -->
+        <rect x="30" y="130" width="190" height="235" rx="6" fill="none" stroke="var(--border, #555)" stroke-width="1" stroke-dasharray="4 3"/>
+        <text x="125" y="148" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="8" font-weight="600">AZ-a</text>
+
+        <!-- App A -->
+        <rect x="55" y="160" width="140" height="35" rx="6" fill="var(--card-bg, #1a1a2e)" stroke="#60a5fa" stroke-width="1.5"/>
+        <text x="125" y="180" text-anchor="middle" fill="#60a5fa" font-size="9" font-weight="600">EC2 App (active)</text>
+
+        <!-- DB Primary -->
+        <rect x="55" y="215" width="140" height="35" rx="6" fill="var(--card-bg, #1a1a2e)" stroke="#a78bfa" stroke-width="2"/>
+        <text x="125" y="236" text-anchor="middle" fill="#a78bfa" font-size="9" font-weight="600">RDS Primary</text>
+
+        <!-- Cache A -->
+        <rect x="55" y="270" width="140" height="30" rx="6" fill="var(--card-bg, #1a1a2e)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="125" y="289" text-anchor="middle" fill="#34d399" font-size="8" font-weight="600">ElastiCache (primary)</text>
+
+        <!-- AZ-b -->
+        <rect x="240" y="130" width="190" height="235" rx="6" fill="none" stroke="var(--border, #555)" stroke-width="1" stroke-dasharray="4 3"/>
+        <text x="335" y="148" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="8" font-weight="600">AZ-b</text>
+
+        <!-- App B -->
+        <rect x="265" y="160" width="140" height="35" rx="6" fill="var(--card-bg, #1a1a2e)" stroke="#60a5fa" stroke-width="1.5"/>
+        <text x="335" y="180" text-anchor="middle" fill="#60a5fa" font-size="9" font-weight="600">EC2 App (active)</text>
+
+        <!-- DB Standby -->
+        <rect x="265" y="215" width="140" height="35" rx="6" fill="var(--card-bg, #1a1a2e)" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="4 2"/>
+        <text x="335" y="236" text-anchor="middle" fill="#a78bfa" font-size="9" font-weight="600">RDS Standby</text>
+
+        <!-- Cache B -->
+        <rect x="265" y="270" width="140" height="30" rx="6" fill="var(--card-bg, #1a1a2e)" stroke="#34d399" stroke-width="1.5" stroke-dasharray="4 2"/>
+        <text x="335" y="289" text-anchor="middle" fill="#34d399" font-size="8" font-weight="600">ElastiCache (replica)</text>
+
+        <!-- ALB -> Apps -->
+        <line x1="200" y1="117" x2="125" y2="160" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#mar-arrow-cyan)"/>
+        <line x1="250" y1="117" x2="335" y2="160" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#mar-arrow-cyan)"/>
+
+        <!-- Sync replication arrows -->
+        <line x1="195" y1="232" x2="265" y2="232" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="4 2" marker-end="url(#mar-arrow)"/>
+        <text x="230" y="225" text-anchor="middle" fill="#a78bfa" font-size="7">sync</text>
+
+        <!-- Annotation -->
+        <text x="30" y="385" fill="var(--text-secondary, #aaa)" font-size="8" font-style="italic">Multi-AZ protects against AZ failures.</text>
+        <text x="30" y="397" fill="var(--text-secondary, #aaa)" font-size="8" font-style="italic">Does NOT protect against Regional outages.</text>
+
+        <!-- ===== DIVIDER ===== -->
+        <line x1="460" y1="35" x2="460" y2="380" stroke="var(--border, #555)" stroke-width="1" stroke-dasharray="6 4"/>
+
+        <!-- ===== RIGHT: Multi-Region ===== -->
+        <text x="690" y="24" text-anchor="middle" fill="#f59e0b" font-size="13" font-weight="600">Multi-Region &mdash; Disaster Recovery</text>
+
+        <!-- Primary Region -->
+        <rect x="475" y="35" width="200" height="180" rx="8" fill="none" stroke="#06b6d4" stroke-width="2"/>
+        <text x="490" y="55" fill="#06b6d4" font-size="10" font-weight="600">Primary: us-east-1</text>
+
+        <!-- Primary app -->
+        <rect x="505" y="70" width="140" height="30" rx="6" fill="var(--card-bg, #1a1a2e)" stroke="#60a5fa" stroke-width="1.5"/>
+        <text x="575" y="89" text-anchor="middle" fill="#60a5fa" font-size="9" font-weight="600">App (full capacity)</text>
+
+        <!-- Primary DB -->
+        <rect x="505" y="115" width="140" height="30" rx="6" fill="var(--card-bg, #1a1a2e)" stroke="#a78bfa" stroke-width="2"/>
+        <text x="575" y="134" text-anchor="middle" fill="#a78bfa" font-size="9" font-weight="600">Aurora Primary</text>
+
+        <!-- Primary status -->
+        <rect x="505" y="160" width="140" height="22" rx="4" fill="#34d399" opacity="0.15"/>
+        <text x="575" y="175" text-anchor="middle" fill="#34d399" font-size="9" font-weight="600">ACTIVE &mdash; serving traffic</text>
+
+        <!-- Recovery Region -->
+        <rect x="710" y="35" width="200" height="180" rx="8" fill="none" stroke="#f59e0b" stroke-width="2" stroke-dasharray="6 3"/>
+        <text x="725" y="55" fill="#f59e0b" font-size="10" font-weight="600">Recovery: us-west-2</text>
+
+        <!-- Recovery app -->
+        <rect x="740" y="70" width="140" height="30" rx="6" fill="var(--card-bg, #1a1a2e)" stroke="#60a5fa" stroke-width="1.5" stroke-dasharray="4 2"/>
+        <text x="810" y="89" text-anchor="middle" fill="#60a5fa" font-size="9">App (scaled down)</text>
+
+        <!-- Recovery DB -->
+        <rect x="740" y="115" width="140" height="30" rx="6" fill="var(--card-bg, #1a1a2e)" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="4 2"/>
+        <text x="810" y="134" text-anchor="middle" fill="#a78bfa" font-size="9">Aurora Read Replica</text>
+
+        <!-- Recovery status -->
+        <rect x="740" y="160" width="140" height="22" rx="4" fill="#f59e0b" opacity="0.12"/>
+        <text x="810" y="175" text-anchor="middle" fill="#f59e0b" font-size="9">STANDBY &mdash; warm standby</text>
+
+        <!-- Replication arrow -->
+        <line x1="645" y1="130" x2="740" y2="130" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#mar-arrow)"/>
+        <text x="693" y="123" text-anchor="middle" fill="#a78bfa" font-size="7">async replication</text>
+        <text x="693" y="143" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="7">(RPO = lag)</text>
+
+        <!-- Route 53 -->
+        <rect x="610" y="230" width="150" height="32" rx="16" fill="var(--card-bg, #1a1a2e)" stroke="#f59e0b" stroke-width="2"/>
+        <text x="685" y="250" text-anchor="middle" fill="#f59e0b" font-size="10" font-weight="600">Route 53 Failover</text>
+
+        <!-- Users (right) -->
+        <rect x="630" y="275" width="110" height="28" rx="14" fill="var(--card-bg, #1a1a2e)" stroke="var(--text-secondary, #aaa)" stroke-width="1.5"/>
+        <text x="685" y="294" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="9" font-weight="600">Users</text>
+
+        <!-- Normal traffic -->
+        <line x1="685" y1="275" x2="575" y2="200" stroke="#06b6d4" stroke-width="1.5" marker-end="url(#mar-arrow-cyan)"/>
+        <text x="610" y="240" fill="#06b6d4" font-size="7">normal traffic</text>
+
+        <!-- Failover traffic -->
+        <line x1="710" y1="275" x2="810" y2="200" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#mar-arrow-orange)"/>
+        <text x="775" y="240" fill="#f59e0b" font-size="7">failover traffic</text>
+
+        <!-- Annotation -->
+        <text x="475" y="330" fill="var(--text-secondary, #aaa)" font-size="8" font-style="italic">Multi-Region protects against Regional outages.</text>
+        <text x="475" y="342" fill="var(--text-secondary, #aaa)" font-size="8" font-style="italic">Actual RTO/RPO depend on replication, readiness, and recovery process.</text>
+
+        <!-- ===== BOTTOM: DR Strategy Spectrum ===== -->
+        <rect x="15" y="415" width="890" height="190" rx="8" fill="var(--card-bg, #1a1a2e)" stroke="var(--border, #444)" stroke-width="1"/>
+        <text x="460" y="438" text-anchor="middle" fill="var(--heading, #e0e0e0)" font-size="11" font-weight="600">DR Strategy Spectrum</text>
+
+        <!-- Arrow bar -->
+        <rect x="55" y="455" width="810" height="8" rx="4" fill="var(--border, #444)"/>
+
+        <!-- Strategy boxes -->
+        <rect x="55" y="475" width="175" height="55" rx="6" fill="var(--card-bg, #1a1a2e)" stroke="var(--text-secondary, #aaa)" stroke-width="1.5"/>
+        <text x="143" y="493" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="9" font-weight="600">Backup &amp; Restore</text>
+        <text x="143" y="506" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="7">RTO: hours | RPO: hours</text>
+        <text x="143" y="518" text-anchor="middle" fill="#34d399" font-size="7">$ Lowest cost</text>
+
+        <rect x="260" y="475" width="175" height="55" rx="6" fill="var(--card-bg, #1a1a2e)" stroke="#60a5fa" stroke-width="1.5"/>
+        <text x="348" y="493" text-anchor="middle" fill="#60a5fa" font-size="9" font-weight="600">Pilot Light</text>
+        <text x="348" y="506" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="7">RTO: tens of min | RPO: min</text>
+        <text x="348" y="518" text-anchor="middle" fill="#f59e0b" font-size="7">$$ Data tier always on</text>
+
+        <rect x="465" y="475" width="175" height="55" rx="6" fill="var(--card-bg, #1a1a2e)" stroke="#f59e0b" stroke-width="1.5"/>
+        <text x="553" y="493" text-anchor="middle" fill="#f59e0b" font-size="9" font-weight="600">Warm Standby</text>
+        <text x="553" y="506" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="7">RTO: minutes | RPO: near-zero</text>
+        <text x="553" y="518" text-anchor="middle" fill="#ef4444" font-size="7">$$$ All tiers live (reduced)</text>
+
+        <rect x="670" y="475" width="195" height="55" rx="6" fill="var(--card-bg, #1a1a2e)" stroke="#ef4444" stroke-width="1.5"/>
+        <text x="768" y="493" text-anchor="middle" fill="#ef4444" font-size="9" font-weight="600">Active/Active</text>
+        <text x="768" y="506" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="7">RTO: near-zero | RPO: near-zero*</text>
+        <text x="768" y="518" text-anchor="middle" fill="#ef4444" font-size="7">$$$$ Full production everywhere</text>
+
+        <!-- Arrows showing direction -->
+        <text x="143" y="548" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="7">&larr; Lower cost</text>
+        <text x="768" y="548" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="7">Lower RTO/RPO &rarr;</text>
+        <text x="460" y="575" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="8" font-style="italic">* Data corruption events may still require point-in-time recovery from backups.</text>
+        <text x="460" y="590" text-anchor="middle" fill="var(--text-secondary, #aaa)" font-size="8" font-style="italic">RTO/RPO values are indicative and depend on implementation, replication, automation, and testing.</text>
+      </svg>
+
+      <p><strong>Left:</strong> A multi-AZ architecture distributes resources across AZs within one Region for high availability. The load balancer, application, database, and cache all span AZs with automatic failover. This handles most production failures but does not protect against a complete Regional outage. <strong>Right:</strong> A multi-Region architecture adds a recovery Region with replicated data and a standby (or active) environment. Route 53 failover or Global Accelerator shifts traffic during a Regional disaster. Actual recovery time depends on the DR strategy chosen, data replication lag, and full-stack readiness. <strong>Bottom:</strong> The four DR strategies form a spectrum &mdash; greater readiness and lower RTO/RPO come with increased cost and complexity.</p>
+    </section>
+
+    <hr class="topic-divider">
+
+    <!-- MAR SECTION 4: Exam Gotchas -->
+    <section class="topic-section" id="mar-gotchas">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain2)" stroke-width="2"><path d="M12 9v4m0 4h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+        20 Exam Gotchas
+      </h2>
+      <ol class="gotcha-list">
+        <li><strong>An AZ failure is not a Regional failure</strong> &mdash; an AZ disruption affects one data center cluster. A Regional failure affects all AZs in that Region. Multi-AZ protects against the first; multi-Region protects against the second. The exam tests whether you know which scope the scenario describes.</li>
+        <li><strong>Multi-AZ alone does not protect against a complete Regional outage</strong> &mdash; if all AZs in a Region are disrupted, multi-AZ resources in that Region are all affected. Regional disaster recovery requires infrastructure in a second Region.</li>
+        <li><strong>Multi-Region does not automatically mean zero downtime</strong> &mdash; a second Region must be ready: data replicated, app servers running, secrets and permissions in place, DNS switched. The actual RTO depends on the DR strategy and implementation, not just having a second Region.</li>
+        <li><strong>RTO and RPO are different measurements</strong> &mdash; RTO is how fast you recover (time to restore service). RPO is how much data you can lose (time since last good data point). Confusing them changes the correct architecture. The exam uses specific RTO/RPO numbers to guide the answer.</li>
+        <li><strong>A backup is not a replica</strong> &mdash; backups are point-in-time snapshots used to restore to a specific moment. Replicas continuously mirror the primary (including unwanted changes). Backups protect against data corruption; replicas provide fast failover. Both are needed.</li>
+        <li><strong>Pilot light is not warm standby</strong> &mdash; pilot light keeps only the data tier running; application servers are off and must be provisioned during recovery. Warm standby keeps all tiers running at reduced capacity. Warm standby recovers faster but costs more.</li>
+        <li><strong>Warm standby is not active/active</strong> &mdash; warm standby is a scaled-down passive environment that does not serve production traffic. Active/active serves traffic from multiple Regions simultaneously. The exam may describe warm standby as &ldquo;reduced capacity in standby Region.&rdquo;</li>
+        <li><strong>Active/active does not eliminate data consistency challenges</strong> &mdash; concurrent writes from multiple Regions require conflict resolution (last-writer-wins, write-global, write-partitioned). Active/active infrastructure without a data consistency strategy leads to data conflicts.</li>
+        <li><strong>Asynchronous replication means potential data loss</strong> &mdash; if the primary fails before a replica catches up, transactions committed during the lag window are lost. RPO for async replication = the replication lag at the moment of failure, not zero.</li>
+        <li><strong>Application servers in separate AZs do not guarantee resilience</strong> &mdash; if the database is in a single AZ, or session state is lost, or health checks are missing, distributing servers across AZs only partially addresses availability. The entire stack must be resilient.</li>
+        <li><strong>Stateful dependencies must be handled during failover</strong> &mdash; user sessions, caches, uploaded files, message queues, and configuration all need replication or recovery strategies. Failing over compute without state leaves users with errors.</li>
+        <li><strong>DNS failover is not instant for every client</strong> &mdash; clients cache DNS responses based on TTL. After Route 53 changes a record, clients with cached responses continue using the old IP until TTL expires. Lower TTL enables faster switching but increases query volume.</li>
+        <li><strong>Health checks do not prove the entire application is ready</strong> &mdash; a health check may confirm that a load balancer responds on port 443. It does not verify that the database is promoted, secrets are loaded, downstream APIs are reachable, or service quotas allow scaling.</li>
+        <li><strong>A multi-Region app does not automatically replicate every resource</strong> &mdash; databases may be replicated, but secrets, IAM policies, VPC configurations, service quotas, certificate deployments, and external API whitelists are often separate. DR planning must cover all dependencies.</li>
+        <li><strong>Secrets, permissions, quotas, and networking must be pre-staged</strong> &mdash; the DR Region needs Secrets Manager entries, IAM roles, VPC/subnet configuration, security groups, and sufficient service quotas before a disaster occurs. Provisioning these during a crisis adds to RTO.</li>
+        <li><strong>The lowest-cost DR strategy cannot satisfy the strictest RTO/RPO</strong> &mdash; backup and restore is cheapest but has hours of RTO. If the business requires minutes of RTO, warm standby or active/active is needed. The exam maps RTO/RPO requirements to the appropriate strategy.</li>
+        <li><strong>A secondary Region is useless without tested recovery procedures</strong> &mdash; infrastructure that has never been tested for DR may have configuration drift, stale credentials, or missing dependencies. Regular DR drills are essential. The exam values &ldquo;tested recovery.&rdquo;</li>
+        <li><strong>High availability, fault tolerance, and disaster recovery are different</strong> &mdash; HA keeps the system running during small failures (multi-AZ). Fault tolerance continues without interruption despite a failure (zero-downtime design). DR restores service after a major disruption. The exam uses precise language to distinguish them.</li>
+        <li><strong>Route 53 alone is not a complete DR solution</strong> &mdash; Route 53 failover routing redirects DNS traffic. It does not provision infrastructure, promote databases, replicate secrets, or verify application readiness. It is one component of a DR plan, not the entire plan.</li>
+        <li><strong>More copies of infrastructure do not always mean better resilience</strong> &mdash; deploying in 5 Regions does not help if data replication, failover automation, and recovery testing are not in place. Resilience comes from design, not just duplication.</li>
+      </ol>
+    </section>
+
+    <hr class="topic-divider">
+
+    <!-- MAR SECTION 5: Practice Questions -->
+    <section class="topic-section" id="mar-practice">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain2)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3m.08 4h.01"/></svg>
+        Quick-Fire Practice
+      </h2>
+
+      <div class="practice-q">
+        <p class="q-text">Q1. A company runs a web application on EC2 instances behind an Application Load Balancer. The application must remain available if one Availability Zone experiences a disruption. The database is Amazon RDS MySQL in a single AZ. Which change provides the MOST resilient architecture?</p>
+        <ul class="q-options">
+          <li><span class="q-letter">A.</span> Add more EC2 instances in the same AZ and increase the instance size for higher throughput.</li>
+          <li><span class="q-letter">B.</span> Deploy EC2 instances across two AZs, configure the ALB to span both AZs, and enable RDS Multi-AZ for the database.</li>
+          <li><span class="q-letter">C.</span> Create a cross-Region read replica of the RDS database and configure Route 53 failover routing.</li>
+          <li><span class="q-letter">D.</span> Move all resources to a larger instance type in a single AZ and enable enhanced monitoring.</li>
+        </ul>
+        <button class="reveal-btn">Show Answer</button>
+        <div class="answer-reveal">
+          <p><strong>Correct Answer: B</strong></p>
+          <p>Multi-AZ deployment distributes application instances and provides automatic database failover. The ALB routes traffic to healthy targets across AZs, and RDS Multi-AZ maintains a synchronous standby that promotes automatically during an AZ disruption. A adds capacity but not AZ resilience. C addresses Regional DR (overkill for AZ-level HA) and does not fix the single-AZ application tier. D increases capacity but remains a single point of failure.</p>
+          <p><strong>Memory rule:</strong> &ldquo;Survive AZ failure&rdquo; = multi-AZ deployment for both compute and database.</p>
+        </div>
+      </div>
+
+      <div class="practice-q">
+        <p class="q-text">Q2. A company requires a disaster recovery solution for a critical application. The business defines an RTO of 30 minutes and an RPO of 5 minutes. The recovery site must be in a different AWS Region. Which disaster recovery strategy BEST meets these requirements at the lowest cost?</p>
+        <ul class="q-options">
+          <li><span class="q-letter">A.</span> Backup and restore: copy daily RDS snapshots to the DR Region and redeploy infrastructure from CloudFormation during a disaster.</li>
+          <li><span class="q-letter">B.</span> Pilot light: continuously replicate the database to the DR Region, but keep application servers off until needed.</li>
+          <li><span class="q-letter">C.</span> Warm standby: run a scaled-down but fully functional environment in the DR Region with continuous database replication.</li>
+          <li><span class="q-letter">D.</span> Multi-site active/active: run full production environments in both Regions with DynamoDB global tables.</li>
+        </ul>
+        <button class="reveal-btn">Show Answer</button>
+        <div class="answer-reveal">
+          <p><strong>Correct Answer: C</strong></p>
+          <p>With an RTO of 30 minutes and RPO of 5 minutes, backup and restore (A) is too slow &mdash; daily snapshots give RPO of up to 24 hours, and restoring infrastructure takes hours. Pilot light (B) could meet the RPO with continuous replication but provisioning application servers from scratch may push past 30 minutes for complex applications. Warm standby (C) meets both targets: continuous replication achieves near-zero RPO, and all tiers are already running so scaling up takes minutes. Active/active (D) meets the targets but is far more expensive than necessary.</p>
+          <p><strong>Memory rule:</strong> Match the DR strategy to the RTO/RPO. Warm standby = minutes RTO, near-zero RPO. Don&rsquo;t over-spend on active/active when warm standby suffices.</p>
+        </div>
+      </div>
+
+      <div class="practice-q">
+        <p class="q-text">Q3. A company uses an Aurora global database with a primary cluster in us-east-1 and a secondary cluster in eu-west-1. During a Regional failover drill, the secondary cluster is promoted successfully and Route 53 redirects traffic. However, the application in eu-west-1 returns authentication errors. What is the MOST likely cause?</p>
+        <ul class="q-options">
+          <li><span class="q-letter">A.</span> Route 53 failover routing does not work with Aurora global database endpoints.</li>
+          <li><span class="q-letter">B.</span> Aurora global database does not support cross-Region failover and the secondary cluster cannot accept writes.</li>
+          <li><span class="q-letter">C.</span> The application&rsquo;s database connection strings are hardcoded to the us-east-1 endpoint and cannot reach the promoted cluster.</li>
+          <li><span class="q-letter">D.</span> The application depends on secrets stored in AWS Secrets Manager in us-east-1 that were not replicated to eu-west-1.</li>
+        </ul>
+        <button class="reveal-btn">Show Answer</button>
+        <div class="answer-reveal">
+          <p><strong>Correct Answer: D</strong></p>
+          <p>Aurora global database fully supports cross-Region promotion (B is wrong). Route 53 works with any endpoint (A is wrong). If the application successfully reaches the DR Region and the database is promoted, authentication errors point to missing credentials. Secrets Manager secrets are Regional &mdash; if database passwords, API keys, or certificates were not replicated to eu-west-1, the application cannot authenticate. C is plausible but the scenario states DNS was redirected successfully, implying the application is reaching the correct Region. The authentication error specifically points to missing secrets.</p>
+          <p><strong>Memory rule:</strong> DR is more than database + DNS. Secrets, IAM, quotas, and external dependencies must all be pre-staged in the recovery Region.</p>
         </div>
       </div>
     </section>

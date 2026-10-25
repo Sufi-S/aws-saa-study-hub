@@ -658,5 +658,80 @@
     "term": "Routing Failure vs Permission Denial",
     "definition": "A routing failure (missing route, wrong target) causes a timeout — the packet has no path. A permission denial (IAM, resource policy) returns an explicit error like 403 or Access Denied. The error type tells you which layer to troubleshoot.",
     "gotcha": "Timeout → check routes, then security groups, then NACLs. Access Denied → the network path works, check IAM policies and resource policies. A security group block also looks like a timeout, not a denial."
+  },
+  {
+    "term": "High Availability (HA)",
+    "definition": "Designing a system so it continues operating when individual components fail. Achieved through redundant resources across AZs, load balancing, health checks, and resilient data tiers. HA targets uptime (e.g., 99.99% = ~4.3 min downtime/month).",
+    "gotcha": "HA is not just multiple servers — the database, session state, caching, and networking must also be resilient. Two EC2 instances in the same AZ is NOT highly available for AZ failures."
+  },
+  {
+    "term": "Fault Tolerance vs High Availability",
+    "definition": "High availability keeps a system running during failures (brief interruptions may occur). Fault tolerance continues operating with zero interruption despite a failure. Fault tolerance typically requires more redundancy and automation than standard HA.",
+    "gotcha": "The exam uses precise language: 'remain available' = HA. 'Continue without interruption' or 'zero downtime' = fault tolerance. The architecture and cost differ significantly."
+  },
+  {
+    "term": "Disaster Recovery (DR)",
+    "definition": "The process of restoring a system after a major disruption (Regional outage, data corruption, large-scale failure). DR involves recovery procedures, data restoration, and traffic redirection. Distinct from HA, which prevents downtime during small failures.",
+    "gotcha": "DR is about recovery, not prevention. A DR plan that has never been tested is a hope, not a plan. The exam values tested, automated recovery over theoretical designs."
+  },
+  {
+    "term": "Availability Zone (Resilience Context)",
+    "definition": "One or more discrete data centers with independent power, cooling, and networking within an AWS Region. AZs are separate failure domains connected by low-latency links. Distributing resources across AZs protects against single-AZ disruptions.",
+    "gotcha": "AZs within a Region are designed for independent failure, but are not absolutely guaranteed to never be affected by the same event. Multi-AZ protects against most AZ-level failures but not Regional outages."
+  },
+  {
+    "term": "AWS Region (Resilience Context)",
+    "definition": "A separate geographic location with multiple AZs and fully independent infrastructure. Regions are isolated — a disruption in us-east-1 does not affect eu-west-1. Multi-Region architecture supports Regional DR and global latency optimization.",
+    "gotcha": "Multi-Region is not automatically better than multi-AZ. It adds significant cost and complexity. Choose based on RTO/RPO requirements, compliance, and whether Regional-level protection is actually needed."
+  },
+  {
+    "term": "Recovery Time Objective (RTO)",
+    "definition": "The maximum acceptable time to restore service after a disruption. RTO = 30 minutes means the business requires the application to be operational within 30 minutes of an outage. Lower RTO demands faster recovery mechanisms.",
+    "gotcha": "RTO measures time to recover, not data loss. A short RTO with a long RPO means 'get back online fast, even if we lose some data.' The exam gives specific RTO values to determine the correct DR strategy."
+  },
+  {
+    "term": "Recovery Point Objective (RPO)",
+    "definition": "The maximum acceptable amount of recent data loss, measured in time. RPO = 5 minutes means you can lose at most 5 minutes of committed data. Lower RPO demands more frequent or continuous data replication.",
+    "gotcha": "RPO measures data loss, not downtime. RPO = 0 requires synchronous replication (expensive, adds latency). RPO of minutes is achievable with asynchronous replication. The exam uses specific RPO values to guide replication choices."
+  },
+  {
+    "term": "Backup and Restore (DR Strategy)",
+    "definition": "Data is backed up to another Region; infrastructure is defined as code but not deployed. On disaster: deploy infrastructure, restore data, configure, and start. Lowest cost but longest recovery (hours of RTO).",
+    "gotcha": "Daily snapshots mean up to 24 hours of RPO. If the exam specifies RPO of minutes, backup and restore is too slow. Always test restore procedures — an untested backup may not actually restore correctly."
+  },
+  {
+    "term": "Pilot Light vs Warm Standby",
+    "definition": "Pilot light: only the data tier runs in the DR Region; app servers are off and must be provisioned during recovery. Warm standby: all tiers run at reduced capacity; only scaling up is needed. Warm standby recovers faster but costs more.",
+    "gotcha": "The key difference: pilot light cannot serve traffic without provisioning first. Warm standby can handle traffic immediately (at reduced capacity). If the exam says 'minimal provisioning during failover,' it's warm standby."
+  },
+  {
+    "term": "Active/Passive vs Active/Active Architecture",
+    "definition": "Active/passive: one environment serves traffic, another stands by for recovery. Active/active: multiple environments serve traffic simultaneously. Active/active offers better utilization and lower latency but introduces data consistency challenges.",
+    "gotcha": "Active/active does NOT eliminate consistency problems — concurrent writes from multiple Regions need conflict resolution. DynamoDB global tables use last-writer-wins. Aurora global database typically uses write-global (single writer Region)."
+  },
+  {
+    "term": "Synchronous vs Asynchronous Replication",
+    "definition": "Synchronous: write confirmed only after both primary and replica acknowledge. Zero data loss but higher latency. Asynchronous: write confirmed after primary only; replica catches up later. Lower latency but potential data loss during failover.",
+    "gotcha": "Cross-Region replication is almost always asynchronous due to network latency. RDS Multi-AZ within a Region is synchronous. If the exam asks about cross-Region RPO, expect some data loss (= replication lag)."
+  },
+  {
+    "term": "Replication Lag and RPO",
+    "definition": "The time difference between the primary database and its replica. With asynchronous replication, the replica is always somewhat behind. If the primary fails, data committed during the lag window is lost. The actual RPO equals the replication lag at failover.",
+    "gotcha": "Aurora global database typically has sub-second replication lag. Standard RDS cross-Region read replicas may lag seconds to minutes depending on workload. Monitor CloudWatch ReplicaLag continuously."
+  },
+  {
+    "term": "Route 53 Failover Routing",
+    "definition": "A Route 53 routing policy that uses health checks to detect primary endpoint failure and automatically returns the DR endpoint's IP. Clients with expired DNS cache connect to the DR site. One component of a DR plan, not the complete solution.",
+    "gotcha": "DNS failover is NOT instant — clients cache responses based on TTL. Lower TTL = faster failover but more DNS queries. Route 53 alone does not provision infrastructure, promote databases, or verify application readiness."
+  },
+  {
+    "term": "Data Consistency During Multi-Region Failover",
+    "definition": "When failing over to a replica, any transactions not yet replicated are lost (async) or consistent (sync). Additionally, replicas mirror corruption — a deleted table is replicated as a deletion. Point-in-time backups protect against corruption that replication propagates.",
+    "gotcha": "Replicas provide fast failover; backups provide point-in-time recovery. Both are needed. If the exam says 'protect against accidental deletion,' the answer involves backups, not just replicas."
+  },
+  {
+    "term": "DR Readiness: Beyond Database and DNS",
+    "definition": "A complete DR plan must cover: database promotion, secrets replication, IAM roles/policies, VPC/networking, service quotas, certificate deployment, external API whitelists, and application startup procedures. DNS failover alone is not a DR solution.",
+    "gotcha": "The most common DR drill failure: DNS switches but the app fails because secrets, quotas, or permissions weren't pre-staged. The exam tests whether you consider the full stack, not just compute and database."
   }
 ]
