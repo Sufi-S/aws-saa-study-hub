@@ -77,6 +77,11 @@
         <li><a href="#rds-diagram">RDS Multi-AZ &amp; Read Replicas &mdash; Architecture Diagram</a></li>
         <li><a href="#rds-gotchas">RDS Multi-AZ &amp; Read Replicas &mdash; Exam Gotchas</a></li>
         <li><a href="#rds-practice">RDS Multi-AZ &amp; Read Replicas &mdash; Practice Questions</a></li>
+        <li><a href="#ddb-learn"><strong>DynamoDB Keys, Indexes &amp; Capacity</strong> &mdash; Learn from Zero</a></li>
+        <li><a href="#ddb-real-world">DynamoDB &mdash; Real-World Scenarios</a></li>
+        <li><a href="#ddb-diagram">DynamoDB &mdash; Keys &amp; Indexes Diagram</a></li>
+        <li><a href="#ddb-gotchas">DynamoDB &mdash; Exam Gotchas</a></li>
+        <li><a href="#ddb-practice">DynamoDB &mdash; Practice Questions</a></li>
       </ol>
     </nav>
 
@@ -3242,6 +3247,857 @@
           <p><strong>Correct Answer: C</strong></p>
           <p>A cross-Region read replica continuously replicates data to eu-west-1. With typical replication lag well under 5 minutes, the RPO requirement is met. During a Regional outage, the team promotes the replica and redirects traffic. A is wrong &mdash; Multi-AZ operates within one Region; a Regional outage affects all AZs, including the standby. B (daily snapshots) gives up to 24 hours of RPO, far exceeding the 5-minute requirement. D adds redundancy within us-east-1 but does not help during a Regional outage.</p>
           <p><strong>Memory rule:</strong> Regional DR with RPO of minutes = cross-Region read replica with continuous replication. Multi-AZ protects within a Region only.</p>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ============================================= -->
+    <!-- TOPIC 12: DynamoDB Keys, Indexes & Capacity   -->
+    <!-- ============================================= -->
+
+    <hr class="topic-divider" style="margin-top:4rem;">
+    <div class="page-header" style="border-bottom:none;padding-bottom:0;margin-bottom:1.5rem;">
+      <h1 style="display:flex;align-items:center;gap:0.6rem;font-size:1.75rem;">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--domain2)" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 3v18"/></svg>
+        Amazon DynamoDB &mdash; Keys, Indexes &amp; Capacity Modes
+      </h1>
+    </div>
+
+    <!-- Part 1: Learn from Zero -->
+    <section class="topic-section" id="ddb-learn">
+      <h2>
+        <svg class="topic-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        Learn from Zero
+      </h2>
+
+      <!-- 1A: DynamoDB Fundamentals -->
+      <h3 id="ddb-1a">1A &mdash; DynamoDB Fundamentals</h3>
+
+      <p><strong>Amazon DynamoDB</strong> is a fully managed NoSQL database service provided by AWS. Unlike traditional relational databases (such as MySQL or PostgreSQL) that store data in tables with fixed columns and rows, DynamoDB is a <strong>key-value and document-oriented</strong> database. It stores data as <em>items</em> (similar to rows) composed of <em>attributes</em> (similar to columns), but each item can have a different set of attributes.</p>
+
+      <h4>Core Concepts</h4>
+      <ul>
+        <li><strong>Table</strong> &mdash; A collection of items. Every DynamoDB table has a name and a primary key.</li>
+        <li><strong>Item</strong> &mdash; A single record in a table. Think of it like a JSON object.</li>
+        <li><strong>Attribute</strong> &mdash; A named data element within an item. Items in the same table can have completely different attributes (except for the primary key, which every item must include).</li>
+      </ul>
+
+      <h4>Relational vs DynamoDB</h4>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Concept</th><th>Relational Database</th><th>DynamoDB</th></tr></thead>
+          <tbody>
+            <tr><td>Data model</td><td>Fixed schema &mdash; every row has the same columns</td><td>Flexible &mdash; items can have different attributes</td></tr>
+            <tr><td>Querying</td><td>SQL with JOINs across tables</td><td>Key-based lookups and index queries; no server-side JOINs</td></tr>
+            <tr><td>Scaling</td><td>Primarily vertical (larger server)</td><td>Horizontal &mdash; distributes data across partitions automatically</td></tr>
+            <tr><td>Latency</td><td>Varies; complex JOINs can be slow</td><td>Single-digit millisecond responses at virtually any scale</td></tr>
+            <tr><td>Schema changes</td><td>ALTER TABLE required</td><td>Items can have new attributes added without migration</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h4>Example: E-Commerce Application</h4>
+      <p>In a relational database, a customer order might require a JOIN across <code>Customers</code>, <code>Orders</code>, and <code>Products</code> tables. In DynamoDB, you design the table around how your application accesses data. A single table could store both customer information and their orders by using a well-designed primary key.</p>
+
+      <div class="callout callout-warn">
+        <strong>Key principle:</strong> In DynamoDB, you design your data model around the <strong>access patterns</strong> your application needs &mdash; the queries it will run. This is the opposite of relational design, where you model the data first and write queries later. You cannot efficiently scan every attribute the way a relational database can with SQL.
+      </div>
+
+      <p><strong>Low-latency access</strong> means DynamoDB can return data in single-digit milliseconds because it uses the primary key to locate items directly, without scanning the entire dataset. This is essential for applications that need fast, predictable performance at scale.</p>
+
+      <!-- 1B: Primary Keys, Partition Keys & Sort Keys -->
+      <h3 id="ddb-1b">1B &mdash; Primary Keys, Partition Keys &amp; Sort Keys</h3>
+
+      <p>Every DynamoDB table must have a <strong>primary key</strong> that uniquely identifies each item. DynamoDB offers two primary-key types:</p>
+
+      <h4>Partition Key (Simple Primary Key)</h4>
+      <p>A <strong>partition key</strong> (also called a hash key) is a single attribute whose value DynamoDB uses to determine which internal partition stores the item. When a table uses only a partition key, each partition-key value must be unique &mdash; it alone identifies the item.</p>
+
+      <p>DynamoDB hashes the partition-key value to determine which physical partition stores the data. This is why <strong>key distribution matters</strong>: if too many requests target the same partition-key value, that partition becomes a <strong>hot partition</strong> (or hot key), causing throttling or reduced performance.</p>
+
+      <div class="callout callout-tip">
+        <strong>Hot key example:</strong> If you use <code>Country</code> as a partition key and 80% of users are in &ldquo;US&rdquo;, that single partition handles 80% of all traffic &mdash; a classic hot-key problem. Choose keys with <strong>high cardinality</strong> and even traffic distribution, such as <code>CustomerId</code> or <code>OrderId</code>.
+      </div>
+
+      <h4>Composite Primary Key (Partition Key + Sort Key)</h4>
+      <p>A <strong>composite primary key</strong> consists of a partition key plus a <strong>sort key</strong> (also called a range key). Multiple items can share the same partition key as long as their sort keys differ. The combination of partition key + sort key must be unique.</p>
+
+      <p>Items with the same partition key form an <strong>item collection</strong> and are stored together. The sort key determines their order, enabling range-based queries and efficient retrieval of related items.</p>
+
+      <h4>Sort Key Access Patterns</h4>
+      <p>Sort keys support:</p>
+      <ul>
+        <li><strong>Exact match</strong> &mdash; <code>SK = "ORDER#2026-001"</code></li>
+        <li><strong>Range queries</strong> &mdash; <code>SK BETWEEN "ORDER#2026-001" AND "ORDER#2026-012"</code></li>
+        <li><strong>Begins-with</strong> &mdash; <code>SK begins_with("ORDER#2026")</code> to get all 2026 orders</li>
+      </ul>
+
+      <h4>Concrete Example</h4>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Partition Key (PK)</th><th>Sort Key (SK)</th><th>Other Attributes</th></tr></thead>
+          <tbody>
+            <tr><td>CUSTOMER#123</td><td>ORDER#2026-001</td><td>Total: $85.00, Status: Shipped</td></tr>
+            <tr><td>CUSTOMER#123</td><td>ORDER#2026-002</td><td>Total: $42.50, Status: Processing</td></tr>
+            <tr><td>CUSTOMER#123</td><td>ORDER#2026-003</td><td>Total: $129.99, Status: Delivered</td></tr>
+            <tr><td>CUSTOMER#456</td><td>ORDER#2026-001</td><td>Total: $67.00, Status: Shipped</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Query: &ldquo;Get all orders for CUSTOMER#123&rdquo; &rarr; Query with <code>PK = "CUSTOMER#123"</code>. DynamoDB returns all three orders, sorted by sort key.</p>
+
+      <h4>Primary-Key Types Comparison</h4>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Feature</th><th>Simple Primary Key</th><th>Composite Primary Key</th></tr></thead>
+          <tbody>
+            <tr><td>Key attributes</td><td>Partition key only</td><td>Partition key + sort key</td></tr>
+            <tr><td>Uniqueness</td><td>Partition key value must be unique</td><td>PK + SK combination must be unique</td></tr>
+            <tr><td>Items per PK value</td><td>Exactly one</td><td>Multiple (different sort keys)</td></tr>
+            <tr><td>Query capability</td><td>Get a single item by key</td><td>Get item(s) by PK, optionally filtering on SK range</td></tr>
+            <tr><td>Use case</td><td>User profile by UserId</td><td>Customer orders (PK=Customer, SK=OrderId)</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout callout-warn">
+        <strong>You cannot change a table&rsquo;s primary-key schema after creation.</strong> If you chose the wrong key design, you must create a new table with the correct schema and migrate your data. This is why understanding access patterns before table creation is critical.
+      </div>
+
+      <!-- 1C: Access Patterns & Query Design -->
+      <h3 id="ddb-1c">1C &mdash; Access Patterns &amp; Query Design</h3>
+
+      <p>DynamoDB provides three main ways to read data:</p>
+
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Operation</th><th>What It Does</th><th>Capacity Impact</th></tr></thead>
+          <tbody>
+            <tr><td><strong>GetItem</strong></td><td>Retrieves a single item by its full primary key</td><td>Minimal &mdash; reads exactly one item</td></tr>
+            <tr><td><strong>Query</strong></td><td>Retrieves items sharing a partition key, with optional sort-key conditions</td><td>Reads only the matching items in the partition</td></tr>
+            <tr><td><strong>Scan</strong></td><td>Reads every item in the table (or index), optionally filtering results</td><td>Reads the entire table &mdash; expensive for large datasets</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h4>Key Conditions vs Filters</h4>
+      <p>A <strong>key condition</strong> restricts which items DynamoDB reads from storage &mdash; it targets a specific partition and optionally a sort-key range. A <strong>filter expression</strong> removes items from the results <em>after</em> they have already been read. Filters do not reduce the read capacity consumed.</p>
+
+      <div class="callout callout-warn">
+        <strong>Exam trap:</strong> A filter on a Scan does not make it efficient. DynamoDB still reads the entire table; the filter just hides items from the response. The read capacity is consumed for every item evaluated, not just the items returned.
+      </div>
+
+      <h4>When Is a Scan Acceptable?</h4>
+      <p>Scans are not inherently wrong. They may be appropriate for:</p>
+      <ul>
+        <li>Small reference tables (hundreds of items)</li>
+        <li>Administrative or batch operations during off-peak hours</li>
+        <li>One-time data exports or migrations</li>
+      </ul>
+      <p>For large production tables serving customer-facing traffic, scans should be avoided in favor of key-based Queries.</p>
+
+      <h4>Modeling Relationships</h4>
+      <p><strong>Denormalization</strong> &mdash; Instead of JOINing separate tables, DynamoDB encourages storing related data together. A composite sort key like <code>ORDER#2026-001</code> alongside <code>PROFILE#</code> lets one Query retrieve a customer&rsquo;s profile and orders from the same partition.</p>
+
+      <p><strong>Single-table design</strong> stores multiple entity types (customers, orders, products) in one table using generic key names (PK, SK). This can reduce the number of requests but adds complexity. Separate tables may be simpler when entities have completely independent access patterns.</p>
+
+      <div class="callout callout-tip">
+        <strong>Access-pattern example:</strong> &ldquo;Find all orders for Customer #123&rdquo; uses a Query on <code>PK = CUSTOMER#123</code>. But &ldquo;Find all orders with status = Shipped&rdquo; cannot use the table&rsquo;s primary key if <code>Status</code> is not part of it. This is where <strong>secondary indexes</strong> come in.
+      </div>
+
+      <!-- 1D: Secondary Index Fundamentals -->
+      <h3 id="ddb-1d">1D &mdash; Secondary Index Fundamentals</h3>
+
+      <p>A <strong>secondary index</strong> is an additional data structure that DynamoDB maintains alongside your base table. It allows you to query data using a different key than the table&rsquo;s primary key.</p>
+
+      <h4>Why Indexes?</h4>
+      <p>If your table&rsquo;s primary key is <code>CustomerId + OrderId</code>, you can efficiently query by customer. But if you also need to query by <code>OrderStatus</code>, the primary key cannot help. A secondary index with <code>OrderStatus</code> as its key enables that query.</p>
+
+      <h4>Projected Attributes</h4>
+      <p>When creating an index, you choose which attributes to <strong>project</strong> (copy) into it:</p>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Projection</th><th>What&rsquo;s Copied</th><th>Trade-off</th></tr></thead>
+          <tbody>
+            <tr><td><code>KEYS_ONLY</code></td><td>Only the index key and table key attributes</td><td>Smallest storage; must fetch other attributes from the base table</td></tr>
+            <tr><td><code>INCLUDE</code></td><td>Key attributes plus specified additional attributes</td><td>Balanced; covers common query fields</td></tr>
+            <tr><td><code>ALL</code></td><td>All attributes from the base table</td><td>Largest storage; no need to fetch from base table</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout callout-warn">
+        <strong>Indexes are not free.</strong> Every index consumes additional storage and write capacity &mdash; when you write to the base table, DynamoDB also updates every affected index. A secondary index is not a universal replacement for good primary-key design.
+      </div>
+
+      <p>DynamoDB provides two types of secondary indexes:</p>
+      <ol>
+        <li><strong>Global Secondary Index (GSI)</strong> &mdash; Can use a completely different partition key and sort key.</li>
+        <li><strong>Local Secondary Index (LSI)</strong> &mdash; Shares the base table&rsquo;s partition key but uses a different sort key.</li>
+      </ol>
+
+      <!-- 1E: Global Secondary Index (GSI) -->
+      <h3 id="ddb-1e">1E &mdash; Global Secondary Index (GSI)</h3>
+
+      <p>A <strong>Global Secondary Index</strong> creates a separate view of your data with a different partition key (and optionally a different sort key) than the base table. &ldquo;Global&rdquo; means the index spans the entire table, not just a single partition.</p>
+
+      <h4>Key Properties</h4>
+      <ul>
+        <li><strong>Different partition key</strong> &mdash; The GSI partition key can be any table attribute, enabling query patterns the base table cannot support.</li>
+        <li><strong>Eventually consistent only</strong> &mdash; GSI data is replicated asynchronously from the base table. GSI queries <strong>never</strong> support strongly consistent reads.</li>
+        <li><strong>Can be added after table creation</strong> &mdash; Unlike LSIs, you can create GSIs on existing tables (subject to account limits).</li>
+        <li><strong>Separate capacity</strong> &mdash; In provisioned mode, each GSI has its own read and write capacity settings. In on-demand mode, the GSI capacity scales with usage.</li>
+        <li><strong>Default limit: 20 GSIs per table.</strong></li>
+      </ul>
+
+      <h4>GSI Example</h4>
+      <p>Base table primary key: <code>CustomerId</code> (PK) + <code>OrderId</code> (SK)</p>
+      <p>Access pattern needed: &ldquo;Find all orders with status = Shipped&rdquo;</p>
+      <p>GSI design:</p>
+      <ul>
+        <li>GSI partition key: <code>OrderStatus</code></li>
+        <li>GSI sort key: <code>OrderDate</code></li>
+        <li>Projection: <code>INCLUDE</code> (OrderTotal, CustomerId)</li>
+      </ul>
+      <p>Now you can query: <code>OrderStatus = "Shipped"</code> with <code>OrderDate</code> range conditions.</p>
+
+      <div class="callout callout-warn">
+        <strong>GSI hot-key risk:</strong> If your GSI partition key is <code>OrderStatus</code> and 90% of orders are &ldquo;Completed&rdquo;, that status value becomes a hot key on the GSI. The same distribution principles that apply to the base table also apply to every GSI.
+      </div>
+
+      <h4>GSI Backfill</h4>
+      <p>When you create a GSI on an existing table, DynamoDB backfills the index with existing data. This consumes write capacity and can take time for large tables. Plan index creation during low-traffic periods.</p>
+
+      <!-- 1F: Local Secondary Index (LSI) -->
+      <h3 id="ddb-1f">1F &mdash; Local Secondary Index (LSI)</h3>
+
+      <p>A <strong>Local Secondary Index</strong> provides an alternative sort key for the same partition key as the base table. &ldquo;Local&rdquo; means the index is scoped to items sharing a partition-key value.</p>
+
+      <h4>Key Properties</h4>
+      <ul>
+        <li><strong>Same partition key as the base table</strong> &mdash; You cannot use a different partition key.</li>
+        <li><strong>Different sort key</strong> &mdash; Enables alternative ordering or range queries within a partition.</li>
+        <li><strong>Must be defined at table creation</strong> &mdash; You <strong>cannot</strong> add an LSI to an existing table.</li>
+        <li><strong>Supports strongly consistent reads</strong> &mdash; Unlike GSIs, LSI queries can be strongly consistent.</li>
+        <li><strong>10 GB item collection limit</strong> &mdash; All items sharing a partition key (including base table and LSI data) must fit within 10 GB.</li>
+        <li><strong>Default limit: 5 LSIs per table.</strong></li>
+      </ul>
+
+      <h4>LSI Example</h4>
+      <p>Base table: <code>CustomerId</code> (PK) + <code>OrderDate</code> (SK)</p>
+      <p>LSI: Same PK (<code>CustomerId</code>) + Alternative SK (<code>OrderTotal</code>)</p>
+      <p>Now you can query a customer&rsquo;s orders sorted by total amount instead of date &mdash; but only within that customer&rsquo;s partition.</p>
+
+      <div class="callout callout-warn">
+        <strong>10 GB limit:</strong> If a customer accumulates enough orders that the item collection exceeds 10 GB, writes to that partition will be rejected. Monitor item collection sizes for tables with LSIs, especially if data grows unboundedly.
+      </div>
+
+      <!-- 1G: GSI vs LSI Comparison -->
+      <h3 id="ddb-1g">1G &mdash; GSI vs LSI &mdash; Complete Comparison</h3>
+
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Feature</th><th>Global Secondary Index (GSI)</th><th>Local Secondary Index (LSI)</th></tr></thead>
+          <tbody>
+            <tr><td>Partition key</td><td>Can differ from base table</td><td>Must match base table</td></tr>
+            <tr><td>Sort key</td><td>Can differ from base table (optional)</td><td>Must differ from base table (required)</td></tr>
+            <tr><td>When to define</td><td>Anytime (can add to existing tables)</td><td>At table creation only</td></tr>
+            <tr><td>Read consistency</td><td>Eventually consistent only</td><td>Eventually or strongly consistent</td></tr>
+            <tr><td>Item collection limit</td><td>No limit</td><td>10 GB per partition key value</td></tr>
+            <tr><td>Projections</td><td>KEYS_ONLY, INCLUDE, or ALL</td><td>KEYS_ONLY, INCLUDE, or ALL</td></tr>
+            <tr><td>Storage</td><td>Separate from base table</td><td>Shares partition with base table items</td></tr>
+            <tr><td>Capacity (provisioned)</td><td>Separate RCU/WCU from base table</td><td>Shares base table&rsquo;s RCU/WCU</td></tr>
+            <tr><td>Default limit per table</td><td>20</td><td>5</td></tr>
+            <tr><td>Query flexibility</td><td>Can query any partition across the table</td><td>Can only query within the base table&rsquo;s partition key</td></tr>
+            <tr><td>Common use case</td><td>Query by a different attribute (e.g., Status)</td><td>Alternative sort order within same entity (e.g., by Total)</td></tr>
+            <tr><td>SAA-C03 clue</td><td>&ldquo;Query by different attribute&rdquo; / &ldquo;new access pattern&rdquo;</td><td>&ldquo;Alternative sort order&rdquo; + &ldquo;same partition key&rdquo; + &ldquo;strong consistency&rdquo;</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout callout-tip">
+        <strong>The fundamental distinction:</strong> A GSI gives you a completely new way to partition and access your data. An LSI gives you a different sort order <em>within the same partition</em>. If the exam says &ldquo;query by a different attribute that isn&rsquo;t the current partition key,&rdquo; it almost always means GSI.
+      </div>
+
+      <!-- 1H: Read/Write Capacity Modes -->
+      <h3 id="ddb-1h">1H &mdash; Read/Write Capacity Modes</h3>
+
+      <p>DynamoDB offers two capacity modes that control how you pay for and manage read/write throughput:</p>
+
+      <h4>Provisioned Capacity Mode</h4>
+      <p>You specify the number of reads and writes per second your table needs:</p>
+      <ul>
+        <li><strong>Read Capacity Unit (RCU)</strong> &mdash; One RCU provides one strongly consistent read per second (or two eventually consistent reads) for an item up to 4 KB.</li>
+        <li><strong>Write Capacity Unit (WCU)</strong> &mdash; One WCU provides one write per second for an item up to 1 KB.</li>
+      </ul>
+
+      <h4>Provisioned Capacity Example</h4>
+      <p>Assuming items are &le; 4 KB and using strongly consistent reads:</p>
+      <ul>
+        <li>100 reads/second &rarr; 100 RCUs</li>
+        <li>100 eventually consistent reads/second &rarr; 50 RCUs (half the cost)</li>
+      </ul>
+      <p><em>Note: Larger items, transactional reads/writes, and batch operations have different capacity calculations. These examples assume the simplest case.</em></p>
+
+      <p><strong>Auto Scaling</strong> adjusts provisioned capacity automatically based on actual usage, within minimum and maximum bounds you define. It reacts to traffic changes but may not respond instantly to sudden spikes.</p>
+
+      <p><strong>Throttling</strong> occurs when requests exceed provisioned capacity. Throttled requests receive an error and must be retried. In provisioned mode, each GSI also has its own capacity &mdash; a GSI can be throttled independently of the base table.</p>
+
+      <h4>On-Demand Capacity Mode</h4>
+      <p>DynamoDB automatically handles capacity scaling. You pay per request instead of provisioning throughput in advance.</p>
+      <ul>
+        <li>No need to estimate or manage RCUs/WCUs.</li>
+        <li>Scales to accommodate workload changes automatically.</li>
+        <li>Charges are based on actual read and write request units consumed.</li>
+        <li>Well-suited for new applications, unpredictable traffic, or workloads with large usage spikes.</li>
+      </ul>
+
+      <div class="callout callout-warn">
+        <strong>On-demand is not unlimited.</strong> DynamoDB on-demand tables still have account and table-level throughput quotas. If traffic increases beyond what the table has recently handled, DynamoDB may need time to scale (it doubles the previous peak traffic automatically). Extremely sudden spikes from zero can still encounter throttling. Switching between modes is allowed but limited to once every 24 hours.
+      </div>
+
+      <h4>Provisioned vs On-Demand Comparison</h4>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Feature</th><th>Provisioned</th><th>On-Demand</th></tr></thead>
+          <tbody>
+            <tr><td>Capacity config</td><td>Set RCUs/WCUs manually (or with auto scaling)</td><td>Automatic &mdash; no capacity planning needed</td></tr>
+            <tr><td>Scaling</td><td>Auto scaling reacts to trends (minutes)</td><td>Instant adaptation to request volume</td></tr>
+            <tr><td>Predictability needed</td><td>Works best with understood traffic patterns</td><td>Handles unpredictable or variable traffic</td></tr>
+            <tr><td>Operational overhead</td><td>Must monitor and tune capacity settings</td><td>Minimal &mdash; no capacity configuration</td></tr>
+            <tr><td>Cost model</td><td>Pay for provisioned capacity (used or not)</td><td>Pay per request</td></tr>
+            <tr><td>Traffic spikes</td><td>Spikes above provisioned capacity cause throttling</td><td>Handles spikes up to recent peak; very sudden bursts from zero may throttle</td></tr>
+            <tr><td>Throttling</td><td>When demand exceeds provisioned capacity</td><td>Rare but possible with extreme sudden spikes or quota limits</td></tr>
+            <tr><td>Auto scaling</td><td>Available and recommended</td><td>Built-in (no configuration)</td></tr>
+            <tr><td>Best for</td><td>Predictable, sustained workloads; cost optimization</td><td>New apps, variable traffic, development/test</td></tr>
+            <tr><td>Main trade-off</td><td>Lower per-request cost but risk of throttling</td><td>Higher per-request cost but less operational burden</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- 1I: Consistency, Hot Keys, Throttling & Architecture Decisions -->
+      <h3 id="ddb-1i">1I &mdash; Consistency, Hot Keys, Throttling &amp; Architecture Decisions</h3>
+
+      <h4>Read Consistency</h4>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Consistency Level</th><th>Description</th><th>Availability</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Eventually consistent</strong></td><td>May return slightly stale data; reads from any replica</td><td>Base table, LSI, GSI queries; GetItem; Query; Scan</td></tr>
+            <tr><td><strong>Strongly consistent</strong></td><td>Returns the most recent write; reads from the leader replica</td><td>Base table and LSI only; <strong>not available on GSI queries</strong></td></tr>
+            <tr><td><strong>Transactional</strong></td><td>ACID guarantees across multiple items/tables</td><td>TransactGetItems / TransactWriteItems; costs 2&times; the capacity</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout callout-warn">
+        <strong>Critical exam fact:</strong> GSI queries are <strong>always</strong> eventually consistent. If a scenario requires strongly consistent reads through an index, the only option is an LSI (which shares the base table&rsquo;s partition key). If neither the base table nor an LSI fits, you must read directly from the base table.
+      </div>
+
+      <h4>Hot Keys and Throttling</h4>
+      <p>A <strong>hot partition key</strong> means a disproportionate share of requests targets a small number of partition-key values. This overloads specific partitions while others sit idle.</p>
+
+      <p><strong>Adaptive capacity</strong> &mdash; DynamoDB can automatically redistribute some capacity to hot partitions, helping absorb short bursts. However, adaptive capacity is not a fix for fundamentally poor key design. If one key value receives sustained heavy traffic, the solution is to redesign the key for better distribution.</p>
+
+      <p><strong>Diagnosis checklist</strong> when throttling occurs:</p>
+      <ol>
+        <li>Check if the table or GSI has sufficient provisioned capacity (or is on on-demand mode).</li>
+        <li>Check partition-key distribution &mdash; are a few keys receiving most traffic?</li>
+        <li>Check if a GSI is the bottleneck (GSI throttling can back-pressure writes to the base table).</li>
+        <li>Check if the access pattern causes full-table scans instead of targeted queries.</li>
+        <li>Simply switching from provisioned to on-demand does <strong>not</strong> fix a hot-key problem &mdash; the hot partition is still hot.</li>
+      </ol>
+
+      <h4>Data Modeling Principles</h4>
+      <ul>
+        <li><strong>Choose partition keys with high cardinality</strong> &mdash; UserId, OrderId, DeviceId; avoid low-cardinality keys like Status or Country.</li>
+        <li><strong>Use composite sort keys</strong> to model one-to-many relationships (e.g., <code>ORDER#date</code>).</li>
+        <li><strong>Select the right index</strong> &mdash; GSI for new partition-key patterns; LSI for alternative sort orders.</li>
+        <li><strong>Manage index overhead</strong> &mdash; Every write to the base table also writes to affected indexes.</li>
+        <li><strong>Prefer Query over Scan</strong> for production workloads &mdash; design keys so your critical queries use targeted lookups.</li>
+      </ul>
+
+      <h4>Architecture Decision Table</h4>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Requirement</th><th>Key / Index / Capacity Choice</th><th>Why</th></tr></thead>
+          <tbody>
+            <tr><td>Retrieve one customer&rsquo;s orders</td><td>Composite PK (CustomerId + OrderId)</td><td>Query by PK returns all orders for that customer</td></tr>
+            <tr><td>Query orders by status</td><td>GSI with PK = OrderStatus</td><td>Different partition key needed; GSI provides it</td></tr>
+            <tr><td>Sort a customer&rsquo;s orders by total</td><td>LSI with SK = OrderTotal</td><td>Same PK, different sort &mdash; LSI fits perfectly</td></tr>
+            <tr><td>Strong consistency on indexed query</td><td>LSI (not GSI)</td><td>GSI queries are always eventually consistent</td></tr>
+            <tr><td>Unpredictable traffic, new app</td><td>On-demand capacity mode</td><td>No capacity planning; scales automatically</td></tr>
+            <tr><td>Stable, high-volume workload</td><td>Provisioned + auto scaling</td><td>Lower per-request cost; auto scaling handles gradual changes</td></tr>
+            <tr><td>GSI throttling blocking writes</td><td>Increase GSI capacity or fix GSI key distribution</td><td>GSI back-pressure can throttle base table writes</td></tr>
+            <tr><td>Hot partition key</td><td>Redesign key for better distribution</td><td>Adaptive capacity helps temporarily; key redesign is the real fix</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+    </section>
+
+    <!-- Part 2: Real-World Scenarios -->
+    <section class="topic-section" id="ddb-real-world">
+      <h2>
+        <svg class="topic-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        When Real Architects Actually Use This
+      </h2>
+
+      <!-- Scenario A -->
+      <h3>Scenario A &mdash; Retrieve a Customer&rsquo;s Orders</h3>
+      <p><strong>Requirement:</strong> An e-commerce company stores orders in DynamoDB. The application must retrieve all orders belonging to a customer, sorted by order date.</p>
+      <p><strong>Design:</strong> Use a composite primary key with <code>CustomerId</code> as the partition key and <code>OrderDate</code> as the sort key. A Query on <code>PK = CUSTOMER#123</code> returns all orders for that customer, already sorted by date.</p>
+      <p><strong>Why this works:</strong> Items sharing a partition key are stored together and sorted by the sort key. The Query operation reads only that customer&rsquo;s item collection &mdash; no scan required.</p>
+      <p><strong>Trade-offs:</strong> This key design cannot directly support queries like &ldquo;all orders with status = Shipped&rdquo; without a secondary index. The design optimizes for the primary access pattern.</p>
+      <p><strong>Exam clue:</strong> &ldquo;Retrieve all related items for one entity, sorted by date/time&rdquo; &rarr; composite primary key with the entity as PK and timestamp-based SK.</p>
+
+      <!-- Scenario B -->
+      <h3>Scenario B &mdash; Query Orders by Status</h3>
+      <p><strong>Requirement:</strong> The same company needs to find all orders with a particular status (e.g., &ldquo;Pending&rdquo;) across all customers.</p>
+      <p><strong>Design:</strong> Create a GSI with <code>OrderStatus</code> as the partition key and <code>OrderDate</code> as the sort key. Project <code>CustomerId</code> and <code>OrderTotal</code> using <code>INCLUDE</code> projection.</p>
+      <p><strong>Why this works:</strong> The GSI provides a completely different partition key, enabling cross-customer queries by status. The base table&rsquo;s primary key (<code>CustomerId + OrderDate</code>) cannot support this pattern.</p>
+      <p><strong>Trade-offs:</strong> GSI queries are eventually consistent. If <code>OrderStatus</code> has low cardinality (few distinct values) and one status dominates traffic, the GSI can develop hot partitions. The GSI consumes additional storage and write capacity.</p>
+      <p><strong>Why not LSI:</strong> An LSI cannot change the partition key &mdash; it would still query within one customer&rsquo;s partition, not across all customers.</p>
+      <p><strong>Exam clue:</strong> &ldquo;Query by a different attribute across all items&rdquo; + &ldquo;different partition key needed&rdquo; &rarr; GSI.</p>
+
+      <!-- Scenario C -->
+      <h3>Scenario C &mdash; Alternative Sort Order Within a Customer</h3>
+      <p><strong>Requirement:</strong> A company wants to retrieve a customer&rsquo;s orders sorted by total amount rather than order date, with strongly consistent reads.</p>
+      <p><strong>Design:</strong> Define an LSI at table creation with the same partition key (<code>CustomerId</code>) and <code>OrderTotal</code> as the alternative sort key.</p>
+      <p><strong>Why this works:</strong> The LSI provides alternative ordering within the same partition. Because it shares the base table&rsquo;s partition key, it supports strongly consistent reads.</p>
+      <p><strong>Trade-offs:</strong> The LSI must be defined at table creation. The 10 GB item collection size limit applies. If the customer accumulates too many orders, writes to that partition will fail.</p>
+      <p><strong>Why not GSI:</strong> A GSI could technically achieve this, but it would not support strongly consistent reads. If strong consistency is required and the partition key stays the same, the LSI is the better choice.</p>
+      <p><strong>Exam clue:</strong> &ldquo;Same partition key&rdquo; + &ldquo;different sort order&rdquo; + &ldquo;strongly consistent&rdquo; &rarr; LSI.</p>
+
+      <!-- Scenario D -->
+      <h3>Scenario D &mdash; Unpredictable Request Volume</h3>
+      <p><strong>Requirement:</strong> A startup launches a new social media app. Traffic patterns are completely unknown and could spike unpredictably during viral events.</p>
+      <p><strong>Design:</strong> Use on-demand capacity mode. The table scales automatically without requiring throughput estimation.</p>
+      <p><strong>Why this works:</strong> On-demand mode absorbs unpredictable traffic without manual intervention. There is no risk of under-provisioning during unexpected spikes.</p>
+      <p><strong>Trade-offs:</strong> On-demand costs more per request than well-tuned provisioned capacity. On-demand is not unlimited &mdash; tables have throughput quotas (default 40,000 read/write request units per table), and extremely sudden traffic from near-zero can still experience brief throttling as DynamoDB scales. The team should still monitor usage and table quotas.</p>
+      <p><strong>Exam clue:</strong> &ldquo;Unpredictable traffic&rdquo; + &ldquo;minimize operational overhead&rdquo; + &ldquo;new application&rdquo; &rarr; on-demand mode.</p>
+
+      <!-- Scenario E -->
+      <h3>Scenario E &mdash; Predictable High-Volume Workload</h3>
+      <p><strong>Requirement:</strong> A mature logistics company processes 50,000 consistent reads per second during business hours and 5,000 during off-hours. The pattern has been stable for months.</p>
+      <p><strong>Design:</strong> Use provisioned capacity with auto scaling. Set the minimum to 5,000 RCUs, maximum to 50,000 RCUs, and target utilization at 70%.</p>
+      <p><strong>Why this works:</strong> Provisioned mode with auto scaling handles the predictable daily pattern at a lower per-request cost than on-demand. Auto scaling adjusts capacity as traffic ramps up and down.</p>
+      <p><strong>Trade-offs:</strong> Auto scaling reacts to trends over minutes, not seconds. Very sudden spikes within the pattern could briefly throttle before scaling kicks in. If traffic patterns change significantly, the auto scaling configuration may need updating.</p>
+      <p><strong>Exam clue:</strong> &ldquo;Predictable traffic&rdquo; + &ldquo;cost optimization&rdquo; + &ldquo;stable workload&rdquo; &rarr; provisioned + auto scaling.</p>
+
+      <!-- Scenario F -->
+      <h3>Scenario F &mdash; A Hot Partition Key</h3>
+      <p><strong>Requirement:</strong> An IoT company uses <code>DeviceType</code> as the partition key. Three popular device types generate 95% of all traffic, causing throttling even though overall capacity seems sufficient.</p>
+      <p><strong>Design:</strong> Redesign the partition key for better distribution. Use <code>DeviceId</code> (high cardinality) instead of <code>DeviceType</code> (low cardinality). If queries by device type are still needed, create a GSI.</p>
+      <p><strong>Why this works:</strong> Redistributing traffic across many partition-key values prevents any single partition from being overwhelmed. DynamoDB&rsquo;s adaptive capacity helps with temporary imbalances, but sustained hot keys require a key redesign.</p>
+      <p><strong>Why common alternatives fail:</strong></p>
+      <ul>
+        <li><strong>Adding a GSI</strong> does not fix a hot base-table partition &mdash; the base table still receives the writes.</li>
+        <li><strong>Switching to on-demand</strong> does not resolve a hot key &mdash; the partition is still overloaded regardless of capacity mode.</li>
+        <li><strong>Increasing provisioned capacity</strong> helps only if the bottleneck is overall table capacity, not a single partition.</li>
+      </ul>
+      <p><strong>Exam clue:</strong> &ldquo;Throttling despite sufficient overall capacity&rdquo; + &ldquo;few partition key values&rdquo; &rarr; hot partition problem &rarr; redesign the key.</p>
+
+      <!-- Scenario G -->
+      <h3>Scenario G &mdash; LSI Requirement Discovered After Table Creation</h3>
+      <p><strong>Requirement:</strong> A company realizes six months after launch that it needs an alternative sort key within the same partition, and the table was created without any LSIs.</p>
+      <p><strong>Design:</strong> You <strong>cannot</strong> add an LSI to an existing table. Options include:</p>
+      <ol>
+        <li><strong>Create a GSI</strong> that mimics the access pattern (but sacrifices strongly consistent reads).</li>
+        <li><strong>Create a new table</strong> with the required LSI and migrate data.</li>
+        <li><strong>Redesign the sort key</strong> on a new table if the application can tolerate a migration.</li>
+      </ol>
+      <p><strong>Why this matters:</strong> LSI design is a one-time decision at table creation. This is why understanding all access patterns before creating the table is critical.</p>
+      <p><strong>Exam clue:</strong> &ldquo;Alternative sort key&rdquo; + &ldquo;existing table&rdquo; + &ldquo;cannot add LSI&rdquo; &rarr; use a GSI (if eventual consistency is acceptable) or migrate to a new table.</p>
+
+      <!-- Scenario H -->
+      <h3>Scenario H &mdash; Strong Consistency Requirement</h3>
+      <p><strong>Requirement:</strong> A financial application reads account balances that must always reflect the latest write. The application also needs to query balances by branch office.</p>
+      <p><strong>Design:</strong> For the primary access (by AccountId), read directly from the base table with strongly consistent reads. For the branch-office query, if strong consistency is required, define an LSI at table creation with <code>AccountId</code> as PK and <code>BranchId</code> as the alternative SK. If eventual consistency is acceptable for the branch query, a GSI works.</p>
+      <p><strong>Why this works:</strong> Base table reads and LSI reads support strongly consistent mode. A GSI cannot provide it.</p>
+      <p><strong>Trade-offs:</strong> The LSI requires foresight at table creation and imposes the 10 GB item collection limit. If the branch query does not need strong consistency, a GSI is simpler and more flexible.</p>
+      <p><strong>Exam clue:</strong> &ldquo;Must have strongly consistent reads&rdquo; + &ldquo;indexed query&rdquo; &rarr; only LSI or base table (never GSI).</p>
+
+      <!-- Scenario I -->
+      <h3>Scenario I &mdash; Table Is Being Throttled</h3>
+      <p><strong>Requirement:</strong> An application&rsquo;s DynamoDB requests start returning <code>ProvisionedThroughputExceededException</code> after a traffic increase.</p>
+      <p><strong>Diagnosis approach:</strong></p>
+      <ol>
+        <li><strong>Check capacity mode</strong> &mdash; Is the table provisioned or on-demand? If provisioned, are RCUs/WCUs sufficient for current demand?</li>
+        <li><strong>Check partition-key distribution</strong> &mdash; Use CloudWatch <code>ConsumedReadCapacityUnits</code> and <code>ConsumedWriteCapacityUnits</code> per partition. Are a few keys receiving most traffic?</li>
+        <li><strong>Check GSI capacity</strong> &mdash; In provisioned mode, each GSI has its own throughput. A throttled GSI can back-pressure writes to the base table.</li>
+        <li><strong>Check access patterns</strong> &mdash; Are scans consuming excessive capacity? Should they be replaced with targeted queries?</li>
+        <li><strong>Evaluate solutions</strong> &mdash; Increase capacity, enable auto scaling, switch to on-demand (if the issue is overall capacity), or redesign keys (if the issue is hot partitions).</li>
+      </ol>
+      <p><strong>Exam clue:</strong> &ldquo;Throttling&rdquo; questions require identifying whether the root cause is insufficient capacity, poor key distribution, GSI bottleneck, or inefficient access patterns before choosing a solution.</p>
+
+    </section>
+
+    <!-- Part 3: SVG Diagram -->
+    <section class="topic-section" id="ddb-diagram">
+      <h2>
+        <svg class="topic-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
+        DynamoDB Keys &amp; Indexes &mdash; Architecture Diagram
+      </h2>
+
+      <p>This diagram shows how a DynamoDB base table, GSI, and LSI relate to each other, along with the capacity mode decision.</p>
+
+      <svg role="img" aria-label="DynamoDB keys, indexes, and capacity modes architecture diagram" viewBox="0 0 900 680" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:900px;height:auto;margin:1.5rem auto;display:block;font-family:inherit;">
+        <title>DynamoDB Keys, Indexes &amp; Capacity Modes</title>
+        <desc>Three-part diagram showing a DynamoDB base table with partition and sort keys, a Global Secondary Index with a different partition key, a Local Secondary Index with the same partition key but different sort key, and a capacity mode comparison.</desc>
+
+        <defs>
+          <marker id="ddb-arrow" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto" fill="var(--domain2, #10b981)">
+            <polygon points="0 0, 10 3.5, 0 7"/>
+          </marker>
+          <marker id="ddb-arrow-warn" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto" fill="#f59e0b">
+            <polygon points="0 0, 10 3.5, 0 7"/>
+          </marker>
+        </defs>
+
+        <!-- Part A: Base Table -->
+        <text x="450" y="28" text-anchor="middle" fill="var(--domain2, #10b981)" font-size="16" font-weight="bold">Part A: Base Table — Composite Primary Key</text>
+
+        <!-- Table outline -->
+        <rect x="100" y="42" width="700" height="170" rx="8" fill="none" stroke="var(--text-secondary, #94a3b8)" stroke-width="2" stroke-dasharray="6,3"/>
+
+        <!-- Header row -->
+        <rect x="110" y="52" width="680" height="32" rx="4" fill="var(--domain2, #10b981)" opacity="0.15"/>
+        <text x="220" y="73" text-anchor="middle" fill="var(--domain2, #10b981)" font-size="13" font-weight="bold">PK: CustomerId</text>
+        <text x="410" y="73" text-anchor="middle" fill="var(--domain2, #10b981)" font-size="13" font-weight="bold">SK: OrderDate</text>
+        <text x="610" y="73" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-size="13">Status</text>
+        <text x="730" y="73" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-size="13">Total</text>
+
+        <!-- Data rows -->
+        <text x="220" y="105" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="12">CUST#123</text>
+        <text x="410" y="105" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="12">2026-01-15</text>
+        <text x="610" y="105" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="12">Shipped</text>
+        <text x="730" y="105" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="12">$85</text>
+
+        <text x="220" y="128" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="12">CUST#123</text>
+        <text x="410" y="128" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="12">2026-03-22</text>
+        <text x="610" y="128" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="12">Pending</text>
+        <text x="730" y="128" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="12">$42</text>
+
+        <text x="220" y="151" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="12">CUST#456</text>
+        <text x="410" y="151" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="12">2026-02-10</text>
+        <text x="610" y="151" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="12">Shipped</text>
+        <text x="730" y="151" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="12">$130</text>
+
+        <!-- Query arrow -->
+        <line x1="30" y1="115" x2="95" y2="115" stroke="var(--domain2, #10b981)" stroke-width="2" marker-end="url(#ddb-arrow)"/>
+        <text x="62" y="108" text-anchor="middle" fill="var(--domain2, #10b981)" font-size="10" font-weight="bold">Query</text>
+        <text x="62" y="133" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-size="9">PK = CUST#123</text>
+
+        <!-- Annotation -->
+        <text x="450" y="195" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-size="11" font-style="italic">Items with same PK stored together, sorted by SK → efficient range queries</text>
+
+        <!-- Part B: GSI vs LSI -->
+        <text x="240" y="240" text-anchor="middle" fill="var(--domain2, #10b981)" font-size="16" font-weight="bold">Part B: Global Secondary Index (GSI)</text>
+        <text x="700" y="240" text-anchor="middle" fill="#8b5cf6" font-size="16" font-weight="bold">Local Secondary Index (LSI)</text>
+
+        <!-- GSI box -->
+        <rect x="40" y="255" width="400" height="170" rx="8" fill="none" stroke="var(--domain2, #10b981)" stroke-width="2" stroke-dasharray="6,3"/>
+
+        <!-- GSI header -->
+        <rect x="50" y="265" width="380" height="28" rx="4" fill="var(--domain2, #10b981)" opacity="0.15"/>
+        <text x="140" y="284" text-anchor="middle" fill="var(--domain2, #10b981)" font-size="12" font-weight="bold">GSI PK: Status</text>
+        <text x="300" y="284" text-anchor="middle" fill="var(--domain2, #10b981)" font-size="12" font-weight="bold">GSI SK: OrderDate</text>
+
+        <!-- GSI data -->
+        <text x="140" y="312" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="11">Pending</text>
+        <text x="300" y="312" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="11">2026-03-22</text>
+
+        <text x="140" y="334" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="11">Shipped</text>
+        <text x="300" y="334" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="11">2026-01-15</text>
+
+        <text x="140" y="356" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="11">Shipped</text>
+        <text x="300" y="356" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="11">2026-02-10</text>
+
+        <!-- GSI annotation -->
+        <text x="240" y="390" text-anchor="middle" fill="#f59e0b" font-size="10" font-weight="bold">⚠ Eventually consistent only</text>
+        <text x="240" y="406" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-size="10">Different PK → query across all customers</text>
+        <text x="240" y="420" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-size="10">Can add anytime · Separate capacity · Max 20/table</text>
+
+        <!-- LSI box -->
+        <rect x="480" y="255" width="400" height="170" rx="8" fill="none" stroke="#8b5cf6" stroke-width="2" stroke-dasharray="6,3"/>
+
+        <!-- LSI header -->
+        <rect x="490" y="265" width="380" height="28" rx="4" fill="#8b5cf6" opacity="0.15"/>
+        <text x="590" y="284" text-anchor="middle" fill="#8b5cf6" font-size="12" font-weight="bold">LSI PK: CustomerId</text>
+        <text x="770" y="284" text-anchor="middle" fill="#8b5cf6" font-size="12" font-weight="bold">LSI SK: Total</text>
+
+        <!-- LSI data -->
+        <text x="590" y="312" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="11">CUST#123</text>
+        <text x="770" y="312" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="11">$42</text>
+
+        <text x="590" y="334" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="11">CUST#123</text>
+        <text x="770" y="334" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="11">$85</text>
+
+        <!-- LSI annotation -->
+        <text x="680" y="370" text-anchor="middle" fill="#8b5cf6" font-size="10" font-weight="bold">✓ Strongly consistent reads supported</text>
+        <text x="680" y="386" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-size="10">Same PK → alternative sort within partition</text>
+        <text x="680" y="402" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-size="10">Table creation only · 10 GB limit · Max 5/table</text>
+
+        <!-- Connecting arrows from base table -->
+        <line x1="300" y1="212" x2="240" y2="250" stroke="var(--domain2, #10b981)" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#ddb-arrow)"/>
+        <line x1="600" y1="212" x2="680" y2="250" stroke="#8b5cf6" stroke-width="1.5" stroke-dasharray="4,2"/>
+
+        <!-- Part C: Capacity Mode Decision -->
+        <text x="450" y="470" text-anchor="middle" fill="var(--domain2, #10b981)" font-size="16" font-weight="bold">Part C: Capacity Mode Decision</text>
+
+        <!-- Provisioned box -->
+        <rect x="40" y="488" width="380" height="170" rx="8" fill="none" stroke="var(--domain2, #10b981)" stroke-width="2"/>
+        <rect x="40" y="488" width="380" height="30" rx="8" fill="var(--domain2, #10b981)" opacity="0.15"/>
+        <text x="230" y="508" text-anchor="middle" fill="var(--domain2, #10b981)" font-size="14" font-weight="bold">Provisioned + Auto Scaling</text>
+
+        <text x="60" y="536" fill="var(--text-primary, #e2e8f0)" font-size="11">✓ Predictable, steady traffic patterns</text>
+        <text x="60" y="556" fill="var(--text-primary, #e2e8f0)" font-size="11">✓ Lower per-request cost</text>
+        <text x="60" y="576" fill="var(--text-primary, #e2e8f0)" font-size="11">✓ Auto scaling adjusts to trends</text>
+        <text x="60" y="596" fill="#f59e0b" font-size="11">⚠ Must monitor and tune capacity</text>
+        <text x="60" y="616" fill="#f59e0b" font-size="11">⚠ Sudden spikes may throttle before scaling</text>
+        <text x="60" y="640" fill="var(--text-secondary, #94a3b8)" font-size="10" font-style="italic">Best for: mature apps with known workloads</text>
+
+        <!-- On-Demand box -->
+        <rect x="480" y="488" width="380" height="170" rx="8" fill="none" stroke="#8b5cf6" stroke-width="2"/>
+        <rect x="480" y="488" width="380" height="30" rx="8" fill="#8b5cf6" opacity="0.15"/>
+        <text x="670" y="508" text-anchor="middle" fill="#8b5cf6" font-size="14" font-weight="bold">On-Demand (Pay per Request)</text>
+
+        <text x="500" y="536" fill="var(--text-primary, #e2e8f0)" font-size="11">✓ Unpredictable or variable traffic</text>
+        <text x="500" y="556" fill="var(--text-primary, #e2e8f0)" font-size="11">✓ No capacity planning needed</text>
+        <text x="500" y="576" fill="var(--text-primary, #e2e8f0)" font-size="11">✓ Scales automatically with demand</text>
+        <text x="500" y="596" fill="#f59e0b" font-size="11">⚠ Higher per-request cost</text>
+        <text x="500" y="616" fill="#f59e0b" font-size="11">⚠ Not unlimited — quotas still apply</text>
+        <text x="500" y="640" fill="var(--text-secondary, #94a3b8)" font-size="10" font-style="italic">Best for: new apps, spiky workloads, dev/test</text>
+
+        <!-- Decision arrow -->
+        <text x="450" y="678" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-size="11" font-style="italic">Switch between modes once every 24 hours</text>
+      </svg>
+
+      <p><strong>Key takeaways from the diagram:</strong> The base table&rsquo;s composite key enables efficient queries by customer. The GSI provides a completely different partition key for cross-customer queries (eventually consistent only). The LSI provides an alternative sort order within the same partition (strongly consistent reads available). Choose your capacity mode based on traffic predictability and cost tolerance.</p>
+
+    </section>
+
+    <!-- Part 4: Exam Gotchas -->
+    <section class="topic-section" id="ddb-gotchas">
+      <h2>
+        <svg class="topic-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Exam Gotchas
+      </h2>
+
+      <div class="gotcha-list">
+
+        <div class="gotcha-item">
+          <h4>1. Confusing partition key with sort key</h4>
+          <p><strong>Wrong:</strong> Thinking the sort key determines data distribution across partitions.</p>
+          <p><strong>Right:</strong> The <strong>partition key</strong> determines which partition stores the data. The sort key determines ordering <em>within</em> a partition. Both serve different roles.</p>
+          <p><strong>Memory rule:</strong> Partition key = where data lives. Sort key = how data is ordered within that location.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <h4>2. Assuming duplicate partition keys in a simple primary key</h4>
+          <p><strong>Wrong:</strong> Two items can share the same partition key in a table with only a partition key.</p>
+          <p><strong>Right:</strong> In a <strong>simple primary key</strong> (partition key only), each partition-key value must be unique. Duplicates are only possible in a <strong>composite primary key</strong> where different sort keys distinguish the items.</p>
+          <p><strong>Memory rule:</strong> Simple PK = unique values only. Composite PK = PK+SK combination must be unique.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <h4>3. Forgetting that composite keys use both attributes</h4>
+          <p><strong>Wrong:</strong> Thinking the partition key alone identifies an item in a table with a composite key.</p>
+          <p><strong>Right:</strong> The <strong>partition key + sort key combination</strong> uniquely identifies each item. Multiple items can share a partition key if their sort keys differ.</p>
+          <p><strong>Memory rule:</strong> Composite key identity = PK + SK together, not PK alone.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <h4>4. Assuming sort key enables cross-partition queries</h4>
+          <p><strong>Wrong:</strong> A sort key lets you query across all partitions automatically.</p>
+          <p><strong>Right:</strong> A sort key only supports range queries <em>within a single partition key value</em>. To query across partitions, you need a GSI or a Scan.</p>
+          <p><strong>Memory rule:</strong> Sort key = within partition. Cross-partition = GSI.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <h4>5. Confusing GSI with LSI</h4>
+          <p><strong>Wrong:</strong> GSI and LSI are interchangeable index types.</p>
+          <p><strong>Right:</strong> A <strong>GSI</strong> can have a completely different partition key. An <strong>LSI</strong> must share the base table&rsquo;s partition key and only provides a different sort key.</p>
+          <p><strong>Memory rule:</strong> GSI = new partition key possible. LSI = same partition key, different sort key only.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <h4>6. Assuming GSI must share the base table&rsquo;s partition key</h4>
+          <p><strong>Wrong:</strong> A GSI always uses the same partition key as the base table.</p>
+          <p><strong>Right:</strong> The whole point of a GSI is that its partition key <strong>can differ</strong> from the base table. That&rsquo;s what makes it &ldquo;global.&rdquo;</p>
+          <p><strong>Memory rule:</strong> &ldquo;Global&rdquo; = different key possible. &ldquo;Local&rdquo; = same partition key required.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <h4>7. Assuming LSI can use a different partition key</h4>
+          <p><strong>Wrong:</strong> An LSI can change both the partition key and sort key.</p>
+          <p><strong>Right:</strong> An LSI <strong>must</strong> use the base table&rsquo;s partition key. Only the sort key can differ. If you need a different partition key, use a GSI.</p>
+          <p><strong>Memory rule:</strong> LSI changes the sort key only. Different partition key = GSI.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <h4>8. Assuming LSI can be added after table creation</h4>
+          <p><strong>Wrong:</strong> You can add an LSI to an existing table like you add a GSI.</p>
+          <p><strong>Right:</strong> LSIs <strong>must be defined at table creation</strong>. Once the table exists, you cannot add or remove LSIs. GSIs can be added anytime.</p>
+          <p><strong>Memory rule:</strong> LSI = birth only. GSI = anytime.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <h4>9. Forgetting GSI queries are eventually consistent only</h4>
+          <p><strong>Wrong:</strong> You can set <code>ConsistentRead = true</code> on a GSI query.</p>
+          <p><strong>Right:</strong> GSI queries <strong>never</strong> support strongly consistent reads. Data is replicated asynchronously to the GSI. If strong consistency is required, read from the base table or an LSI.</p>
+          <p><strong>Memory rule:</strong> GSI = eventually consistent always. Strong consistency = base table or LSI.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <h4>10. Assuming identical consistency for all indexes</h4>
+          <p><strong>Wrong:</strong> All secondary indexes behave the same way for consistency.</p>
+          <p><strong>Right:</strong> LSIs support both eventually and strongly consistent reads. GSIs support only eventually consistent reads. This is a key architectural difference.</p>
+          <p><strong>Memory rule:</strong> Consistency varies by index type. LSI = both. GSI = eventual only.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <h4>11. Assuming indexes have no overhead</h4>
+          <p><strong>Wrong:</strong> Creating indexes is free and has no impact on writes or storage.</p>
+          <p><strong>Right:</strong> Every index consumes additional <strong>storage</strong> and <strong>write capacity</strong>. When you write to the base table, every affected index is also updated. In provisioned mode, GSIs have separate throughput settings.</p>
+          <p><strong>Memory rule:</strong> Each index = more storage + more write cost + more to manage.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <h4>12. Assuming GSI makes every query efficient</h4>
+          <p><strong>Wrong:</strong> A GSI automatically makes any query fast.</p>
+          <p><strong>Right:</strong> A GSI is only efficient if its <strong>key design matches the query pattern</strong> and the partition key distributes traffic evenly. A GSI with a hot partition key is just as problematic as a hot base-table key.</p>
+          <p><strong>Memory rule:</strong> GSI efficiency depends on its key design, not just its existence.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <h4>13. Confusing Query with Scan</h4>
+          <p><strong>Wrong:</strong> Query and Scan are the same operation.</p>
+          <p><strong>Right:</strong> <strong>Query</strong> targets a specific partition key (efficient). <strong>Scan</strong> reads the entire table (expensive). For production workloads on large tables, prefer Query with appropriate key design.</p>
+          <p><strong>Memory rule:</strong> Query = targeted by key. Scan = reads everything.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <h4>14. Assuming filters reduce read capacity</h4>
+          <p><strong>Wrong:</strong> Adding a filter expression to a Scan makes it use less read capacity.</p>
+          <p><strong>Right:</strong> Filter expressions remove items from the <em>results</em> but DynamoDB still <strong>reads and charges for every item evaluated</strong>. Only key conditions reduce what is actually read from storage.</p>
+          <p><strong>Memory rule:</strong> Filters hide results; key conditions prevent reads. Capacity is consumed for items read, not items returned.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <h4>15. Choosing on-demand because it is always cheaper</h4>
+          <p><strong>Wrong:</strong> On-demand mode is always the most cost-effective choice.</p>
+          <p><strong>Right:</strong> On-demand has a <strong>higher per-request cost</strong>. For predictable, sustained workloads, provisioned capacity with auto scaling is typically more cost-effective.</p>
+          <p><strong>Memory rule:</strong> Unpredictable = on-demand. Predictable + cost-sensitive = provisioned.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <h4>16. Choosing provisioned without accounting for variability</h4>
+          <p><strong>Wrong:</strong> Setting static provisioned capacity works for all traffic patterns.</p>
+          <p><strong>Right:</strong> Without auto scaling, provisioned capacity cannot adapt to traffic changes. Under-provisioning causes throttling; over-provisioning wastes money.</p>
+          <p><strong>Memory rule:</strong> Provisioned without auto scaling = fragile. Always pair with auto scaling or use on-demand.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <h4>17. Assuming on-demand means no throttling ever</h4>
+          <p><strong>Wrong:</strong> On-demand mode guarantees unlimited throughput with zero throttling.</p>
+          <p><strong>Right:</strong> On-demand tables still have throughput quotas (default 40,000 read/write request units per table). Extremely sudden traffic spikes from near-zero can briefly throttle while DynamoDB scales.</p>
+          <p><strong>Memory rule:</strong> On-demand scales automatically but has quotas. Not unlimited.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <h4>18. Treating adaptive capacity as a universal fix</h4>
+          <p><strong>Wrong:</strong> Adaptive capacity solves all hot-key problems automatically.</p>
+          <p><strong>Right:</strong> Adaptive capacity helps with <strong>temporary</strong> imbalances. Sustained hot keys from poor partition-key design require a <strong>key redesign</strong>, not reliance on adaptive capacity.</p>
+          <p><strong>Memory rule:</strong> Adaptive capacity = temporary relief. Key redesign = permanent fix.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <h4>19. Ignoring GSI bottlenecks when diagnosing throttling</h4>
+          <p><strong>Wrong:</strong> If the base table has enough capacity, throttling cannot occur.</p>
+          <p><strong>Right:</strong> In provisioned mode, each GSI has <strong>separate throughput</strong>. A throttled GSI can <strong>back-pressure writes</strong> to the base table, causing write rejections even when the base table has capacity.</p>
+          <p><strong>Memory rule:</strong> Check GSI capacity when base table writes throttle. GSI is a separate capacity consumer.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <h4>20. Assuming flexible attributes eliminate design needs</h4>
+          <p><strong>Wrong:</strong> Because DynamoDB items can have any attributes, no upfront design is needed.</p>
+          <p><strong>Right:</strong> Flexible item structure does not eliminate the need to <strong>design access patterns, keys, and indexes</strong>. Poor key design leads to hot partitions, expensive scans, and inability to support required queries.</p>
+          <p><strong>Memory rule:</strong> Flexible schema ≠ no design needed. Access patterns must drive key and index choices.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <h4>21. Forgetting to verify index behavior for the workload</h4>
+          <p><strong>Wrong:</strong> An index works correctly regardless of how the workload uses it.</p>
+          <p><strong>Right:</strong> Indexes consume capacity and have their own key distribution. A GSI can become a bottleneck. An LSI has a 10 GB item collection limit. Always evaluate index behavior against the actual workload.</p>
+          <p><strong>Memory rule:</strong> Indexes need capacity and design planning too — not just the base table.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <h4>22. Assuming more read capacity fixes poor key design</h4>
+          <p><strong>Wrong:</strong> Increasing RCUs always resolves read throttling.</p>
+          <p><strong>Right:</strong> If the problem is a <strong>hot partition key</strong>, increasing overall capacity does not help because the extra capacity is distributed across all partitions, not concentrated on the hot one. The fix is better key distribution.</p>
+          <p><strong>Memory rule:</strong> Throttling from hot keys ≠ insufficient capacity. Fix the key design, not the capacity number.</p>
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- Part 5: Practice Questions -->
+    <section class="topic-section" id="ddb-practice">
+      <h2>
+        <svg class="topic-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Practice Questions
+      </h2>
+
+      <div class="practice-q">
+        <p class="q-text">Q1. A company stores customer orders in a DynamoDB table with <code>CustomerId</code> as the partition key and <code>OrderId</code> as the sort key. The marketing team needs to query all orders across all customers that have a status of &ldquo;Returned.&rdquo; The query must support filtering by return date. Which solution enables this access pattern with the LEAST operational effort?</p>
+        <ul class="q-options">
+          <li><span class="q-letter">A.</span> Create a Local Secondary Index with <code>OrderStatus</code> as the sort key.</li>
+          <li><span class="q-letter">B.</span> Scan the entire table and filter results where <code>OrderStatus = "Returned"</code>.</li>
+          <li><span class="q-letter">C.</span> Create a Global Secondary Index with <code>OrderStatus</code> as the partition key and <code>ReturnDate</code> as the sort key.</li>
+          <li><span class="q-letter">D.</span> Create a new table with <code>OrderStatus</code> as the partition key and replicate data using DynamoDB Streams.</li>
+        </ul>
+        <button class="reveal-btn">Show Answer</button>
+        <div class="answer-reveal">
+          <p><strong>Correct Answer: C</strong></p>
+          <p>A GSI with <code>OrderStatus</code> as the partition key enables querying orders by status <strong>across all customers</strong> &mdash; a different partition key than the base table. Adding <code>ReturnDate</code> as the sort key supports date-range filtering efficiently. A is wrong &mdash; an LSI cannot change the partition key, so it would only query within one customer&rsquo;s partition, not across all customers. B is wrong &mdash; scanning the entire table is expensive and does not scale. D is wrong &mdash; maintaining a separate table adds significant operational overhead compared to a GSI.</p>
+          <p><strong>Memory rule:</strong> &ldquo;Query by a different attribute across all items&rdquo; = GSI. An LSI cannot provide a different partition key.</p>
+        </div>
+      </div>
+
+      <div class="practice-q">
+        <p class="q-text">Q2. A startup is launching a new mobile game. Player activity is expected to vary dramatically &mdash; from near-zero during development to potentially millions of requests during launch events. The team wants to minimize time spent on capacity planning and avoid throttling during unpredictable traffic spikes. Which DynamoDB capacity configuration BEST meets these requirements?</p>
+        <ul class="q-options">
+          <li><span class="q-letter">A.</span> Use provisioned capacity mode with high initial RCU and WCU values to handle the expected peak.</li>
+          <li><span class="q-letter">B.</span> Use on-demand capacity mode so the table scales automatically with actual traffic without requiring throughput estimation.</li>
+          <li><span class="q-letter">C.</span> Use provisioned capacity mode with auto scaling configured for a wide range of minimum to maximum values.</li>
+          <li><span class="q-letter">D.</span> Use provisioned capacity mode and manually increase capacity before each launch event.</li>
+        </ul>
+        <button class="reveal-btn">Show Answer</button>
+        <div class="answer-reveal">
+          <p><strong>Correct Answer: B</strong></p>
+          <p>On-demand mode eliminates capacity planning entirely &mdash; DynamoDB handles scaling automatically. This is ideal for unpredictable, highly variable workloads. A is wrong &mdash; over-provisioning wastes money during low-traffic periods and may still under-provision during unexpected spikes. C is wrong &mdash; auto scaling reacts to trends over minutes, which may not respond fast enough for sudden massive spikes, and still requires configuring capacity ranges. D is wrong &mdash; manual scaling before events requires operational effort and accurate prediction, which the team wants to avoid.</p>
+          <p><strong>Memory rule:</strong> &ldquo;Unpredictable traffic&rdquo; + &ldquo;minimize operational overhead&rdquo; = on-demand mode.</p>
+        </div>
+      </div>
+
+      <div class="practice-q">
+        <p class="q-text">Q3. A financial services company has a DynamoDB table with <code>AccountId</code> as the partition key and <code>TransactionDate</code> as the sort key. The compliance team needs to query an account&rsquo;s transactions sorted by amount instead of date, and the results <strong>must reflect the most recent writes</strong> (strongly consistent reads). Which solution meets these requirements?</p>
+        <ul class="q-options">
+          <li><span class="q-letter">A.</span> Create a Global Secondary Index with <code>AccountId</code> as the partition key and <code>TransactionAmount</code> as the sort key, and use strongly consistent reads on the GSI.</li>
+          <li><span class="q-letter">B.</span> Scan the table with a filter expression on <code>TransactionAmount</code> using strongly consistent reads.</li>
+          <li><span class="q-letter">C.</span> Create a new table with <code>TransactionAmount</code> as the sort key and replicate data.</li>
+          <li><span class="q-letter">D.</span> Define a Local Secondary Index at table creation with <code>AccountId</code> as the partition key and <code>TransactionAmount</code> as the sort key, and use strongly consistent reads.</li>
+        </ul>
+        <button class="reveal-btn">Show Answer</button>
+        <div class="answer-reveal">
+          <p><strong>Correct Answer: D</strong></p>
+          <p>An LSI shares the base table&rsquo;s partition key (<code>AccountId</code>) and provides an alternative sort key (<code>TransactionAmount</code>). LSI queries <strong>support strongly consistent reads</strong>. A is wrong &mdash; GSI queries are <strong>always eventually consistent</strong>; you cannot use <code>ConsistentRead = true</code> on a GSI. B is wrong &mdash; scanning the entire table is expensive and does not provide sorting by amount. C is wrong &mdash; creating a separate table and replicating data adds unnecessary complexity.</p>
+          <p><strong>Memory rule:</strong> &ldquo;Same partition key&rdquo; + &ldquo;different sort key&rdquo; + &ldquo;strongly consistent&rdquo; = LSI. GSI can never provide strongly consistent reads.</p>
         </div>
       </div>
 

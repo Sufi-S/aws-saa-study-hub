@@ -850,5 +850,47 @@
     ],
     "correctAnswer": 2,
     "explanation": "A cross-Region read replica continuously replicates to eu-west-1. Typical replication lag is well under 5 minutes, meeting the RPO. Multi-AZ (A) operates within one Region only. Daily snapshots (B) give up to 24 hours of RPO. An additional same-Region replica (D) does not help during a Regional outage."
+  },
+  {
+    "id": "d2-ddb-01",
+    "domain": "domain2",
+    "topic": "dynamodb-keys-indexes-capacity",
+    "question": "A company stores customer orders in a DynamoDB table with CustomerId as the partition key and OrderId as the sort key. The marketing team needs to query all orders across all customers that have a status of \"Returned.\" The query must support filtering by return date. Which solution enables this access pattern with the LEAST operational effort?",
+    "options": [
+      "Create a Local Secondary Index with OrderStatus as the sort key.",
+      "Scan the entire table and filter results where OrderStatus = \"Returned\".",
+      "Create a Global Secondary Index with OrderStatus as the partition key and ReturnDate as the sort key.",
+      "Create a new table with OrderStatus as the partition key and replicate data using DynamoDB Streams."
+    ],
+    "correctAnswer": 2,
+    "explanation": "A GSI with OrderStatus as the partition key enables querying orders by status across all customers — a different partition key than the base table. Adding ReturnDate as the sort key supports date-range filtering. An LSI (A) cannot change the partition key. Scanning (B) is expensive and unscalable. A separate table (D) adds unnecessary operational overhead."
+  },
+  {
+    "id": "d2-ddb-02",
+    "domain": "domain2",
+    "topic": "dynamodb-keys-indexes-capacity",
+    "question": "A startup is launching a new mobile game. Player activity is expected to vary dramatically — from near-zero during development to potentially millions of requests during launch events. The team wants to minimize time spent on capacity planning and avoid throttling during unpredictable traffic spikes. Which DynamoDB capacity configuration BEST meets these requirements?",
+    "options": [
+      "Use provisioned capacity mode with high initial RCU and WCU values to handle the expected peak.",
+      "Use on-demand capacity mode so the table scales automatically with actual traffic without requiring throughput estimation.",
+      "Use provisioned capacity mode with auto scaling configured for a wide range of minimum to maximum values.",
+      "Use provisioned capacity mode and manually increase capacity before each launch event."
+    ],
+    "correctAnswer": 1,
+    "explanation": "On-demand mode eliminates capacity planning — DynamoDB handles scaling automatically, ideal for unpredictable workloads. Over-provisioning (A) wastes money during low traffic. Auto scaling (C) reacts over minutes, insufficient for sudden massive spikes. Manual scaling (D) requires operational effort and accurate prediction."
+  },
+  {
+    "id": "d2-ddb-03",
+    "domain": "domain2",
+    "topic": "dynamodb-keys-indexes-capacity",
+    "question": "A financial services company has a DynamoDB table with AccountId as the partition key and TransactionDate as the sort key. The compliance team needs to query an account's transactions sorted by amount instead of date, and the results must reflect the most recent writes (strongly consistent reads). Which solution meets these requirements?",
+    "options": [
+      "Create a Global Secondary Index with AccountId as the partition key and TransactionAmount as the sort key, and use strongly consistent reads on the GSI.",
+      "Scan the table with a filter expression on TransactionAmount using strongly consistent reads.",
+      "Create a new table with TransactionAmount as the sort key and replicate data.",
+      "Define a Local Secondary Index at table creation with AccountId as the partition key and TransactionAmount as the sort key, and use strongly consistent reads."
+    ],
+    "correctAnswer": 3,
+    "explanation": "An LSI shares the base table's partition key (AccountId) and provides an alternative sort key (TransactionAmount). LSI queries support strongly consistent reads. A GSI (A) only supports eventually consistent reads. Scanning (B) is expensive and does not sort. A separate table (C) adds unnecessary complexity."
   }
 ]

@@ -928,5 +928,120 @@
     "term": "Backup vs Replication",
     "definition": "Replication (Multi-AZ, read replicas) copies all changes including accidental deletes and corruption. Backups (snapshots, PITR) preserve data at a point in time before the corruption. Replication protects against infrastructure failure. Backups protect against logical data errors.",
     "gotcha": "If the exam says 'accidental deletion' or 'data corruption,' the answer involves backups/PITR, not Multi-AZ or read replicas. Both replicate the bad data."
+  },
+  {
+    "term": "Amazon DynamoDB",
+    "definition": "A fully managed NoSQL key-value and document database service. Provides single-digit millisecond latency at any scale. Tables are schemaless — items can have different attributes. Data is distributed across partitions using the partition key.",
+    "gotcha": "DynamoDB is NoSQL, not relational. It does not support server-side JOINs. Design around access patterns, not entity relationships."
+  },
+  {
+    "term": "DynamoDB Item and Attribute",
+    "definition": "An item is a single record in a DynamoDB table (like a row). An attribute is a named data element within an item (like a column). Items in the same table can have completely different attributes except for the primary key.",
+    "gotcha": "Flexible attributes do not eliminate the need for deliberate key and access-pattern design."
+  },
+  {
+    "term": "DynamoDB Partition Key",
+    "definition": "The attribute DynamoDB uses to distribute items across internal partitions. In a simple primary key, the partition key value must be unique. DynamoDB hashes this value to determine storage placement.",
+    "gotcha": "Low-cardinality partition keys (e.g., Status, Country) cause hot partitions. Choose keys with high cardinality and even traffic distribution."
+  },
+  {
+    "term": "DynamoDB Sort Key",
+    "definition": "The second attribute in a composite primary key. Items sharing a partition key are stored together and sorted by the sort key. Supports range queries, begins-with, and between conditions within a partition.",
+    "gotcha": "Sort key queries only work within a single partition key value, not across the entire table."
+  },
+  {
+    "term": "DynamoDB Simple Primary Key",
+    "definition": "A table with only a partition key. Each partition-key value uniquely identifies one item. No sort key exists, so no range queries within a partition.",
+    "gotcha": "In a simple primary key table, two items cannot share the same partition key value."
+  },
+  {
+    "term": "DynamoDB Composite Primary Key",
+    "definition": "A table with both a partition key and a sort key. The PK+SK combination uniquely identifies an item. Multiple items can share a partition key if their sort keys differ, forming an item collection.",
+    "gotcha": "The primary key schema cannot be changed after table creation. Wrong key design = new table + data migration."
+  },
+  {
+    "term": "Global Secondary Index (GSI)",
+    "definition": "A secondary index with a partition key (and optional sort key) that can differ from the base table's keys. Spans all partitions. Can be added after table creation. Default limit: 20 per table. Has separate capacity in provisioned mode.",
+    "gotcha": "GSI queries are ALWAYS eventually consistent. You cannot use ConsistentRead=true on a GSI. GSI key distribution matters — a hot GSI partition key is just as problematic as a hot base-table key."
+  },
+  {
+    "term": "Local Secondary Index (LSI)",
+    "definition": "A secondary index that shares the base table's partition key but uses a different sort key. Provides alternative ordering within a partition. Must be defined at table creation. Default limit: 5 per table. 10 GB item collection size limit per partition key value.",
+    "gotcha": "LSIs cannot be added after table creation — plan ahead. Supports strongly consistent reads (unlike GSI). If item collection exceeds 10 GB, writes are rejected."
+  },
+  {
+    "term": "GSI vs LSI Decision",
+    "definition": "Use a GSI when you need a different partition key (query across all items by a new attribute). Use an LSI when you need a different sort order within the same partition key and require strongly consistent reads. GSI = flexible, eventual consistency. LSI = same PK, strong consistency possible.",
+    "gotcha": "If the exam says 'different partition key' → GSI. If it says 'same partition key, different sort, strong consistency' → LSI."
+  },
+  {
+    "term": "DynamoDB Index Projection",
+    "definition": "Controls which attributes are copied into a secondary index. KEYS_ONLY copies only key attributes. INCLUDE copies keys plus specified attributes. ALL copies everything. Larger projections = more storage and write cost but fewer fetches from the base table.",
+    "gotcha": "Querying a non-projected attribute from an index requires a fetch back to the base table, adding latency and cost."
+  },
+  {
+    "term": "DynamoDB Query vs Scan",
+    "definition": "Query targets a specific partition key (efficient, reads only matching items). Scan reads the entire table or index (expensive for large tables). Filter expressions on a Scan do not reduce read capacity — they only hide results after reading.",
+    "gotcha": "A filter on a Scan still consumes capacity for every item read. 'Efficient search' in exam scenarios = Query with proper key design, not Scan with filters."
+  },
+  {
+    "term": "DynamoDB Read Capacity Unit (RCU)",
+    "definition": "One RCU = one strongly consistent read per second for an item up to 4 KB, or two eventually consistent reads per second. Larger items and transactional reads consume more RCUs.",
+    "gotcha": "Eventually consistent reads cost half the RCUs of strongly consistent reads. The exam often tests this 2:1 ratio."
+  },
+  {
+    "term": "DynamoDB Write Capacity Unit (WCU)",
+    "definition": "One WCU = one write per second for an item up to 1 KB. Larger items consume more WCUs proportionally. Transactional writes cost 2 WCUs per 1 KB.",
+    "gotcha": "Index writes also consume WCUs. Each GSI affected by a write adds to the write cost."
+  },
+  {
+    "term": "DynamoDB Provisioned Capacity",
+    "definition": "You specify RCUs and WCUs for the table and each GSI. Best for predictable workloads. Supports auto scaling to adjust capacity based on utilization. Lower per-request cost than on-demand.",
+    "gotcha": "Without auto scaling, provisioned capacity cannot adapt to traffic changes. Each GSI has its own capacity settings — a throttled GSI can back-pressure base table writes."
+  },
+  {
+    "term": "DynamoDB On-Demand Capacity",
+    "definition": "DynamoDB scales automatically without specifying RCUs/WCUs. Pay per request. Best for unpredictable, variable, or new workloads. Can switch from provisioned once every 24 hours.",
+    "gotcha": "On-demand is not unlimited — tables have throughput quotas (default 40,000 read/write request units). Sudden spikes from near-zero can briefly throttle."
+  },
+  {
+    "term": "DynamoDB Capacity Auto Scaling",
+    "definition": "Automatically adjusts provisioned RCUs/WCUs based on actual utilization within configured min/max bounds. Reacts to traffic trends over minutes. Available in provisioned mode only.",
+    "gotcha": "Auto scaling reacts to trends, not instant spikes. Very sudden traffic surges may throttle briefly before scaling activates."
+  },
+  {
+    "term": "DynamoDB Strongly Consistent Read",
+    "definition": "Returns the most recent write, reading from the leader replica. Available on base table reads and LSI queries. NOT available on GSI queries. Costs 1 RCU per 4 KB (twice the cost of eventually consistent).",
+    "gotcha": "If an exam scenario requires strong consistency through an index, only an LSI works — never a GSI."
+  },
+  {
+    "term": "DynamoDB Eventually Consistent Read",
+    "definition": "May return slightly stale data — reads from any replica, not necessarily the leader. Default read mode. Costs 0.5 RCU per 4 KB. Available on all read operations including GSI queries.",
+    "gotcha": "GSI queries are always eventually consistent, even if you try to set ConsistentRead=true."
+  },
+  {
+    "term": "DynamoDB Hot Partition Key",
+    "definition": "When a disproportionate share of requests targets a small number of partition-key values, those partitions become overloaded. Causes throttling even if overall table capacity seems sufficient. Adaptive capacity helps temporarily.",
+    "gotcha": "Switching to on-demand or increasing provisioned capacity does NOT fix a hot key — the partition is still overloaded. Fix the key design."
+  },
+  {
+    "term": "DynamoDB Throttling",
+    "definition": "Requests exceeding provisioned capacity or partition-level limits receive ProvisionedThroughputExceededException. Can be caused by insufficient capacity, hot partition keys, GSI bottlenecks, or excessive scans.",
+    "gotcha": "Diagnose before fixing: check overall capacity, key distribution, GSI throughput, and access patterns. The root cause determines the solution."
+  },
+  {
+    "term": "DynamoDB GSI Consistency Limitation",
+    "definition": "GSI data is replicated asynchronously from the base table. GSI queries ONLY support eventually consistent reads. There is no option for strongly consistent GSI reads.",
+    "gotcha": "If strongly consistent indexed reads are required and the partition key is the same, use an LSI instead."
+  },
+  {
+    "term": "DynamoDB LSI Creation Constraint",
+    "definition": "Local Secondary Indexes must be defined when the table is created. They cannot be added, modified, or removed after table creation. Plan all LSI requirements before creating the table.",
+    "gotcha": "If you discover an LSI requirement after table creation, your options are: use a GSI (if eventual consistency is acceptable), migrate to a new table, or redesign the data model."
+  },
+  {
+    "term": "DynamoDB Access-Pattern-Driven Design",
+    "definition": "Design DynamoDB tables around the queries your application needs to perform, not the entity relationships. Choose partition keys, sort keys, and indexes based on known access patterns. This is the opposite of relational database design.",
+    "gotcha": "DynamoDB's flexible schema does not mean 'no design needed.' Poor key design leads to hot partitions, expensive scans, and inability to support required queries."
   }
 ]
