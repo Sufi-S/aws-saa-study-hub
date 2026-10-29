@@ -1233,5 +1233,80 @@
     "term": "Work Queue vs Pub/Sub vs Event Routing",
     "definition": "Work queue (SQS): one message → one competing consumer, buffered. Pub/sub (SNS): one message → all subscribers, pushed. Event routing (EventBridge): events matched by content → specific targets.",
     "gotcha": "These are complementary, not mutually exclusive. SNS + SQS fanout combines broadcast with durable queues. EventBridge can route to SQS for buffering."
+  },
+  {
+    "term": "Backup and Restore DR Strategy",
+    "definition": "The simplest and cheapest DR strategy. Data is backed up to a recovery Region (e.g., AWS Backup cross-Region vaults, S3 CRR). No infrastructure runs in the DR Region. On failure, rebuild everything from IaC and restore data. Highest RTO (hours to days), RPO depends on backup frequency.",
+    "gotcha": "Lowest cost but slowest recovery. Requires IaC templates and tested restore procedures. A backup that has never been restored is not proof the plan works."
+  },
+  {
+    "term": "Pilot Light DR Strategy",
+    "definition": "Core data is continuously replicated to the DR Region (e.g., RDS cross-Region read replica, Aurora Global Database). Networking is preconfigured. Application servers are NOT running. On failure, promote the DB replica, launch compute, and switch traffic.",
+    "gotcha": "Pilot light CANNOT serve traffic until compute is provisioned. That's the key difference from warm standby. 'Data ready, app off' = pilot light."
+  },
+  {
+    "term": "Warm Standby DR Strategy",
+    "definition": "A reduced but fully functioning application runs in the DR Region at all times. It can serve traffic immediately at reduced capacity. On failure, scale up to full production capacity. Lower RTO than pilot light because the app is already running.",
+    "gotcha": "Warm standby ≠ full production capacity. It still needs scaling up. 'Running but small' = warm standby. 'Off but data ready' = pilot light."
+  },
+  {
+    "term": "Multi-Site Active/Active DR Strategy",
+    "definition": "Full production stacks run simultaneously in multiple Regions, all serving traffic. Traffic is distributed via Route 53 or Global Accelerator. If one Region fails, the other absorbs all traffic. Near-zero RTO/RPO but highest cost and complexity.",
+    "gotcha": "Active/active does NOT automatically solve data consistency. Bidirectional replication can cause write conflicts. Applications must handle conflict resolution. Two environments ≠ zero problems."
+  },
+  {
+    "term": "Backup vs Replication in DR",
+    "definition": "Backup: point-in-time snapshot, protects against corruption/deletion/ransomware. Replication: continuous copy, keeps DR current but propagates destructive changes. Both are needed — replication for fast failover, backup for recovery from logical errors.",
+    "gotcha": "A corrupted table replicates to the secondary. An independent backup provides a clean pre-corruption recovery point. Replication ≠ backup."
+  },
+  {
+    "term": "Asynchronous Replication and RPO",
+    "definition": "Async replication copies data with a small lag (seconds to minutes). During failover, the most recent writes may be lost — the RPO equals the replication lag at the moment of failure.",
+    "gotcha": "If the exam requires 'zero RPO,' async replication alone does not satisfy it. Synchronous replication adds latency but eliminates the data-loss window."
+  },
+  {
+    "term": "DR Recovery Orchestration",
+    "definition": "The multi-step process of recovering: detect failure → decide to failover → provision/scale infra → promote/restore DB → verify config/secrets/IAM → health checks → switch traffic → monitor. No single AWS service does all of this.",
+    "gotcha": "Route 53 switches DNS but doesn't provision infrastructure. AWS Backup stores snapshots but doesn't deploy apps. DR requires coordinating multiple services."
+  },
+  {
+    "term": "DR Testing and Validation",
+    "definition": "Regular testing of the complete DR procedure: restore data, deploy infrastructure, start the application, run health checks, verify user transactions. Types: tabletop exercises, restore tests, application recovery tests, full failover exercises, failback tests.",
+    "gotcha": "An untested DR plan is an assumption. Test regularly, measure actual RTO/RPO, and check for hidden dependencies (IAM roles, secrets, quotas, network config in recovery Region)."
+  },
+  {
+    "term": "DNS Failover and TTL",
+    "definition": "Route 53 can detect a failed Region via health checks and update DNS to point to the recovery Region. However, clients cache DNS records for the TTL duration. Lower TTLs enable faster failover but increase DNS query volume.",
+    "gotcha": "DNS failover is not instant. Even with a 60-second TTL, some clients will use the old IP for up to 60 seconds. Do not switch DNS until the recovery environment is fully ready."
+  },
+  {
+    "term": "DR Failback",
+    "definition": "The process of returning to the original (primary) Region after it recovers from a disaster. Requires reverse replication from the DR Region back to primary, data synchronization, traffic switching, and validation.",
+    "gotcha": "Failback is a second recovery event — it must be planned and tested separately from failover. Uncoordinated failback can cause split-brain (two Regions accepting conflicting writes)."
+  },
+  {
+    "term": "Infrastructure as Code in DR",
+    "definition": "CloudFormation, CDK, or Terraform templates that can reconstruct the complete application environment in a recovery Region. Essential for backup-and-restore and pilot-light strategies where compute must be provisioned during recovery.",
+    "gotcha": "IaC must be maintained and tested. An outdated template that references deleted AMIs or wrong security group IDs will fail during an actual DR event."
+  },
+  {
+    "term": "AWS Backup for DR",
+    "definition": "Centralized backup management for supported AWS resources (EBS, RDS, DynamoDB, EFS, S3, etc.). Supports cross-Region and cross-account backup vaults with scheduled backup plans, retention policies, and compliance reporting.",
+    "gotcha": "AWS Backup stores and manages backups but does NOT deploy infrastructure, start applications, or switch traffic. It is one piece of the DR puzzle, not the complete solution."
+  },
+  {
+    "term": "Cross-Region Backup Copies",
+    "definition": "Copying backups (RDS snapshots, EBS snapshots, DynamoDB backups) to a different Region so they survive a primary Region failure. Can be automated via AWS Backup cross-Region rules.",
+    "gotcha": "Backups stored only in the primary Region are lost if that Region fails catastrophically. Always copy DR-critical backups to the recovery Region."
+  },
+  {
+    "term": "Application Dependency Readiness in DR",
+    "definition": "A recovered application needs more than data — it needs VPCs, subnets, security groups, IAM roles, secrets (Secrets Manager), environment config, application code, and downstream API access in the recovery Region.",
+    "gotcha": "The #1 reason DR exercises fail: missing dependencies. A database restore is useless without the application stack that uses it."
+  },
+  {
+    "term": "DR Strategy Selection Framework",
+    "definition": "Match strategy to business requirements: 'Lowest cost + long RTO' → Backup & Restore. 'Data replicated + moderate RTO' → Pilot Light. 'Running app + short RTO' → Warm Standby. 'Both Regions active + near-zero RTO' → Active/Active.",
+    "gotcha": "The strategy name does not guarantee the RTO/RPO. Only a tested, measured implementation delivers the actual recovery performance."
   }
 ]

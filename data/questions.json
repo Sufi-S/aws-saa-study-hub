@@ -976,5 +976,47 @@
     ],
     "correctAnswer": 2,
     "explanation": "EventBridge event patterns support matching on any JSON field including numeric conditions. Two rules handle both requirements with zero custom code. SQS requires custom routing logic (A). SNS filter policies don't natively support numeric greater-than on body fields like EventBridge (B). Scheduler triggers on time, not event content (D)."
+  },
+  {
+    "id": "d2-drs-01",
+    "domain": "domain2",
+    "topic": "disaster-recovery-strategies",
+    "question": "A company has a noncritical internal analytics application running in us-east-1. The application can tolerate up to 48 hours of downtime and can accept losing up to 24 hours of data. The company wants the LOWEST COST disaster recovery solution that protects against a Regional failure. Which approach meets these requirements?",
+    "options": [
+      "Deploy a warm standby in eu-west-1 with a scaled-down Auto Scaling group and an Aurora Global Database for continuous replication.",
+      "Configure daily automated backups using AWS Backup with cross-Region copies to eu-west-1. Store CloudFormation templates in a version-controlled repository. On failure, deploy the stack in eu-west-1 and restore data from the latest backup.",
+      "Deploy a pilot light in eu-west-1 with an RDS cross-Region read replica and preconfigured networking. On failure, promote the replica and launch application servers.",
+      "Run an active/active deployment with DynamoDB Global Tables in both Regions and Route 53 latency-based routing."
+    ],
+    "correctAnswer": 1,
+    "explanation": "Backup and Restore is the lowest-cost DR strategy. With a 48-hour RTO and 24-hour RPO, daily backups and IaC reconstruction are adequate. Warm standby (A) and pilot light (C) run infrastructure continuously, adding unnecessary cost. Active/active (D) is the most expensive and over-engineered for this use case."
+  },
+  {
+    "id": "d2-drs-02",
+    "domain": "domain2",
+    "topic": "disaster-recovery-strategies",
+    "question": "A company runs a business-critical order-management application in us-east-1 using Aurora MySQL. The company requires an RTO of 30 minutes and an RPO of 1 minute. Data must be continuously replicated to a recovery Region. The company wants to minimize ongoing DR costs while meeting these recovery targets. Which strategy is MOST appropriate?",
+    "options": [
+      "Configure daily RDS automated snapshots with cross-Region copies. On failure, restore the snapshot and deploy the application using CloudFormation.",
+      "Deploy a full production environment in eu-west-1 with DynamoDB Global Tables and Route 53 active/active routing.",
+      "Configure an Aurora Global Database replicating to eu-west-1. Preconfigure networking and prepare launch templates. On failure, promote the Aurora secondary, launch application instances, and update Route 53.",
+      "Deploy a reduced but fully functioning application stack in eu-west-1 with an Aurora Global Database. The standby serves health-check traffic and scales up on failover."
+    ],
+    "correctAnswer": 2,
+    "explanation": "Pilot light with Aurora Global Database provides continuous replication (sub-second lag, meeting 1-minute RPO) and can provision compute within 30 minutes. Daily snapshots (A) cannot meet 1-minute RPO. Active/active (B) is far more expensive. Warm standby (D) meets targets but costs more than pilot light."
+  },
+  {
+    "id": "d2-drs-03",
+    "domain": "domain2",
+    "topic": "disaster-recovery-strategies",
+    "question": "A global media company runs a content platform that must serve users from both us-east-1 and eu-west-1 simultaneously during normal operations. If either Region becomes unavailable, the other must continue serving all users with near-zero interruption and minimal data loss. Which architecture meets these requirements?",
+    "options": [
+      "Deploy the application in us-east-1 with a warm standby in eu-west-1. Use Aurora Global Database with a secondary cluster. On failure, promote and scale up.",
+      "Deploy full production stacks in both Regions using DynamoDB Global Tables for bidirectional replication. Use Route 53 latency-based routing with health checks. Design for eventual consistency and write conflicts.",
+      "Take hourly database snapshots and copy them to eu-west-1. On failure, restore from the latest snapshot and deploy the application.",
+      "Deploy the application in us-east-1 with a pilot light in eu-west-1. Replicate data using DynamoDB Streams. On failure, start application servers and switch DNS."
+    ],
+    "correctAnswer": 1,
+    "explanation": "Both Regions serving traffic simultaneously requires active/active. DynamoDB Global Tables provides bidirectional replication, and Route 53 distributes users. Warm standby (A) is active/passive. Hourly snapshots (C) have high RPO and long recovery. Pilot light (D) does not serve traffic from both Regions."
   }
 ]

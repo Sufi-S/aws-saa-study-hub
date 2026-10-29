@@ -92,6 +92,11 @@
         <li><a href="#msg-diagram">SQS vs SNS vs EventBridge &mdash; Architecture Diagram</a></li>
         <li><a href="#msg-gotchas">SQS vs SNS vs EventBridge &mdash; Exam Gotchas</a></li>
         <li><a href="#msg-practice">SQS vs SNS vs EventBridge &mdash; Practice Questions</a></li>
+        <li><a href="#dr-learn"><strong>Disaster Recovery Strategies</strong> &mdash; Learn from Zero</a></li>
+        <li><a href="#dr-real-world">Disaster Recovery &mdash; Real-World Scenarios</a></li>
+        <li><a href="#dr-diagram">Disaster Recovery &mdash; Strategy Comparison Diagram</a></li>
+        <li><a href="#dr-gotchas">Disaster Recovery &mdash; Exam Gotchas</a></li>
+        <li><a href="#dr-practice">Disaster Recovery &mdash; Practice Questions</a></li>
       </ol>
     </nav>
 
@@ -5848,6 +5853,849 @@
           <p><strong>Correct Answer: C</strong></p>
           <p>EventBridge event patterns support matching on any JSON field, including numeric conditions (greater-than, less-than). Two rules handle both routing requirements with zero custom code. A is wrong &mdash; it works but requires custom routing logic inside a Lambda, adding code to maintain. B is wrong &mdash; SNS filter policies support basic attribute matching but do not natively support numeric greater-than conditions on message body fields the way EventBridge patterns do. D is wrong &mdash; EventBridge Scheduler triggers actions at scheduled times; it does not evaluate event content or route events from an event bus.</p>
           <p><strong>Memory rule:</strong> &ldquo;Route by event content/fields&rdquo; + &ldquo;least custom code&rdquo; = EventBridge rules with event patterns.</p>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ============================================= -->
+    <!-- TOPIC 15: Disaster Recovery Strategies         -->
+    <!-- ============================================= -->
+
+    <hr class="topic-divider" style="margin-top:4rem;">
+    <div class="page-header" style="border-bottom:none;padding-bottom:0;margin-bottom:1.5rem;">
+      <h1 style="display:flex;align-items:center;gap:0.6rem;font-size:1.75rem;">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--domain2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        AWS Disaster Recovery Strategies
+      </h1>
+      <p>Backup &amp; Restore, Pilot Light, Warm Standby, and Multi-Site Active/Active &mdash; choosing the right recovery strategy based on business requirements.</p>
+    </div>
+
+    <!-- DR SECTION 1: Learn from Zero -->
+    <section class="topic-section" id="dr-learn">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain2)" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        Learn from Zero &mdash; Disaster Recovery Strategies
+      </h2>
+
+      <!-- Part 1A: DR Fundamentals -->
+      <h3>Disaster Recovery Fundamentals</h3>
+
+      <p><strong>What is disaster recovery?</strong> Disaster recovery (DR) is the process of restoring an application and its data after a major disruption &mdash; one severe enough that normal high-availability mechanisms within a single environment cannot handle it. DR plans address scenarios like a full AWS Region outage, widespread data corruption, or catastrophic infrastructure failure.</p>
+
+      <p><strong>Why DR matters even when you have high availability.</strong> High availability (HA) protects against component failures within your environment &mdash; an instance crash, an Availability Zone outage. But HA within one Region does not protect against a Region-wide disruption, accidental data deletion that propagates across replicas, or a security incident that compromises your primary environment. DR is your plan for recovering from events that exceed your HA design.</p>
+
+      <p><strong>Key distinctions:</strong></p>
+      <ul>
+        <li><strong>High availability:</strong> Keeps the application running during individual component or AZ failures. Automatic, within-Region.</li>
+        <li><strong>Fault tolerance:</strong> Continues operating without degradation when a component fails. Zero or near-zero interruption.</li>
+        <li><strong>Backup:</strong> A point-in-time copy of data that can be restored later. Protects against data loss.</li>
+        <li><strong>Replication:</strong> Continuously copying data to another location. Keeps a second copy current (with possible lag).</li>
+        <li><strong>Disaster recovery:</strong> The complete plan and process for restoring the entire application &mdash; infrastructure, data, configuration, networking, permissions, and dependencies &mdash; after a major failure.</li>
+      </ul>
+
+      <p><strong>Recovery is more than restoring a database.</strong> A working application requires compute instances, load balancers, networking, DNS, security groups, IAM roles, secrets, configuration files, application code, and downstream dependencies. Restoring one database snapshot does not give you a running application. DR planning must cover the complete stack.</p>
+
+      <p><strong>Testing is essential.</strong> A backup that has never been restored is an assumption, not a plan. DR procedures must be tested end-to-end: restore the data, provision the infrastructure, start the application, run health checks, and verify that users can actually work. Untested plans fail when you need them most.</p>
+
+      <p><strong>E-commerce example:</strong> An online retailer runs its primary application in us-east-1. The application uses RDS, ElastiCache, S3, Lambda, and API Gateway. If us-east-1 experiences a major disruption, the company needs to restore service in eu-west-1. This requires not just a database copy, but also deployed application code, network configuration, DNS routing, IAM permissions, secrets, and verified downstream service connectivity. The DR strategy determines how much of this is pre-built, how much must be constructed during recovery, and how long recovery takes.</p>
+
+      <p><strong>The right strategy depends on business requirements.</strong> A more complex DR architecture is not automatically the right choice. A development environment does not need the same recovery posture as a payment-processing platform. Recovery requirements should drive the design, not the other way around.</p>
+
+      <!-- Part 1B: RTO and RPO -->
+      <h3>RTO and RPO &mdash; The Two Foundational Metrics</h3>
+
+      <div class="info-box">
+        <p><strong>Recovery Time Objective (RTO):</strong> The maximum acceptable duration of downtime after a disruption. It answers: &ldquo;How long can we be offline?&rdquo; RTO is a business requirement, not an automatic guarantee of any AWS service. Achieving a low RTO requires pre-provisioned infrastructure, automation, and tested recovery procedures. A 1-hour RTO means the application must be fully operational within 1 hour of the disruption.</p>
+      </div>
+
+      <div class="info-box">
+        <p><strong>Recovery Point Objective (RPO):</strong> The maximum acceptable amount of data loss, measured in time. It answers: &ldquo;How much data can we afford to lose?&rdquo; An RPO of 1 hour means you can lose at most 1 hour&rsquo;s worth of data. RPO is influenced by backup frequency and replication lag. Daily backups give you an RPO of up to 24 hours. Continuous replication can approach near-zero RPO, but asynchronous replication may still lose the most recent writes.</p>
+      </div>
+
+      <p><strong>RTO &ne; RPO.</strong> RTO is about time to recover <em>service</em>. RPO is about how much <em>data</em> you might lose. A system could recover quickly (low RTO) but lose significant data (high RPO), or vice versa. Both metrics must be considered together.</p>
+
+      <h4>Worked Examples</h4>
+
+      <div class="comparison-table-wrapper">
+        <table class="comparison-table">
+          <thead>
+            <tr><th>Application</th><th>RTO</th><th>RPO</th><th>What This Implies</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>App A: Internal wiki</td><td>24 hours</td><td>12 hours</td><td>Daily backups are sufficient. Infrastructure can be rebuilt after the event using IaC. No pre-provisioned recovery environment needed.</td></tr>
+            <tr><td>App B: Business reporting</td><td>30 minutes</td><td>5 minutes</td><td>Needs pre-provisioned or quickly scalable infrastructure. Near-continuous data replication required. Automated recovery with tested failover.</td></tr>
+            <tr><td>App C: Payment platform</td><td>5 minutes</td><td>Near zero</td><td>Requires a fully ready recovery environment with synchronous or near-synchronous replication. Automated failover with health checks. Only achievable if the entire architecture supports it.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p><strong>Important:</strong> These are hypothetical business requirements, not guaranteed results. Achieving a 5-minute RTO requires significant investment in infrastructure, automation, and testing. The strategy name does not guarantee the outcome &mdash; only a tested, measured implementation does.</p>
+
+      <div class="comparison-table-wrapper">
+        <table class="comparison-table">
+          <thead>
+            <tr><th>Metric</th><th>RTO</th><th>RPO</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Measures</td><td>Time to restore service</td><td>Amount of data loss (in time)</td></tr>
+            <tr><td>Question it answers</td><td>&ldquo;How long can we be down?&rdquo;</td><td>&ldquo;How much data can we lose?&rdquo;</td></tr>
+            <tr><td>Driven by</td><td>Infrastructure readiness, automation, testing</td><td>Backup frequency, replication lag</td></tr>
+            <tr><td>Lower value means</td><td>Faster recovery needed (more investment)</td><td>Less data loss tolerated (more replication)</td></tr>
+            <tr><td>Example cost driver</td><td>Pre-provisioned compute, auto-failover</td><td>Continuous replication, frequent snapshots</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Part 1C: The Four Main DR Strategies -->
+      <h3>The Four Main AWS Disaster Recovery Strategies</h3>
+
+      <p>AWS teaches four DR strategies, ordered by increasing readiness (and typically increasing cost and complexity). This order is a useful planning model &mdash; actual cost and recovery performance depend on the specific implementation.</p>
+
+      <h4>Strategy 1: Backup and Restore</h4>
+
+      <p><strong>What it is:</strong> Data, configuration, and application artifacts are backed up to a recovery Region. No application infrastructure runs in the recovery Region during normal operations. When a disaster occurs, infrastructure is provisioned from scratch (using Infrastructure as Code), data is restored from backups, and the application is started.</p>
+
+      <p><strong>During normal operations:</strong> Backups are taken on a regular schedule and stored in the recovery Region (e.g., S3 cross-Region replication, RDS snapshot copies, AWS Backup with cross-Region vaults). No compute, load balancers, or application components run in the DR Region.</p>
+
+      <p><strong>During recovery:</strong> Deploy infrastructure using CloudFormation/CDK. Restore databases from snapshots. Deploy application code. Configure networking, DNS, secrets, and permissions. Run health checks. Switch traffic.</p>
+
+      <p><strong>RTO/RPO impact:</strong> Highest RTO (hours to days) because everything must be built and restored. RPO depends on backup frequency &mdash; daily backups mean up to 24 hours of data loss.</p>
+
+      <p><strong>Key considerations:</strong></p>
+      <ul>
+        <li>Backups must be protected against accidental deletion, corruption, and unauthorized access (encryption, separate accounts, immutable storage).</li>
+        <li>Infrastructure as Code dramatically reduces recovery time vs. manual provisioning.</li>
+        <li>Backup retention, lifecycle policies, and access controls must be planned.</li>
+        <li>A backup that has never been restored in a test is not proof the plan works.</li>
+      </ul>
+
+      <p><strong>Best for:</strong> Non-critical workloads, development environments, or systems where long recovery windows are acceptable and cost must be minimized.</p>
+
+      <h4>Strategy 2: Pilot Light</h4>
+
+      <p><strong>What it is:</strong> Critical data is continuously replicated to the recovery Region, and a minimal core of infrastructure (e.g., database replicas, networking configuration) is kept running. Application servers and most compute resources are <em>not</em> active. When recovery is needed, additional infrastructure is provisioned and scaled up.</p>
+
+      <p><strong>During normal operations:</strong> Database replicas stay synchronized via continuous replication (e.g., RDS cross-Region read replica, Aurora Global Database). Core networking (VPC, subnets, security groups) is preconfigured. Application AMIs and launch templates are prepared. But application servers, load balancers, and other resources are not running.</p>
+
+      <p><strong>During recovery:</strong> Promote the database replica. Launch application servers from prepared AMIs/templates. Attach load balancers. Scale to required capacity. Verify health. Switch traffic via DNS.</p>
+
+      <p><strong>RTO/RPO impact:</strong> Lower RTO than backup and restore (tens of minutes to hours, depending on automation). RPO can be very low because data replication is continuous &mdash; but asynchronous replication may still lose the most recent writes.</p>
+
+      <p><strong>Key distinction from warm standby:</strong> Pilot light keeps <em>data infrastructure</em> ready but does not run a functioning application. The application cannot serve requests until additional resources are provisioned and started. A warm standby runs a reduced but functional application.</p>
+
+      <p><strong>Key considerations:</strong></p>
+      <ul>
+        <li>DNS or traffic switching alone does not make pilot light operational &mdash; application infrastructure must be started first.</li>
+        <li>Automation (CloudFormation, CDK, Systems Manager) is critical for fast provisioning.</li>
+        <li>Database promotion, configuration propagation, and dependency checks all add to recovery time.</li>
+      </ul>
+
+      <p><strong>Best for:</strong> Production workloads needing faster recovery than backup/restore, where the cost of a full warm standby is not justified.</p>
+
+      <h4>Strategy 3: Warm Standby</h4>
+
+      <p><strong>What it is:</strong> A reduced but <em>fully functioning</em> copy of the application runs in the recovery Region at all times. It can handle requests immediately, though at reduced capacity. During recovery, the standby is scaled up to full production capacity.</p>
+
+      <p><strong>During normal operations:</strong> A smaller version of the production environment runs in the DR Region &mdash; smaller instance sizes, fewer instances, reduced Auto Scaling group sizes. The database is replicated continuously. The application serves internal health checks or even a small portion of production traffic.</p>
+
+      <p><strong>During recovery:</strong> Scale up instance counts and sizes. Adjust Auto Scaling policies. Verify data replication status. Switch full production traffic to the recovery Region.</p>
+
+      <p><strong>RTO/RPO impact:</strong> Lower RTO than pilot light (minutes to tens of minutes) because the application is already running. RPO depends on replication lag &mdash; typically very low with continuous replication.</p>
+
+      <p><strong>Key distinction from pilot light:</strong> Warm standby can serve traffic immediately (at reduced capacity) without starting anything new. Pilot light requires provisioning compute resources before it can serve any traffic.</p>
+
+      <p><strong>Key distinction from active/active:</strong> Warm standby typically receives little or no production traffic during normal operations. Active/active serves full production traffic from both Regions simultaneously.</p>
+
+      <p><strong>Key considerations:</strong></p>
+      <ul>
+        <li>Running a reduced environment 24/7 costs more than pilot light but enables faster recovery.</li>
+        <li>The standby must be regularly tested with realistic traffic to ensure it actually works when needed.</li>
+        <li>Database, application code, secrets, and configuration must stay synchronized.</li>
+        <li>Scaling up takes time &mdash; warm standby is not instant full-capacity recovery.</li>
+      </ul>
+
+      <p><strong>Best for:</strong> Business-critical applications needing recovery within minutes, where the cost of running a reduced environment is justified by the recovery-time improvement.</p>
+
+      <h4>Strategy 4: Multi-Site Active/Active</h4>
+
+      <p><strong>What it is:</strong> Full production application environments run simultaneously in multiple Regions, all actively serving user traffic. If one Region fails, the other continues serving all traffic with minimal interruption.</p>
+
+      <p><strong>During normal operations:</strong> Both Regions run full-capacity application stacks. Traffic is distributed via Route 53, Global Accelerator, or CloudFront. Data is replicated bidirectionally or uses a global database (Aurora Global Database, DynamoDB Global Tables). Both Regions handle reads and writes.</p>
+
+      <p><strong>During recovery:</strong> Traffic routes away from the failed Region automatically (health checks detect the failure) or via manual DNS update. The remaining Region absorbs the full workload. There is no traditional &ldquo;failover&rdquo; &mdash; the surviving Region was already active.</p>
+
+      <p><strong>RTO/RPO impact:</strong> Potentially the lowest RTO (seconds to minutes) and near-zero RPO, but only if the entire architecture supports it. Two running environments do not automatically guarantee zero data loss or uninterrupted service.</p>
+
+      <p><strong>Key considerations:</strong></p>
+      <ul>
+        <li><strong>Data consistency:</strong> Bidirectional replication introduces write conflicts. Applications must handle conflict resolution (last-writer-wins, application-level merge, write-partitioning).</li>
+        <li><strong>Write ownership:</strong> Decide whether each Region handles all writes (requires conflict resolution) or specific write partitions (simpler but less flexible).</li>
+        <li><strong>Session state:</strong> User sessions must either be stateless or shared across Regions.</li>
+        <li><strong>Cost:</strong> Running two full production environments is the most expensive DR option.</li>
+        <li><strong>Complexity:</strong> Deployment, testing, monitoring, and data management are significantly more complex.</li>
+        <li>Both Regions must be capable of handling the full workload independently.</li>
+      </ul>
+
+      <p><strong>Best for:</strong> Mission-critical applications with stringent availability requirements, global user bases, and budgets that support the operational complexity.</p>
+
+      <h4>Strategy Comparison</h4>
+
+      <div class="comparison-table-wrapper">
+        <table class="comparison-table">
+          <thead>
+            <tr><th>Aspect</th><th>Backup &amp; Restore</th><th>Pilot Light</th><th>Warm Standby</th><th>Active/Active</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><strong>DR Region during normal ops</strong></td><td>Nothing running</td><td>Data replicated + minimal core</td><td>Reduced functioning app</td><td>Full production app</td></tr>
+            <tr><td><strong>Recovery action</strong></td><td>Build everything + restore data</td><td>Provision + start app + promote DB</td><td>Scale up existing environment</td><td>Route traffic away from failed Region</td></tr>
+            <tr><td><strong>Typical RTO</strong></td><td>Hours to days</td><td>Tens of minutes to hours</td><td>Minutes to tens of minutes</td><td>Seconds to minutes</td></tr>
+            <tr><td><strong>Typical RPO</strong></td><td>Hours (backup frequency)</td><td>Minutes (replication lag)</td><td>Minutes (replication lag)</td><td>Near zero (continuous replication)</td></tr>
+            <tr><td><strong>Relative cost</strong></td><td>Lowest</td><td>Low&ndash;moderate</td><td>Moderate&ndash;high</td><td>Highest</td></tr>
+            <tr><td><strong>Complexity</strong></td><td>Lowest</td><td>Moderate</td><td>Moderate&ndash;high</td><td>Highest</td></tr>
+            <tr><td><strong>Can serve traffic immediately</strong></td><td>No</td><td>No</td><td>Yes (reduced capacity)</td><td>Yes (full capacity)</td></tr>
+            <tr><td><strong>SAA-C03 clue</strong></td><td>&ldquo;Lowest cost DR&rdquo;</td><td>&ldquo;Core data replicated, minimal infra&rdquo;</td><td>&ldquo;Reduced but running environment&rdquo;</td><td>&ldquo;Both Regions serve traffic&rdquo;</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p><strong>Important:</strong> The RTO/RPO values above are typical ranges, not guarantees. Actual recovery performance depends on the specific implementation, automation, and testing.</p>
+
+      <!-- Part 1D: How to Choose -->
+      <h3>How to Choose the Right DR Strategy</h3>
+
+      <div class="comparison-table-wrapper">
+        <table class="comparison-table">
+          <thead>
+            <tr><th>Scenario</th><th>Likely Strategy</th><th>Key Assumption</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Dev environment; can tolerate a day of downtime</td><td>Backup &amp; Restore</td><td>IaC can rebuild; daily backups are sufficient</td></tr>
+            <tr><td>Internal reporting; several hours of recovery tolerance</td><td>Backup &amp; Restore or Pilot Light</td><td>Depends on data freshness needs</td></tr>
+            <tr><td>Revenue-generating service; recovery within tens of minutes</td><td>Warm Standby</td><td>Reduced environment runs continuously; scaling is automated</td></tr>
+            <tr><td>Critical customer-facing platform; rapid recovery, minimal data loss</td><td>Warm Standby or Active/Active</td><td>Continuous replication; automated failover tested</td></tr>
+            <tr><td>Global app must serve traffic from multiple Regions</td><td>Active/Active</td><td>Data consistency and conflict resolution are designed</td></tr>
+            <tr><td>Stateful app where active/active is too complex</td><td>Warm Standby (active/passive)</td><td>One Region is primary; standby scales up on failure</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p><strong>Decision factors:</strong></p>
+      <ul>
+        <li><strong>Maximum acceptable downtime</strong> &rarr; determines minimum RTO &rarr; drives infrastructure readiness.</li>
+        <li><strong>Acceptable data loss</strong> &rarr; determines RPO &rarr; drives replication and backup frequency.</li>
+        <li><strong>Business criticality and revenue impact</strong> &rarr; justifies higher investment in readiness.</li>
+        <li><strong>Data replication characteristics</strong> &rarr; async replication has lag; sync replication adds latency.</li>
+        <li><strong>Application dependencies</strong> &rarr; external APIs, third-party services, shared databases.</li>
+        <li><strong>Recovery automation</strong> &rarr; manual steps increase RTO and human error risk.</li>
+        <li><strong>Testing requirements</strong> &rarr; more complex strategies need more frequent testing.</li>
+        <li><strong>Compliance and data residency</strong> &rarr; may constrain which Regions can be used.</li>
+        <li><strong>Cost</strong> &rarr; running infrastructure in two Regions increases spend.</li>
+      </ul>
+
+      <!-- Part 1E: Backup and Replication Architecture -->
+      <h3>Backup vs. Replication &mdash; Complementary, Not Interchangeable</h3>
+
+      <p><strong>Backups</strong> are point-in-time copies. They capture a snapshot of data at a specific moment. If corruption or accidental deletion occurs, you can restore to a known-good point. Backups protect against logical errors, human mistakes, and ransomware &mdash; problems that replication may propagate.</p>
+
+      <p><strong>Replication</strong> continuously copies data to another location. It keeps the recovery copy current (with possible lag). Replication protects against infrastructure failure but may not protect against corruption &mdash; if bad data is written to the primary, it replicates to the secondary.</p>
+
+      <div class="comparison-table-wrapper">
+        <table class="comparison-table">
+          <thead>
+            <tr><th>Aspect</th><th>Backup</th><th>Replication</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Type</td><td>Point-in-time snapshot</td><td>Continuous copy</td></tr>
+            <tr><td>Data freshness</td><td>As of last backup</td><td>Near-current (with lag)</td></tr>
+            <tr><td>Protects against</td><td>Corruption, deletion, ransomware</td><td>Infrastructure/Region failure</td></tr>
+            <tr><td>Does NOT protect against</td><td>Data written since last backup</td><td>Corruption that replicates</td></tr>
+            <tr><td>Recovery action</td><td>Restore from snapshot</td><td>Promote replica or switch reads</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p><strong>AWS backup and replication services:</strong></p>
+      <ul>
+        <li><strong>AWS Backup:</strong> Centralized backup management for supported resources (EBS, RDS, DynamoDB, EFS, S3, etc.). Cross-Region and cross-account backup vaults. Backup plans with scheduled policies and retention rules.</li>
+        <li><strong>S3:</strong> Versioning preserves previous versions. Cross-Region Replication (CRR) copies objects to another Region. S3 Object Lock provides immutable backups.</li>
+        <li><strong>RDS:</strong> Automated backups with point-in-time recovery (within retention period). Manual snapshots can be copied cross-Region. Cross-Region read replicas for continuous replication.</li>
+        <li><strong>Aurora Global Database:</strong> Replicates across Regions with typically under 1 second of lag. Supports managed cross-Region failover.</li>
+        <li><strong>DynamoDB:</strong> On-demand backups and point-in-time recovery (PITR). Global Tables provide multi-Region active/active replication.</li>
+        <li><strong>Infrastructure as Code:</strong> CloudFormation/CDK templates reconstruct the complete environment. Store templates in version-controlled repositories with cross-Region access.</li>
+      </ul>
+
+      <p><strong>Why both are needed:</strong> Replication keeps your DR copy current for fast failover. Backups provide independent recovery points that survive corruption, logical errors, and malicious changes that replication would propagate.</p>
+
+      <!-- Part 1F: Recovery Orchestration and Traffic Failover -->
+      <h3>Recovery Orchestration &amp; Traffic Failover</h3>
+
+      <p>Recovering from a disaster is a multi-step process. Restoring data alone does not restore service. The complete recovery sequence typically includes:</p>
+
+      <ol>
+        <li><strong>Detect the failure</strong> &mdash; monitoring, health checks, CloudWatch alarms, or operator observation.</li>
+        <li><strong>Decide to initiate DR</strong> &mdash; automated (health-check-based) or manual approval depending on the runbook.</li>
+        <li><strong>Provision/scale infrastructure</strong> &mdash; launch instances, adjust Auto Scaling, deploy containers.</li>
+        <li><strong>Recover or promote the database</strong> &mdash; promote a read replica, restore from snapshot, or verify Global Database failover.</li>
+        <li><strong>Verify data consistency</strong> &mdash; confirm the recovery point, check replication status, validate data integrity.</li>
+        <li><strong>Restore configuration</strong> &mdash; secrets (Secrets Manager), environment variables, IAM permissions, network routes.</li>
+        <li><strong>Check downstream dependencies</strong> &mdash; external APIs, third-party services, partner integrations.</li>
+        <li><strong>Run health checks and smoke tests</strong> &mdash; verify the application works end-to-end before accepting traffic.</li>
+        <li><strong>Switch traffic</strong> &mdash; update Route 53 records, Global Accelerator endpoints, or CloudFront origins.</li>
+        <li><strong>Monitor the recovery</strong> &mdash; watch error rates, latency, and user impact after the switch.</li>
+      </ol>
+
+      <p><strong>DNS caching matters.</strong> Even after you update a Route 53 record, clients may use cached DNS for the previous TTL. Lower TTLs enable faster redirection but increase DNS query volume. Plan for the delay.</p>
+
+      <p><strong>Do not switch traffic before the environment is ready.</strong> Sending users to a recovery Region where the database is still restoring or the application has not started creates a worse experience than waiting.</p>
+
+      <p><strong>Failback requires its own plan.</strong> After the primary Region recovers, returning to it involves synchronizing data back, verifying the original environment, and switching traffic again. Failback is a second recovery event and must be tested independently.</p>
+
+      <p><strong>Prevent split-brain.</strong> During failover and failback, ensure only one Region accepts writes at a time (unless using an active/active design with proper conflict resolution). Two Regions accepting writes without coordination can corrupt data.</p>
+
+      <!-- Part 1G: DR Testing and Operational Readiness -->
+      <h3>DR Testing &amp; Operational Readiness</h3>
+
+      <p><strong>Why test?</strong> A documented recovery plan that has never been tested is an assumption. Real-world failures expose hidden dependencies, missing permissions, expired secrets, resource quotas, and untested automation paths.</p>
+
+      <p><strong>Types of DR tests:</strong></p>
+      <ul>
+        <li><strong>Tabletop exercise:</strong> Walk through the recovery plan on paper. Identify gaps in documentation, role assignments, and decision criteria.</li>
+        <li><strong>Restore test:</strong> Actually restore data from backups. Verify that snapshots produce usable databases and that the restore process matches expectations.</li>
+        <li><strong>Application recovery test:</strong> Restore data AND deploy the application. Verify the complete stack works &mdash; compute, networking, secrets, DNS, health checks.</li>
+        <li><strong>Regional failover exercise:</strong> Execute the full DR procedure, including traffic switching. Measure actual RTO and RPO.</li>
+        <li><strong>Failback test:</strong> After failover, test returning to the original Region. Verify data synchronization and traffic switching in reverse.</li>
+      </ul>
+
+      <p><strong>DR test checklist:</strong></p>
+      <ul>
+        <li>Can data be restored or the replica promoted within the target RTO?</li>
+        <li>Is the recovered data consistent and within the target RPO?</li>
+        <li>Do all infrastructure components deploy correctly from IaC?</li>
+        <li>Are IAM roles, security groups, secrets, and encryption keys available in the recovery Region?</li>
+        <li>Do resource quotas (service limits) in the recovery Region support the required capacity?</li>
+        <li>Do health checks pass before traffic is switched?</li>
+        <li>Can end-to-end transactions complete successfully in the recovery environment?</li>
+        <li>Is monitoring and alerting active in the recovery Region?</li>
+        <li>Does DNS failover redirect clients within the expected timeframe?</li>
+        <li>Can the team execute the runbook under time pressure?</li>
+      </ul>
+
+      <!-- Part 1H: AWS Services and Their Roles in DR -->
+      <h3>AWS Services &amp; Their Roles in DR</h3>
+
+      <div class="comparison-table-wrapper">
+        <table class="comparison-table">
+          <thead>
+            <tr><th>Service</th><th>Role in DR</th><th>What It Does NOT Do</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><strong>AWS Backup</strong></td><td>Centralized backup scheduling, retention, cross-Region/account vaults</td><td>Does not provision infrastructure or restore the application</td></tr>
+            <tr><td><strong>S3 (CRR + Versioning)</strong></td><td>Cross-Region data replication, immutable backups via Object Lock</td><td>Does not replicate compute resources or application config</td></tr>
+            <tr><td><strong>RDS Snapshots / Read Replicas</strong></td><td>Point-in-time recovery, cross-Region snapshot copies, cross-Region read replicas</td><td>Does not auto-promote replicas or rebuild the application</td></tr>
+            <tr><td><strong>Aurora Global Database</strong></td><td>Sub-second cross-Region replication, managed failover</td><td>Does not handle application deployment or DNS switching</td></tr>
+            <tr><td><strong>DynamoDB Global Tables</strong></td><td>Active/active multi-Region replication</td><td>Does not resolve application-level write conflicts</td></tr>
+            <tr><td><strong>Route 53</strong></td><td>DNS-based failover routing, health checks</td><td>Does not verify the recovery application is fully functional</td></tr>
+            <tr><td><strong>ELB</strong></td><td>Distributes traffic to healthy targets in the recovery Region</td><td>Does not provision targets or manage cross-Region failover</td></tr>
+            <tr><td><strong>Auto Scaling</strong></td><td>Scales compute in recovery Region to handle production load</td><td>Does not restore data or configure the application</td></tr>
+            <tr><td><strong>CloudFormation / CDK</strong></td><td>Provisions infrastructure from templates in the recovery Region</td><td>Does not replicate data or manage ongoing replication</td></tr>
+            <tr><td><strong>CloudWatch</strong></td><td>Monitoring, alarms, health checks to detect failures</td><td>Does not initiate failover or restore services</td></tr>
+            <tr><td><strong>Systems Manager</strong></td><td>Automation runbooks for recovery steps</td><td>Does not replace a complete DR plan</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>No single AWS service recovers an entire application. DR requires coordinating multiple services across backup, replication, provisioning, verification, and traffic management.</p>
+
+      <!-- Part 1I: Final DR Decision Guide -->
+      <h3>DR Architecture Decision Guide</h3>
+
+      <p><strong>Step-by-step framework:</strong></p>
+      <ol>
+        <li>Determine the business impact of downtime (revenue loss, customer impact, regulatory risk).</li>
+        <li>Set the required RTO and RPO based on business, not technical, requirements.</li>
+        <li>Identify all data stores, application components, and dependencies.</li>
+        <li>Choose backup frequency and replication strategy to meet RPO.</li>
+        <li>Determine how much infrastructure must remain ready (none, core data, reduced app, full app).</li>
+        <li>Automate provisioning, data recovery, and application startup.</li>
+        <li>Define how failover is triggered (automated health checks vs. manual decision).</li>
+        <li>Verify data consistency and the recovery point after failover.</li>
+        <li>Design traffic switching (Route 53, Global Accelerator) and plan for DNS caching delays.</li>
+        <li>Test the complete workflow and measure actual RTO and RPO.</li>
+      </ol>
+
+      <p><strong>Quick exam decision tree:</strong></p>
+      <ul>
+        <li>&ldquo;Lowest cost&rdquo; + &ldquo;can tolerate hours/days of downtime&rdquo; &rarr; <strong>Backup &amp; Restore</strong></li>
+        <li>&ldquo;Core data replicated&rdquo; + &ldquo;minimal infrastructure running&rdquo; &rarr; <strong>Pilot Light</strong></li>
+        <li>&ldquo;Reduced but running environment&rdquo; + &ldquo;recovery in minutes&rdquo; &rarr; <strong>Warm Standby</strong></li>
+        <li>&ldquo;Both Regions serve production traffic&rdquo; + &ldquo;near-zero downtime&rdquo; &rarr; <strong>Active/Active</strong></li>
+        <li>&ldquo;Schedule a task&rdquo; or &ldquo;run on a cron&rdquo; &rarr; Not DR &mdash; that&rsquo;s EventBridge Scheduler</li>
+      </ul>
+
+    </section>
+
+    <!-- DR SECTION 2: Real-World Scenarios -->
+    <section class="topic-section" id="dr-real-world">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain2)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        When Real Architects Actually Use This
+      </h2>
+
+      <!-- Scenario A -->
+      <div class="real-world-scenario">
+        <h4>Scenario A: Low-Criticality Development Environment</h4>
+        <p><strong>Business requirement:</strong> A dev/test environment can tolerate 24+ hours of downtime. The company wants the cheapest possible DR solution.</p>
+        <p><strong>Recommended strategy:</strong> <strong>Backup and Restore</strong></p>
+        <p><strong>How recovery works:</strong> Automated daily backups are stored in a cross-Region S3 bucket and AWS Backup vault. Infrastructure is defined in CloudFormation templates stored in a Git repository. On failure, the team deploys the CloudFormation stack in the recovery Region and restores data from the latest backup.</p>
+        <p><strong>RTO/RPO:</strong> RTO: hours to a day (deploy + restore + verify). RPO: up to 24 hours (daily backup frequency).</p>
+        <p><strong>Trade-off:</strong> Cheapest option &mdash; no running infrastructure in DR Region. But the slowest to recover. Requires IaC to be maintained and tested.</p>
+        <p><strong>Why not pilot light:</strong> Unnecessary cost for a non-critical environment that can tolerate a long outage.</p>
+        <p><strong>Exam clue:</strong> &ldquo;Lowest cost&rdquo; + &ldquo;can tolerate long downtime&rdquo; = Backup and Restore.</p>
+      </div>
+
+      <!-- Scenario B -->
+      <div class="real-world-scenario">
+        <h4>Scenario B: Critical Data Must Survive a Regional Outage</h4>
+        <p><strong>Business requirement:</strong> A production database must survive a Region failure with minimal data loss. The application has an RTO of 1&ndash;2 hours and an RPO of 5 minutes.</p>
+        <p><strong>Recommended strategy:</strong> <strong>Pilot Light</strong></p>
+        <p><strong>How recovery works:</strong> An RDS cross-Region read replica or Aurora Global Database replica continuously replicates data to the DR Region. VPC, subnets, and security groups are preconfigured. On failure, the team promotes the replica, launches application servers from prepared AMIs, and switches DNS.</p>
+        <p><strong>RTO/RPO:</strong> RTO: tens of minutes to an hour (promote DB + launch servers + verify). RPO: minutes (replication lag).</p>
+        <p><strong>Trade-off:</strong> Lower cost than warm standby (no running application servers), but slower to recover because compute must be provisioned.</p>
+        <p><strong>Why not backup and restore:</strong> Daily backups cannot meet a 5-minute RPO. Infrastructure reconstruction takes too long for a 1-hour RTO.</p>
+        <p><strong>Exam clue:</strong> &ldquo;Data continuously replicated&rdquo; + &ldquo;minimal infrastructure running&rdquo; + &ldquo;moderate RTO&rdquo; = Pilot Light.</p>
+      </div>
+
+      <!-- Scenario C -->
+      <div class="real-world-scenario">
+        <h4>Scenario C: Recovery Within Tens of Minutes</h4>
+        <p><strong>Business requirement:</strong> A business-critical e-commerce platform cannot afford more than 15 minutes of downtime or more than 1 minute of data loss.</p>
+        <p><strong>Recommended strategy:</strong> <strong>Warm Standby</strong></p>
+        <p><strong>How recovery works:</strong> A smaller version of the production stack runs continuously in the DR Region. Aurora Global Database keeps data synchronized with sub-second lag. On failure, Auto Scaling increases capacity to production levels, and Route 53 health checks trigger DNS failover.</p>
+        <p><strong>RTO/RPO:</strong> RTO: minutes (scale up + DNS propagation). RPO: seconds to 1 minute (continuous replication).</p>
+        <p><strong>Trade-off:</strong> Running a reduced environment 24/7 costs more, but the application can absorb traffic immediately while scaling.</p>
+        <p><strong>Why not pilot light:</strong> Pilot light cannot serve traffic until compute is provisioned &mdash; too slow for a 15-minute RTO.</p>
+        <p><strong>Exam clue:</strong> &ldquo;Reduced but running environment&rdquo; + &ldquo;recovery in minutes&rdquo; = Warm Standby.</p>
+      </div>
+
+      <!-- Scenario D -->
+      <div class="real-world-scenario">
+        <h4>Scenario D: Near-Continuous Service Across Regions</h4>
+        <p><strong>Business requirement:</strong> A global financial platform must serve users from multiple Regions simultaneously and survive a Regional failure with near-zero downtime.</p>
+        <p><strong>Recommended strategy:</strong> <strong>Multi-Site Active/Active</strong></p>
+        <p><strong>How recovery works:</strong> Full production stacks run in us-east-1 and eu-west-1. DynamoDB Global Tables replicate data bidirectionally. Route 53 latency-based routing directs users to the nearest Region. When one Region fails, Route 53 health checks remove it from DNS, and the surviving Region handles all traffic.</p>
+        <p><strong>RTO/RPO:</strong> RTO: seconds to minutes (traffic rerouting). RPO: near zero (continuous bidirectional replication).</p>
+        <p><strong>Trade-off:</strong> Most expensive and complex. Requires conflict resolution for concurrent writes, capacity planning for full-load absorption, and careful data consistency design.</p>
+        <p><strong>Why not warm standby:</strong> The requirement specifies both Regions serving traffic during normal operations &mdash; that is active/active, not active/passive.</p>
+        <p><strong>Exam clue:</strong> &ldquo;Both Regions serve production traffic&rdquo; + &ldquo;near-zero downtime&rdquo; = Active/Active.</p>
+      </div>
+
+      <!-- Scenario E -->
+      <div class="real-world-scenario">
+        <h4>Scenario E: A Backup Exists but Recovery Fails</h4>
+        <p><strong>Business requirement:</strong> A team stored database backups in a cross-Region vault. During a DR exercise, the database restores successfully, but the application does not work.</p>
+        <p><strong>Root cause:</strong> The recovery Region has no VPC, no security groups, no IAM roles, no secrets in Secrets Manager, and no deployed application code. The backup only contained data, not the complete environment.</p>
+        <p><strong>Lesson:</strong> DR requires infrastructure (IaC templates), networking, IAM permissions, secrets, application code, and health verification &mdash; not just data backup. Every dependency must be recoverable.</p>
+        <p><strong>Exam clue:</strong> &ldquo;Backup exists but application cannot run&rdquo; = missing infrastructure, permissions, or configuration in the recovery Region.</p>
+      </div>
+
+      <!-- Scenario F -->
+      <div class="real-world-scenario">
+        <h4>Scenario F: Replica Available but Data Is Missing</h4>
+        <p><strong>Business requirement:</strong> A company promotes a cross-Region RDS read replica after a Regional failure. Users report that their most recent transactions are missing.</p>
+        <p><strong>Root cause:</strong> Asynchronous replication had a lag of approximately 30 seconds. The last 30 seconds of writes were on the primary but had not yet reached the replica when the failure occurred.</p>
+        <p><strong>Lesson:</strong> Async replication does not guarantee zero data loss. The RPO equals the replication lag at the moment of failure. Applications must handle the possibility of missing recent writes and may need reconciliation after recovery.</p>
+        <p><strong>Exam clue:</strong> &ldquo;Replication lag&rdquo; + &ldquo;recent data missing after failover&rdquo; = async replication RPO limitation.</p>
+      </div>
+
+      <!-- Scenario G -->
+      <div class="real-world-scenario">
+        <h4>Scenario G: Failover Traffic Reaches an Unready Environment</h4>
+        <p><strong>Business requirement:</strong> A company updates Route 53 to point to the DR Region, but users see errors and timeouts.</p>
+        <p><strong>Root cause:</strong> The database replica promotion was still in progress. Application servers had not completed startup. Health checks were not configured on the load balancer. DNS was switched before the environment was ready.</p>
+        <p><strong>Lesson:</strong> Traffic should not be switched until the recovery environment passes health checks. Route 53 health checks should verify the actual application, not just port availability. Automated failover must include readiness gates.</p>
+        <p><strong>Exam clue:</strong> &ldquo;Failover completed but errors continue&rdquo; = environment not ready before traffic switch.</p>
+      </div>
+
+      <!-- Scenario H -->
+      <div class="real-world-scenario">
+        <h4>Scenario H: Accidental Deletion Propagates Through Replication</h4>
+        <p><strong>Business requirement:</strong> An administrator accidentally drops a production database table. The change replicates to the DR Region replica within seconds.</p>
+        <p><strong>Root cause:</strong> Replication faithfully copies all changes, including destructive ones. The replica now has the same deleted table.</p>
+        <p><strong>Lesson:</strong> Replication does not protect against logical errors, accidental deletion, or malicious changes. Independent backups (snapshots, point-in-time recovery) provide a different recovery point that precedes the destructive change.</p>
+        <p><strong>Exam clue:</strong> &ldquo;Corruption/deletion replicated&rdquo; = need independent backup or point-in-time recovery, not just replication.</p>
+      </div>
+
+      <!-- Scenario I -->
+      <div class="real-world-scenario">
+        <h4>Scenario I: Multi-Region Failback</h4>
+        <p><strong>Business requirement:</strong> After operating in the DR Region for two weeks, the primary Region recovers. The company wants to return to the primary.</p>
+        <p><strong>How failback works:</strong> Reverse replication from DR Region to primary Region. Verify data is synchronized. Redirect a small portion of traffic for testing. Once verified, switch full traffic back. Monitor for errors. Decommission the temporary primary role of the DR Region.</p>
+        <p><strong>Key risks:</strong> Data written in the DR Region during the recovery period must be synchronized back. Write conflicts can occur if both Regions accept writes during the transition. Failback must be tested as rigorously as failover.</p>
+        <p><strong>Exam clue:</strong> &ldquo;Return to primary Region after recovery&rdquo; = failback requires reverse replication, data sync, and its own tested plan.</p>
+      </div>
+
+      <!-- Scenario J -->
+      <div class="real-world-scenario">
+        <h4>Scenario J: Choosing Between Pilot Light and Warm Standby</h4>
+        <p><strong>Business requirement:</strong> A company has data replicated to the DR Region and must decide whether to keep only the database running (pilot light) or also run a small application stack (warm standby).</p>
+        <p><strong>Comparison:</strong></p>
+        <ul>
+          <li><strong>Pilot light:</strong> Lower ongoing cost. Higher RTO because compute must be provisioned on failover. Suitable when RTO of tens of minutes to an hour is acceptable.</li>
+          <li><strong>Warm standby:</strong> Higher ongoing cost (running reduced app 24/7). Lower RTO because the app is already running. Suitable when the application must serve traffic within minutes.</li>
+        </ul>
+        <p><strong>Decision factor:</strong> How fast must the application serve traffic after a disaster? If the answer is &ldquo;immediately at reduced capacity,&rdquo; warm standby. If &ldquo;within an hour after provisioning,&rdquo; pilot light.</p>
+        <p><strong>Exam clue:</strong> &ldquo;Can serve traffic immediately at reduced capacity&rdquo; = Warm Standby. &ldquo;Must provision compute before serving&rdquo; = Pilot Light.</p>
+      </div>
+
+    </section>
+
+    <!-- DR SECTION 3: SVG Diagram -->
+    <section class="topic-section" id="dr-diagram">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain2)" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 3v18"/></svg>
+        Disaster Recovery &mdash; Strategy Comparison
+      </h2>
+
+      <svg role="img" aria-label="AWS Disaster Recovery strategies comparison diagram" viewBox="0 0 900 920" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:900px;height:auto;margin:1.5rem auto;display:block;font-family:inherit;">
+        <title>AWS Disaster Recovery Strategies Comparison</title>
+        <desc>Four DR strategies compared: Backup and Restore, Pilot Light, Warm Standby, and Multi-Site Active/Active, showing increasing readiness and typical cost.</desc>
+
+        <defs>
+          <marker id="dr-arrow" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="10" markerHeight="7" orient="auto-start-reverse"><polygon points="0 0, 10 3.5, 0 7" fill="var(--domain2)"/></marker>
+          <filter id="dr-sketch"><feTurbulence type="turbulence" baseFrequency="0.03" numOctaves="3" result="noise"/><feDisplacementMap in="SourceGraphic" in2="noise" scale="1.2" xChannelSelector="R" yChannelSelector="G"/></filter>
+        </defs>
+
+        <!-- Strategy A: Backup & Restore -->
+        <g filter="url(#dr-sketch)">
+          <text x="450" y="28" text-anchor="middle" font-size="15" font-weight="bold" fill="var(--text)">A. Backup &amp; Restore</text>
+
+          <!-- Primary Region -->
+          <rect x="40" y="45" width="250" height="80" rx="10" fill="var(--card-bg)" stroke="var(--domain2)" stroke-width="2"/>
+          <text x="165" y="70" text-anchor="middle" font-size="13" font-weight="bold" fill="var(--domain2)">Primary Region</text>
+          <text x="165" y="90" text-anchor="middle" font-size="11" fill="var(--text)">App + DB + Full Stack</text>
+          <text x="165" y="108" text-anchor="middle" font-size="10" fill="var(--text-muted)">Active &amp; serving traffic</text>
+
+          <!-- Arrow: backups -->
+          <line x1="290" y1="85" x2="420" y2="85" stroke="#ff9900" stroke-width="2" stroke-dasharray="6,3" marker-end="url(#dr-arrow)"/>
+          <text x="355" y="77" text-anchor="middle" font-size="10" fill="#ff9900">backups</text>
+
+          <!-- Recovery Region -->
+          <rect x="425" y="45" width="250" height="80" rx="10" fill="var(--card-bg)" stroke="var(--border)" stroke-width="1.5" stroke-dasharray="8,4"/>
+          <text x="550" y="70" text-anchor="middle" font-size="13" fill="var(--text-muted)">Recovery Region</text>
+          <text x="550" y="90" text-anchor="middle" font-size="11" fill="var(--text-muted)">Backup copies only</text>
+          <text x="550" y="108" text-anchor="middle" font-size="10" fill="var(--text-muted)">Nothing running</text>
+
+          <!-- Label -->
+          <text x="740" y="75" font-size="10" fill="var(--text-muted)">RTO: hours-days</text>
+          <text x="740" y="90" font-size="10" fill="var(--text-muted)">RPO: hours</text>
+          <text x="740" y="105" font-size="10" fill="var(--text-muted)">Cost: lowest</text>
+        </g>
+
+        <!-- Strategy B: Pilot Light -->
+        <g filter="url(#dr-sketch)" transform="translate(0,145)">
+          <text x="450" y="28" text-anchor="middle" font-size="15" font-weight="bold" fill="var(--text)">B. Pilot Light</text>
+
+          <rect x="40" y="45" width="250" height="80" rx="10" fill="var(--card-bg)" stroke="var(--domain2)" stroke-width="2"/>
+          <text x="165" y="70" text-anchor="middle" font-size="13" font-weight="bold" fill="var(--domain2)">Primary Region</text>
+          <text x="165" y="90" text-anchor="middle" font-size="11" fill="var(--text)">App + DB + Full Stack</text>
+          <text x="165" y="108" text-anchor="middle" font-size="10" fill="var(--text-muted)">Active &amp; serving traffic</text>
+
+          <line x1="290" y1="85" x2="420" y2="85" stroke="#27ae60" stroke-width="2" marker-end="url(#dr-arrow)"/>
+          <text x="355" y="77" text-anchor="middle" font-size="10" fill="#27ae60">replication</text>
+
+          <rect x="425" y="45" width="250" height="80" rx="10" fill="var(--card-bg)" stroke="#27ae60" stroke-width="2"/>
+          <text x="550" y="70" text-anchor="middle" font-size="13" font-weight="bold" fill="#27ae60">Recovery Region</text>
+          <text x="550" y="90" text-anchor="middle" font-size="11" fill="var(--text)">DB replica + core network</text>
+          <text x="550" y="108" text-anchor="middle" font-size="10" fill="var(--text-muted)">App servers OFF</text>
+
+          <text x="740" y="75" font-size="10" fill="var(--text-muted)">RTO: mins-hours</text>
+          <text x="740" y="90" font-size="10" fill="var(--text-muted)">RPO: minutes</text>
+          <text x="740" y="105" font-size="10" fill="var(--text-muted)">Cost: low-mod</text>
+        </g>
+
+        <!-- Strategy C: Warm Standby -->
+        <g filter="url(#dr-sketch)" transform="translate(0,290)">
+          <text x="450" y="28" text-anchor="middle" font-size="15" font-weight="bold" fill="var(--text)">C. Warm Standby</text>
+
+          <rect x="40" y="45" width="250" height="80" rx="10" fill="var(--card-bg)" stroke="var(--domain2)" stroke-width="2"/>
+          <text x="165" y="70" text-anchor="middle" font-size="13" font-weight="bold" fill="var(--domain2)">Primary Region</text>
+          <text x="165" y="90" text-anchor="middle" font-size="11" fill="var(--text)">Full production stack</text>
+          <text x="165" y="108" text-anchor="middle" font-size="10" fill="var(--text-muted)">Active &amp; serving traffic</text>
+
+          <line x1="290" y1="85" x2="420" y2="85" stroke="#2980b9" stroke-width="2" marker-end="url(#dr-arrow)"/>
+          <text x="355" y="77" text-anchor="middle" font-size="10" fill="#2980b9">replication</text>
+
+          <rect x="425" y="45" width="250" height="80" rx="10" fill="var(--card-bg)" stroke="#2980b9" stroke-width="2"/>
+          <text x="550" y="70" text-anchor="middle" font-size="13" font-weight="bold" fill="#2980b9">Recovery Region</text>
+          <text x="550" y="90" text-anchor="middle" font-size="11" fill="var(--text)">Reduced app running</text>
+          <text x="550" y="108" text-anchor="middle" font-size="10" fill="var(--text-muted)">Can serve traffic now</text>
+
+          <text x="740" y="75" font-size="10" fill="var(--text-muted)">RTO: minutes</text>
+          <text x="740" y="90" font-size="10" fill="var(--text-muted)">RPO: seconds-mins</text>
+          <text x="740" y="105" font-size="10" fill="var(--text-muted)">Cost: mod-high</text>
+        </g>
+
+        <!-- Strategy D: Active/Active -->
+        <g filter="url(#dr-sketch)" transform="translate(0,435)">
+          <text x="450" y="28" text-anchor="middle" font-size="15" font-weight="bold" fill="var(--text)">D. Multi-Site Active/Active</text>
+
+          <rect x="40" y="45" width="250" height="80" rx="10" fill="var(--card-bg)" stroke="#8e44ad" stroke-width="2"/>
+          <text x="165" y="70" text-anchor="middle" font-size="13" font-weight="bold" fill="#8e44ad">Region A</text>
+          <text x="165" y="90" text-anchor="middle" font-size="11" fill="var(--text)">Full production stack</text>
+          <text x="165" y="108" text-anchor="middle" font-size="10" fill="var(--text-muted)">Serving traffic</text>
+
+          <line x1="290" y1="78" x2="420" y2="78" stroke="#8e44ad" stroke-width="2" marker-end="url(#dr-arrow)"/>
+          <line x1="420" y1="92" x2="290" y2="92" stroke="#8e44ad" stroke-width="2" marker-end="url(#dr-arrow)"/>
+          <text x="355" y="72" text-anchor="middle" font-size="10" fill="#8e44ad">bidirectional</text>
+          <text x="355" y="107" text-anchor="middle" font-size="10" fill="#8e44ad">replication</text>
+
+          <rect x="425" y="45" width="250" height="80" rx="10" fill="var(--card-bg)" stroke="#8e44ad" stroke-width="2"/>
+          <text x="550" y="70" text-anchor="middle" font-size="13" font-weight="bold" fill="#8e44ad">Region B</text>
+          <text x="550" y="90" text-anchor="middle" font-size="11" fill="var(--text)">Full production stack</text>
+          <text x="550" y="108" text-anchor="middle" font-size="10" fill="var(--text-muted)">Serving traffic</text>
+
+          <text x="740" y="75" font-size="10" fill="var(--text-muted)">RTO: secs-mins</text>
+          <text x="740" y="90" font-size="10" fill="var(--text-muted)">RPO: near zero</text>
+          <text x="740" y="105" font-size="10" fill="var(--text-muted)">Cost: highest</text>
+        </g>
+
+        <!-- Readiness Spectrum -->
+        <g transform="translate(0,590)">
+          <text x="450" y="20" text-anchor="middle" font-size="14" font-weight="bold" fill="var(--text)">Readiness Spectrum</text>
+
+          <!-- Arrow bar -->
+          <rect x="80" y="35" width="650" height="30" rx="15" fill="var(--card-bg)" stroke="var(--border)" stroke-width="1.5"/>
+
+          <!-- Gradient segments -->
+          <rect x="80" y="35" width="162" height="30" rx="15" fill="none" stroke="#ff9900" stroke-width="2"/>
+          <text x="161" y="55" text-anchor="middle" font-size="10" font-weight="bold" fill="#ff9900">Backup</text>
+
+          <rect x="242" y="35" width="163" height="30" fill="none" stroke="#27ae60" stroke-width="2"/>
+          <text x="323" y="55" text-anchor="middle" font-size="10" font-weight="bold" fill="#27ae60">Pilot Light</text>
+
+          <rect x="405" y="35" width="163" height="30" fill="none" stroke="#2980b9" stroke-width="2"/>
+          <text x="486" y="55" text-anchor="middle" font-size="10" font-weight="bold" fill="#2980b9">Warm Standby</text>
+
+          <rect x="568" y="35" width="162" height="30" rx="15" fill="none" stroke="#8e44ad" stroke-width="2"/>
+          <text x="649" y="55" text-anchor="middle" font-size="10" font-weight="bold" fill="#8e44ad">Active/Active</text>
+
+          <!-- Labels -->
+          <text x="80" y="85" font-size="11" fill="var(--text-muted)">&larr; Lower cost, higher RTO</text>
+          <text x="730" y="85" text-anchor="end" font-size="11" fill="var(--text-muted)">Lower RTO, higher cost &rarr;</text>
+        </g>
+
+        <!-- Note -->
+        <g transform="translate(0,690)">
+          <rect x="60" y="0" width="780" height="50" rx="8" fill="var(--card-bg)" stroke="var(--border)" stroke-width="1"/>
+          <text x="450" y="20" text-anchor="middle" font-size="11" font-style="italic" fill="var(--text-muted)">RTO and RPO are architecture outcomes that must be measured and tested;</text>
+          <text x="450" y="38" text-anchor="middle" font-size="11" font-style="italic" fill="var(--text-muted)">they are not guaranteed by the strategy name alone.</text>
+        </g>
+      </svg>
+
+      <p><strong>Key takeaway:</strong> Moving from left to right, each strategy provides faster recovery at higher cost. Backup &amp; Restore provisions everything after failure. Pilot Light keeps data ready but must start the application. Warm Standby runs a reduced application that can serve traffic immediately. Active/Active runs full production in multiple Regions simultaneously.</p>
+
+    </section>
+
+    <!-- DR SECTION 4: Exam Gotchas -->
+    <section class="topic-section" id="dr-gotchas">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain2)" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Exam Gotchas
+      </h2>
+
+      <div class="gotcha-list">
+
+        <div class="gotcha-item">
+          <p><strong>1. Confusing RTO with RPO.</strong></p>
+          <p><em>Wrong:</em> Treating them as the same metric.</p>
+          <p><em>Correct:</em> <strong>RTO</strong> = max acceptable downtime (time to recover service). <strong>RPO</strong> = max acceptable data loss (time since last good backup/replication point).</p>
+          <p><strong>Memory rule:</strong> RTO = Time to come back online. RPO = Point in time you recover data to.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <p><strong>2. Choosing backup and restore when the RTO requires much faster recovery.</strong></p>
+          <p><em>Wrong:</em> Selecting &ldquo;lowest cost&rdquo; when the scenario states a 15-minute RTO.</p>
+          <p><em>Correct:</em> Backup and restore typically takes hours. A 15-minute RTO needs warm standby or active/active.</p>
+          <p><strong>Memory rule:</strong> Read the RTO first. If it&rsquo;s minutes, backup and restore is too slow.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <p><strong>3. Assuming pilot light and warm standby are the same.</strong></p>
+          <p><em>Correct:</em> <strong>Pilot light</strong> = data replicated + minimal core resources, app servers NOT running. <strong>Warm standby</strong> = reduced but functioning application that can serve traffic immediately.</p>
+          <p><strong>Memory rule:</strong> Pilot light must turn on the app. Warm standby is already running (small).</p>
+        </div>
+
+        <div class="gotcha-item">
+          <p><strong>4. Assuming warm standby means full production capacity is already running.</strong></p>
+          <p><em>Correct:</em> Warm standby runs at reduced capacity. It must be scaled UP to handle full production load during recovery.</p>
+          <p><strong>Memory rule:</strong> Warm = running but small. Still needs to scale up.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <p><strong>5. Assuming active/active automatically guarantees zero downtime or zero data loss.</strong></p>
+          <p><em>Correct:</em> Active/active aims for near-zero RTO/RPO but does not automatically achieve it. Replication lag, write conflicts, capacity limits, and DNS propagation all affect the outcome.</p>
+          <p><strong>Memory rule:</strong> Active/active = closest to zero, not guaranteed zero.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <p><strong>6. Assuming two running environments automatically solve data consistency.</strong></p>
+          <p><em>Correct:</em> Bidirectional replication can create write conflicts. The application must handle conflict resolution (last-writer-wins, write-partitioning, or application-level merge).</p>
+          <p><strong>Memory rule:</strong> Two writers = potential conflicts. Design the resolution strategy.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <p><strong>7. Confusing HA within one Region with DR across Regions.</strong></p>
+          <p><em>Correct:</em> Multi-AZ HA protects against AZ failures within a Region. DR protects against a full Regional outage. They are complementary, not interchangeable.</p>
+          <p><strong>Memory rule:</strong> Multi-AZ = HA. Multi-Region = DR.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <p><strong>8. Assuming replicated data means the complete application is recoverable.</strong></p>
+          <p><em>Correct:</em> A database replica is one piece. Recovery requires compute, networking, IAM, secrets, configuration, code deployment, and health verification.</p>
+          <p><strong>Memory rule:</strong> Data alone &ne; working application.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <p><strong>9. Treating replication and backup as interchangeable.</strong></p>
+          <p><em>Correct:</em> Replication keeps a copy current (but propagates corruption). Backup provides an independent recovery point (but may be hours old).</p>
+          <p><strong>Memory rule:</strong> Replication = current copy. Backup = independent point-in-time copy. Need both.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <p><strong>10. Assuming a replica always contains every recent write.</strong></p>
+          <p><em>Correct:</em> Asynchronous replication has lag. Recent writes on the primary may not reach the replica before failure. RPO = replication lag at failure time.</p>
+          <p><strong>Memory rule:</strong> Async replication = some recent data may be lost.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <p><strong>11. Ignoring replication lag when evaluating RPO.</strong></p>
+          <p><em>Correct:</em> If the exam states &ldquo;RPO of zero,&rdquo; async replication alone does not satisfy it. Synchronous replication or application-level confirmation is needed.</p>
+          <p><strong>Memory rule:</strong> Zero RPO + async replication = does not compute.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <p><strong>12. Assuming DNS failover instantly redirects all clients.</strong></p>
+          <p><em>Correct:</em> DNS records have a TTL. Clients cache the old IP until TTL expires. Even a 60-second TTL means some clients connect to the old Region for up to 60 seconds.</p>
+          <p><strong>Memory rule:</strong> DNS failover speed = TTL + client cache behavior.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <p><strong>13. Switching traffic before the recovery environment is ready.</strong></p>
+          <p><em>Correct:</em> DNS should not change until the database is promoted, application is deployed, and health checks pass. Premature switching causes user-facing errors.</p>
+          <p><strong>Memory rule:</strong> Health check first, then switch traffic.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <p><strong>14. Forgetting network, secrets, IAM, quotas, and dependencies.</strong></p>
+          <p><em>Correct:</em> Recovery Regions need VPCs, subnets, security groups, IAM roles, secrets, service quotas, and downstream API access. Missing any one blocks recovery.</p>
+          <p><strong>Memory rule:</strong> The app needs more than data to run. Check every dependency.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <p><strong>15. Assuming cross-Region recovery works without preplanned infrastructure.</strong></p>
+          <p><em>Correct:</em> Even backup and restore needs IaC templates, AMIs, and permissions pre-staged in the recovery Region. Without preparation, recovery takes much longer.</p>
+          <p><strong>Memory rule:</strong> Even &ldquo;just backups&rdquo; needs a plan to rebuild the environment.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <p><strong>16. Ignoring recovery testing.</strong></p>
+          <p><em>Correct:</em> An untested DR plan is an assumption. Test restores, failovers, and failbacks regularly. Measure actual RTO/RPO against targets.</p>
+          <p><strong>Memory rule:</strong> Untested backup = Schr&ouml;dinger&rsquo;s backup (maybe works, maybe doesn&rsquo;t).</p>
+        </div>
+
+        <div class="gotcha-item">
+          <p><strong>17. Assuming a backup is useful without confirming it can be restored.</strong></p>
+          <p><em>Correct:</em> A backup that cannot be restored (wrong format, missing permissions, corrupted) is worthless. Regular restore tests are required.</p>
+          <p><strong>Memory rule:</strong> A backup you haven&rsquo;t restored is a hope, not a plan.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <p><strong>18. Confusing DR failover with failback.</strong></p>
+          <p><em>Correct:</em> Failover = switch to DR Region. Failback = return to original Region after it recovers. Failback requires reverse replication, data sync, and its own testing.</p>
+          <p><strong>Memory rule:</strong> Failback is a second recovery event. Plan and test it separately.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <p><strong>19. Assuming the cheapest strategy always meets business targets.</strong></p>
+          <p><em>Correct:</em> Backup and restore is cheapest but has the highest RTO. If the business needs minutes, not hours, a more expensive strategy is required.</p>
+          <p><strong>Memory rule:</strong> Match strategy to business requirements, not just budget.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <p><strong>20. Assuming the most complex strategy is automatically best.</strong></p>
+          <p><em>Correct:</em> Active/active adds complexity (write conflicts, deployment coordination, higher cost). For a dev environment, backup and restore is the right answer.</p>
+          <p><strong>Memory rule:</strong> Best = meets requirements at lowest justified cost and complexity.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <p><strong>21. Assuming Route 53 or AWS Backup alone recovers the entire application.</strong></p>
+          <p><em>Correct:</em> Route 53 changes DNS; it does not provision infrastructure. AWS Backup stores snapshots; it does not deploy applications. DR requires coordinating multiple services.</p>
+          <p><strong>Memory rule:</strong> No single service = complete DR. It takes a coordinated plan.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <p><strong>22. Ignoring corruption/deletion propagating through replication.</strong></p>
+          <p><em>Correct:</em> Replication copies everything &mdash; including destructive changes. If a table is dropped on the primary, it is dropped on the replica. Independent backups (snapshots, PITR) provide a clean recovery point.</p>
+          <p><strong>Memory rule:</strong> Replication copies mistakes too. Backups provide an escape hatch.</p>
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- DR SECTION 5: Practice Questions -->
+    <section class="topic-section" id="dr-practice">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain2)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Practice Questions &mdash; Disaster Recovery Strategies
+      </h2>
+
+      <div class="practice-q">
+        <p class="q-text">Q1. A company has a noncritical internal analytics application running in us-east-1. The application can tolerate up to 48 hours of downtime and can accept losing up to 24 hours of data. The company wants the LOWEST COST disaster recovery solution that protects against a Regional failure. Which approach meets these requirements?</p>
+        <ul class="q-options">
+          <li><span class="q-letter">A.</span> Deploy a warm standby in eu-west-1 with a scaled-down Auto Scaling group and an Aurora Global Database for continuous replication.</li>
+          <li><span class="q-letter">B.</span> Configure daily automated backups using AWS Backup with cross-Region copies to eu-west-1. Store CloudFormation templates in a version-controlled repository. On failure, deploy the stack in eu-west-1 and restore data from the latest backup.</li>
+          <li><span class="q-letter">C.</span> Deploy a pilot light in eu-west-1 with an RDS cross-Region read replica and preconfigured networking. On failure, promote the replica and launch application servers.</li>
+          <li><span class="q-letter">D.</span> Run an active/active deployment with DynamoDB Global Tables in both Regions and Route 53 latency-based routing.</li>
+        </ul>
+        <button class="reveal-btn">Show Answer</button>
+        <div class="answer-reveal">
+          <p><strong>Correct Answer: B</strong></p>
+          <p><strong>Backup and Restore</strong> is the lowest-cost DR strategy. With a 48-hour RTO and 24-hour RPO, daily backups and infrastructure-from-code reconstruction are perfectly adequate. A is wrong &mdash; warm standby runs infrastructure 24/7, adding unnecessary cost for a noncritical application. C is wrong &mdash; pilot light continuously replicates data and maintains core resources, which exceeds the cost requirements. D is wrong &mdash; active/active is the most expensive option and wildly over-engineered for a noncritical workload with a 48-hour RTO.</p>
+          <p><strong>Memory rule:</strong> &ldquo;Lowest cost&rdquo; + &ldquo;long RTO/RPO acceptable&rdquo; = Backup and Restore. Don&rsquo;t over-engineer.</p>
+        </div>
+      </div>
+
+      <div class="practice-q">
+        <p class="q-text">Q2. A company runs a business-critical order-management application in us-east-1. The application uses an Aurora MySQL database. The company requires an RTO of 30 minutes and an RPO of 1 minute. Data must be continuously replicated to a recovery Region. The company wants to minimize ongoing DR costs while meeting these recovery targets. Which strategy is MOST appropriate?</p>
+        <ul class="q-options">
+          <li><span class="q-letter">A.</span> Configure daily RDS automated snapshots with cross-Region copies. On failure, restore the snapshot in eu-west-1 and deploy the application stack using CloudFormation.</li>
+          <li><span class="q-letter">B.</span> Deploy a full production environment in eu-west-1 with DynamoDB Global Tables and Route 53 active/active routing.</li>
+          <li><span class="q-letter">C.</span> Configure an Aurora Global Database replicating to eu-west-1. Preconfigure networking and prepare launch templates. On failure, promote the Aurora secondary, launch application instances, and update Route 53.</li>
+          <li><span class="q-letter">D.</span> Deploy a reduced but fully functioning application stack in eu-west-1 with an Aurora Global Database. The standby serves health-check traffic continuously and scales up on failover.</li>
+        </ul>
+        <button class="reveal-btn">Show Answer</button>
+        <div class="answer-reveal">
+          <p><strong>Correct Answer: C</strong></p>
+          <p>This describes a <strong>pilot light</strong> strategy. Aurora Global Database provides continuous replication with sub-second lag (meeting the 1-minute RPO). Preconfigured networking and launch templates enable application provisioning within the 30-minute RTO. A is wrong &mdash; daily snapshots cannot meet a 1-minute RPO, and snapshot restoration + full infrastructure deployment likely exceeds 30 minutes. B is wrong &mdash; active/active with DynamoDB is far more expensive and the question asks to minimize costs; also, the application uses Aurora MySQL, not DynamoDB. D is wrong &mdash; warm standby would meet the targets but runs application infrastructure continuously, which costs more than pilot light. Since the question says &ldquo;minimize ongoing DR costs,&rdquo; pilot light is the better fit.</p>
+          <p><strong>Memory rule:</strong> &ldquo;Continuous replication&rdquo; + &ldquo;moderate RTO&rdquo; + &ldquo;minimize cost&rdquo; = Pilot Light.</p>
+        </div>
+      </div>
+
+      <div class="practice-q">
+        <p class="q-text">Q3. A global media company runs a content platform that must serve users from both us-east-1 and eu-west-1 simultaneously during normal operations. If either Region becomes unavailable, the other Region must continue serving all users with near-zero interruption and minimal data loss. The application uses a NoSQL database with user-generated content. Which architecture meets these requirements?</p>
+        <ul class="q-options">
+          <li><span class="q-letter">A.</span> Deploy the application in us-east-1 with a warm standby in eu-west-1. Use an Aurora Global Database with a secondary cluster. On failure, promote the secondary and scale up.</li>
+          <li><span class="q-letter">B.</span> Deploy full production stacks in both Regions using DynamoDB Global Tables for bidirectional data replication. Use Route 53 latency-based routing with health checks. Design the application to handle eventual consistency and write conflicts.</li>
+          <li><span class="q-letter">C.</span> Deploy the application in us-east-1. Take hourly snapshots of the database and copy them to eu-west-1. On failure, restore from the latest snapshot and deploy the application.</li>
+          <li><span class="q-letter">D.</span> Deploy the application in us-east-1 with a pilot light in eu-west-1. Replicate data continuously using DynamoDB Streams. On failure, start application servers and switch DNS.</li>
+        </ul>
+        <button class="reveal-btn">Show Answer</button>
+        <div class="answer-reveal">
+          <p><strong>Correct Answer: B</strong></p>
+          <p>The requirement states both Regions must serve traffic during normal operations &mdash; this is <strong>multi-site active/active</strong>. DynamoDB Global Tables provides bidirectional multi-Region replication. Route 53 latency-based routing distributes users to the nearest Region. Health checks automatically remove a failed Region. A is wrong &mdash; warm standby is active/passive, not active/active; only one Region serves traffic normally. C is wrong &mdash; hourly snapshots give a high RPO and require full reconstruction, far exceeding near-zero interruption. D is wrong &mdash; pilot light does not serve traffic from both Regions during normal operations.</p>
+          <p><strong>Memory rule:</strong> &ldquo;Both Regions serve traffic simultaneously&rdquo; + &ldquo;near-zero interruption&rdquo; = Active/Active.</p>
         </div>
       </div>
 
