@@ -87,6 +87,11 @@
         <li><a href="#s3s-diagram">S3 Storage &mdash; Lifecycle, Versioning &amp; Replication Diagram</a></li>
         <li><a href="#s3s-gotchas">S3 Storage &mdash; Exam Gotchas</a></li>
         <li><a href="#s3s-practice">S3 Storage &mdash; Practice Questions</a></li>
+        <li><a href="#msg-learn"><strong>SQS vs SNS vs EventBridge</strong> &mdash; Learn from Zero</a></li>
+        <li><a href="#msg-real-world">SQS vs SNS vs EventBridge &mdash; Real-World Scenarios</a></li>
+        <li><a href="#msg-diagram">SQS vs SNS vs EventBridge &mdash; Architecture Diagram</a></li>
+        <li><a href="#msg-gotchas">SQS vs SNS vs EventBridge &mdash; Exam Gotchas</a></li>
+        <li><a href="#msg-practice">SQS vs SNS vs EventBridge &mdash; Practice Questions</a></li>
       </ol>
     </nav>
 
@@ -4954,6 +4959,895 @@
           <p><strong>Correct Answer: C</strong></p>
           <p>CRR with RTC provides a 15-minute SLA for 99.99% of <strong>new objects</strong>. However, CRR only replicates objects written after the rule is created. <strong>S3 Batch Replication</strong> is needed separately to copy existing objects. A is wrong &mdash; CRR does not automatically replicate existing objects, and RTC does not apply to batch operations. B is wrong &mdash; SRR copies within the same Region, not cross-Region. D is wrong &mdash; lifecycle policies move objects between storage classes in the same bucket, not to another Region.</p>
           <p><strong>Memory rule:</strong> New objects = CRR + RTC. Existing objects = Batch Replication. Both needed for full coverage.</p>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ============================================= -->
+    <!-- TOPIC 14: SQS vs SNS vs EventBridge           -->
+    <!-- ============================================= -->
+
+    <hr class="topic-divider" style="margin-top:4rem;">
+    <div class="page-header" style="border-bottom:none;padding-bottom:0;margin-bottom:1.5rem;">
+      <h1 style="display:flex;align-items:center;gap:0.6rem;font-size:1.75rem;">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--domain2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v4H4z"/><path d="M4 12l8-4 8 4"/><path d="M4 12v4l8 4 8-4v-4"/></svg>
+        Amazon SQS vs SNS vs EventBridge
+      </h1>
+      <p>When to use message queues, pub/sub fanout, or event-driven routing &mdash; and how to choose the right service for your architecture.</p>
+    </div>
+
+    <!-- MSG SECTION 1: Learn from Zero -->
+    <section class="topic-section" id="msg-learn">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain2)" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        Learn from Zero &mdash; SQS vs SNS vs EventBridge
+      </h2>
+
+      <!-- Part 1A: Messaging & Event-Driven Architecture Fundamentals -->
+      <h3>Messaging &amp; Event-Driven Architecture Fundamentals</h3>
+
+      <p><strong>What is a distributed application?</strong> A modern application is rarely a single program running on one server. Instead, it is split into multiple <strong>components</strong> (microservices, serverless functions, worker processes) that run independently and communicate over a network. These components need a reliable way to talk to each other.</p>
+
+      <p><strong>Synchronous vs. asynchronous communication.</strong> In <strong>synchronous</strong> communication, one component calls another and waits for a response before continuing &mdash; like a phone call. In <strong>asynchronous</strong> communication, the sender fires off a message and continues its own work without waiting for the receiver to finish &mdash; like sending a text message. Asynchronous designs improve responsiveness because the sender is not blocked by slow downstream processing.</p>
+
+      <p><strong>Messages, events, and commands.</strong></p>
+      <ul>
+        <li><strong>Command:</strong> An instruction to do something &mdash; &ldquo;Process this order.&rdquo;</li>
+        <li><strong>Message:</strong> A unit of data sent between components &mdash; it could carry a command, a request, or any payload.</li>
+        <li><strong>Event:</strong> A notification that something happened &mdash; &ldquo;OrderPlaced&rdquo; or &ldquo;PaymentFailed.&rdquo; Events describe facts; they do not tell the receiver what to do.</li>
+      </ul>
+
+      <p><strong>Producers and consumers.</strong> A <strong>producer</strong> (or publisher) creates and sends messages. A <strong>consumer</strong> (or subscriber) receives and processes them. Decoupling producers from consumers means that each side can scale, fail, and recover independently.</p>
+
+      <p><strong>Three fundamental patterns:</strong></p>
+      <ul>
+        <li><strong>Message queue:</strong> A durable buffer between a producer and one or more competing consumers. Each message is processed by one consumer. Think of a line at a bank &mdash; one teller handles each customer.</li>
+        <li><strong>Pub/sub (publish&ndash;subscribe):</strong> A publisher sends a message to a topic, and the topic delivers a copy to every subscriber. Think of a radio broadcast &mdash; every tuned-in listener hears the same news.</li>
+        <li><strong>Event bus:</strong> A central router that receives events, evaluates rules based on event content, and routes matching events to the appropriate targets.</li>
+      </ul>
+
+      <p><strong>Why decoupling matters.</strong> If the order-submission API directly calls inventory, payment, and notification services synchronously, any failure or slowdown in one service stalls the entire request. Decoupled designs use messaging so each downstream component processes work at its own pace. This improves resilience (one slow service does not block others), flexibility (you can add consumers without changing the producer), and scalability (you can scale consumers independently).</p>
+
+      <p><strong>E-commerce example:</strong> A customer places an order. The system must (1) record the order, (2) process payment, (3) update inventory, and (4) send a confirmation email. These tasks have different latencies (payment is slow, recording is fast), different reliability needs (payment must not be lost), and different delivery needs (the email is not critical to the transaction). Doing them all synchronously in one API call makes the system fragile. Instead, the order API can publish a message or event, and each downstream system processes its part independently and asynchronously.</p>
+
+      <p><strong>Important nuances of asynchronous processing:</strong></p>
+      <ul>
+        <li><strong>Retries:</strong> A consumer may fail and need to reprocess a message.</li>
+        <li><strong>Ordering:</strong> Messages may arrive in a different order than sent (depending on the service).</li>
+        <li><strong>Duplication:</strong> A message may be delivered more than once.</li>
+        <li><strong>Eventual consistency:</strong> Downstream state may take time to reflect the original action.</li>
+        <li><strong>Success &ne; completion:</strong> Successfully publishing a message does not mean every consumer has finished its work. The producer knows the message was accepted, not that inventory was updated or the email was sent.</li>
+      </ul>
+
+      <p>Before diving into each AWS service, remember: a <strong>message queue</strong> (SQS) buffers work, a <strong>notification service</strong> (SNS) broadcasts to subscribers, and an <strong>event bus</strong> (EventBridge) routes events by content. They solve different problems and are often combined.</p>
+
+      <!-- Part 1B: Amazon SQS -->
+      <h3>Amazon Simple Queue Service (SQS)</h3>
+
+      <p><strong>What is SQS?</strong> Amazon SQS is a fully managed message queue service. It acts as a durable buffer between producers and consumers. A producer sends a message to the queue, and a consumer retrieves (polls) and processes it later. The queue decouples the two: the producer does not need to know who or what will process the message, and the consumer does not need to be available when the message is sent.</p>
+
+      <p><strong>How it works:</strong></p>
+      <ol>
+        <li>A <strong>producer</strong> sends a message to an SQS queue.</li>
+        <li>The message stays in the queue until a <strong>consumer</strong> polls the queue and receives it.</li>
+        <li>While the consumer is processing the message, SQS hides it from other consumers for a period called the <strong>visibility timeout</strong>.</li>
+        <li>After successful processing, the consumer <strong>deletes</strong> the message from the queue.</li>
+        <li>If the consumer fails (crashes, times out), the visibility timeout expires, and the message becomes visible again for another consumer to retry.</li>
+      </ol>
+
+      <p><strong>Why consumers poll (pull model).</strong> SQS does not push messages to consumers the way SNS does. Consumers must actively poll the queue. This means consumers control their own processing rate &mdash; they fetch messages when they are ready, not when the queue decides. This is fundamental to how SQS provides backpressure and buffering.</p>
+
+      <p><strong>Key SQS concepts:</strong></p>
+
+      <div class="info-box">
+        <p><strong>Message retention:</strong> How long SQS keeps an unprocessed message before automatically deleting it. Default: 4 days. Maximum: 14 days. If no consumer processes the message within this window, it is gone.</p>
+      </div>
+
+      <div class="info-box">
+        <p><strong>Visibility timeout:</strong> When a consumer receives a message, SQS hides it from other consumers for this duration (default: 30 seconds, max: 12 hours). This prevents two consumers from processing the same message simultaneously. If the consumer finishes and deletes the message, great. If the consumer fails, the timeout expires and the message reappears for retry. <em>Visibility timeout is not the same as message retention</em> &mdash; retention is how long the message exists; visibility timeout is how long it is hidden during processing.</p>
+      </div>
+
+      <div class="info-box">
+        <p><strong>Dead-letter queue (DLQ):</strong> A separate SQS queue where messages are sent after a configured number of failed processing attempts (the <strong>maxReceiveCount</strong> in the redrive policy). DLQs isolate &ldquo;poison messages&rdquo; so they do not block the main queue. DLQs are not automatic &mdash; you must configure a redrive policy. Messages in a DLQ still have a retention period and must be monitored.</p>
+      </div>
+
+      <div class="info-box">
+        <p><strong>Long polling vs. short polling:</strong> Short polling returns immediately (possibly empty). Long polling waits up to 20 seconds for a message to arrive, reducing empty responses and unnecessary API calls. Long polling is almost always preferred &mdash; it saves cost and reduces latency.</p>
+      </div>
+
+      <div class="info-box">
+        <p><strong>Delay queues:</strong> You can configure a queue-level delay (0&ndash;900 seconds) so that new messages are invisible for a set period before consumers can receive them. Message timers can set per-message delays on Standard queues.</p>
+      </div>
+
+      <p><strong>Why consumers must delete messages.</strong> SQS does not auto-delete messages after delivery. If a consumer receives a message, processes it, but forgets to delete it, the message reappears after the visibility timeout and gets processed again &mdash; causing duplicate work.</p>
+
+      <p><strong>Planning together:</strong> Retention, visibility timeout, and DLQ redrive configuration must be coordinated. If your visibility timeout is too short, messages reappear before workers finish. If retention is too short, messages expire before being processed. If the DLQ maxReceiveCount is too low, messages get sent to the DLQ before the application has enough retry chances.</p>
+
+      <p><strong>Worked example &mdash; absorbing traffic spikes:</strong> An online store runs a flash sale and receives 5,000 order-processing messages in 10 minutes. The order-processing workers can handle 500 messages per minute. Without a queue, the system drops 80% of orders. With SQS, all 5,000 messages sit safely in the queue, and workers process them at a sustainable 500/minute pace. The queue absorbs the burst. However, SQS does not magically make workers faster &mdash; if the backlog grows too large relative to consumer capacity, you need to scale out more workers. And those workers must respect downstream limits (database connections, payment API rate limits). The queue provides buffering, not infinite scalability.</p>
+
+      <h4>Standard vs. FIFO Queues</h4>
+
+      <div class="comparison-table-wrapper">
+        <table class="comparison-table">
+          <thead>
+            <tr><th>Feature</th><th>Standard Queue</th><th>FIFO Queue</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Throughput</td><td>Nearly unlimited &mdash; scales automatically</td><td>300 TPS (3,000 with batching), or 70,000 TPS with high-throughput mode</td></tr>
+            <tr><td>Ordering</td><td>Best-effort &mdash; generally in order, but not guaranteed</td><td>Strict ordering within each <strong>message group</strong></td></tr>
+            <tr><td>Delivery</td><td>At-least-once &mdash; duplicates are possible</td><td>Exactly-once processing (within SQS &mdash; see note below)</td></tr>
+            <tr><td>Deduplication</td><td>None built-in</td><td>Content-based deduplication or deduplication IDs (5-minute window)</td></tr>
+            <tr><td>Message groups</td><td>N/A</td><td><strong>Message group ID</strong> groups related messages &mdash; ordering is per group</td></tr>
+            <tr><td>Best for</td><td>High throughput, duplicate-tolerant workloads</td><td>Ordered processing, deduplication needed</td></tr>
+            <tr><td>Queue name</td><td>Any name</td><td>Must end in <code>.fifo</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p><strong>Standard queues</strong> offer massive scalability with at-least-once delivery. Messages might occasionally be delivered out of order or more than once. Use Standard when your application can handle duplicates (idempotent processing) and does not require strict ordering.</p>
+
+      <p><strong>FIFO queues</strong> guarantee strict ordering within a message group and provide deduplication. The <strong>message group ID</strong> determines which messages are ordered together &mdash; for example, using a customer ID means all orders for that customer are processed in sequence, while different customers can be processed in parallel. The <strong>deduplication ID</strong> (or content-based deduplication) prevents the same message from being enqueued twice within a 5-minute window.</p>
+
+      <p><strong>Important precision:</strong> FIFO&rsquo;s &ldquo;exactly-once processing&rdquo; means SQS delivers each message once and in order <em>within its own system</em>. It does not guarantee that your downstream operations (database writes, API calls, payment charges) happen exactly once. If a consumer processes a message, the delete call fails due to a network error, and the message is redelivered, the business operation could execute again. Applications should still implement idempotency for operations where duplicate execution is harmful.</p>
+
+      <p><strong>FIFO is not automatically better.</strong> If your workload does not require strict ordering, Standard queues offer higher throughput and lower cost. Choose based on your actual requirements, not a preference for &ldquo;stronger&rdquo; guarantees.</p>
+
+      <!-- Part 1C: Amazon SNS -->
+      <h3>Amazon Simple Notification Service (SNS)</h3>
+
+      <p><strong>What is SNS?</strong> Amazon SNS is a fully managed pub/sub (publish&ndash;subscribe) messaging service. Instead of buffering messages for one consumer like SQS, SNS <strong>fans out</strong> a published message to <em>all</em> of its subscribers.</p>
+
+      <p><strong>The pub/sub model:</strong></p>
+      <ol>
+        <li>You create an <strong>SNS topic</strong> &mdash; a named channel for messages.</li>
+        <li><strong>Publishers</strong> send messages to the topic.</li>
+        <li>The topic delivers a copy of each message to every <strong>subscriber</strong> that is subscribed to it.</li>
+        <li>Subscribers can be SQS queues, Lambda functions, HTTP/S endpoints, email addresses, SMS, or mobile push notifications.</li>
+      </ol>
+
+      <p><strong>SNS pushes; SQS pulls.</strong> This is a critical distinction. When a publisher sends a message to an SNS topic, SNS immediately pushes that message to all subscribers. There is no polling. With SQS, consumers must actively poll. This difference drives when you choose each service.</p>
+
+      <p><strong>Why fanout matters.</strong> Suppose an order is placed and three systems need to react: shipping, analytics, and customer notification. Without fanout, the order service would need to call each system individually (tight coupling). With SNS, the order service publishes one message to a topic, and SNS delivers it to all three subscribers. Adding a fourth subscriber later requires zero changes to the order service.</p>
+
+      <p><strong>Subscription filters.</strong> By default, every subscriber gets every message. <strong>Message filtering</strong> lets subscribers set filter policies so they only receive messages that match specific attributes. For example, a shipping subscriber can filter for <code>{"order_type": ["physical"]}</code> and ignore digital orders. This reduces unnecessary processing and keeps subscriber logic clean.</p>
+
+      <p><strong>SNS is not a durable work queue.</strong> SNS delivers messages to subscribers, but if a subscriber is temporarily unavailable, the message may be lost (depending on configuration and the subscription type). SNS supports delivery retries and DLQs for certain subscription types (like SQS and Lambda), but it does not buffer messages the way SQS does. If you need durable, independently processed backlogs for each consumer, use <strong>SNS + SQS fanout</strong>: publish to an SNS topic, and subscribe separate SQS queues for each consumer. Each queue then acts as an independent, durable buffer.</p>
+
+      <p><strong>Retries and DLQs.</strong> SNS has its own retry policies for delivery failures. For SQS and Lambda subscriptions, you can configure a DLQ (on the subscription side) to capture messages that SNS failed to deliver. Note that an SNS delivery failure (SNS could not deliver to the subscriber) is different from an SQS processing failure (a consumer could not process a message from a queue).</p>
+
+      <p><strong>Permissions matter.</strong> The publisher needs permission to publish to the topic. The topic needs permission to deliver to each subscriber. And the subscriber (e.g., an SQS queue) needs a resource policy allowing SNS to send messages to it. A successful publish does not guarantee every subscriber completed its business operation &mdash; it means SNS accepted the message and will attempt delivery.</p>
+
+      <p><strong>Practical example &mdash; order notifications:</strong> When an order is placed, the order service publishes to an SNS topic called <code>OrderEvents</code>. Three SQS queues are subscribed: <code>ShippingQueue</code>, <code>AnalyticsQueue</code>, and <code>NotificationQueue</code>. Each queue gets its own copy of the message. The shipping team&rsquo;s workers poll <code>ShippingQueue</code>, analytics workers poll <code>AnalyticsQueue</code>, and email workers poll <code>NotificationQueue</code>. If the analytics system falls behind, its queue accumulates messages without affecting shipping or email processing. Each consumer has its own backlog, retry behavior, and DLQ.</p>
+
+      <!-- Part 1D: Amazon EventBridge -->
+      <h3>Amazon EventBridge</h3>
+
+      <p><strong>What is EventBridge?</strong> Amazon EventBridge is a serverless event bus service that receives events and routes them to targets based on rules you define. It is the AWS hub for event-driven architecture &mdash; connecting AWS services, SaaS applications, and your own code through structured events.</p>
+
+      <p><strong>Core concepts:</strong></p>
+      <ul>
+        <li><strong>Event bus:</strong> A channel that receives events. Every AWS account has a default event bus that receives events from AWS services. You can also create custom event buses for your applications and partner event buses for SaaS integrations.</li>
+        <li><strong>Event source:</strong> What generates the event &mdash; an AWS service (e.g., EC2 state change, S3 object creation), a SaaS partner (e.g., Zendesk, Datadog), or your application (custom events).</li>
+        <li><strong>Rule:</strong> A filter that matches incoming events against an <strong>event pattern</strong>. A rule specifies: &ldquo;when an event with these fields arrives, send it to these targets.&rdquo;</li>
+        <li><strong>Target:</strong> The destination that receives matching events &mdash; Lambda functions, SQS queues, SNS topics, Step Functions, ECS tasks, Kinesis streams, and more. A single rule can have multiple targets.</li>
+      </ul>
+
+      <p><strong>How it works:</strong></p>
+      <ol>
+        <li>An event arrives on the event bus (from AWS, a partner, or your app).</li>
+        <li>EventBridge evaluates the event against all active rules on that bus.</li>
+        <li>For every rule whose pattern matches, EventBridge delivers the event to that rule&rsquo;s configured targets.</li>
+        <li>Multiple rules can match the same event, sending it to different targets.</li>
+      </ol>
+
+      <p><strong>Event bus vs. SQS queue.</strong> An SQS queue is a durable buffer where consumers poll for work. An EventBridge event bus is a router &mdash; it evaluates event content and pushes matching events to targets in near-real-time. EventBridge does not buffer messages for later consumption the way SQS does. If a target is unavailable, EventBridge has its own retry policy and can send failed events to a DLQ, but it is not a persistent work queue.</p>
+
+      <p><strong>Event patterns.</strong> EventBridge rules use JSON-based event patterns to match on specific fields. For example, you can match all <code>OrderPlaced</code> events where the <code>region</code> is <code>us-east-1</code> and the <code>amount</code> is greater than 100. This content-based filtering is far more powerful than simple topic-level filtering &mdash; you can route events by any combination of fields in the event payload.</p>
+
+      <p><strong>AWS service events.</strong> Over 90 AWS services automatically emit events to the default event bus. For example, EC2 sends instance state-change events, S3 sends object-creation events, and CodePipeline sends deployment status events. This makes EventBridge the natural choice for reacting to infrastructure changes.</p>
+
+      <p><strong>EventBridge vs. EventBridge Scheduler.</strong> These are related but distinct. <strong>EventBridge event buses</strong> route events that happen or are published. <strong>EventBridge Scheduler</strong> is designed for invoking targets at a scheduled time (one-time or recurring) &mdash; like a cron job. Scheduler does not process events from a bus; it triggers actions on a schedule. Do not confuse &ldquo;schedule a Lambda every 5 minutes&rdquo; (Scheduler) with &ldquo;route an OrderPlaced event to Lambda&rdquo; (event bus).</p>
+
+      <p><strong>Retries and DLQs.</strong> When EventBridge cannot deliver an event to a target, it retries for up to 24 hours (configurable). If all retries fail, you can configure a DLQ (an SQS queue) to capture undeliverable events. However, EventBridge routing an event to a target does not mean the target completed its operation successfully &mdash; a Lambda function might receive the event but fail internally.</p>
+
+      <p><strong>Schema registry and discovery.</strong> EventBridge can discover and store schemas for events flowing through your bus. This helps developers understand event structures without reading source code. Useful but not a core SAA-C03 topic.</p>
+
+      <p><strong>Practical example &mdash; event routing:</strong> A company&rsquo;s application publishes structured events to a custom EventBridge bus. Three rules are configured:</p>
+      <ul>
+        <li>Rule 1: Event type = <code>OrderPlaced</code> &rarr; triggers an order-processing Step Functions workflow.</li>
+        <li>Rule 2: Event type = <code>PaymentFailed</code> &rarr; sends an alert to an operations SNS topic.</li>
+        <li>Rule 3: Event type = <code>DeliveryCompleted</code> &rarr; invokes a Lambda that sends a customer satisfaction survey.</li>
+      </ul>
+      <p>Each rule independently evaluates every event. If a new event type <code>RefundRequested</code> is added later, a new rule handles it without modifying the existing rules or the publishing application. This is the power of loosely coupled, event-driven design.</p>
+
+      <!-- Part 1E: Complete Comparison -->
+      <h3>SQS vs SNS vs EventBridge &mdash; Complete Comparison</h3>
+
+      <div class="comparison-table-wrapper">
+        <table class="comparison-table">
+          <thead>
+            <tr><th>Aspect</th><th>Amazon SQS</th><th>Amazon SNS</th><th>Amazon EventBridge</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><strong>Primary purpose</strong></td><td>Message queue &mdash; buffer and distribute work</td><td>Pub/sub &mdash; fan out notifications to subscribers</td><td>Event bus &mdash; route events by content to targets</td></tr>
+            <tr><td><strong>Communication model</strong></td><td>Point-to-point (one message &rarr; one consumer)</td><td>One-to-many (one message &rarr; all subscribers)</td><td>Many-to-many (events &rarr; matching rule targets)</td></tr>
+            <tr><td><strong>Producer interaction</strong></td><td>SendMessage to a queue</td><td>Publish to a topic</td><td>PutEvents to an event bus</td></tr>
+            <tr><td><strong>Consumer interaction</strong></td><td>Consumer <strong>polls</strong> (pull)</td><td>SNS <strong>pushes</strong> to subscribers</td><td>EventBridge <strong>pushes</strong> to matched targets</td></tr>
+            <tr><td><strong>Message buffering</strong></td><td>Yes &mdash; durable queue (up to 14 days)</td><td>No &mdash; delivers immediately, does not buffer</td><td>No persistent buffer &mdash; retry/DLQ for failures</td></tr>
+            <tr><td><strong>Fanout</strong></td><td>No &mdash; one message processed by one consumer</td><td>Yes &mdash; all subscribers get a copy</td><td>Yes &mdash; multiple rules can match one event</td></tr>
+            <tr><td><strong>Content-based filtering</strong></td><td>No (consumer receives all messages)</td><td>Subscription filter policies (attribute-level)</td><td>Event patterns (any JSON field, nested, numeric)</td></tr>
+            <tr><td><strong>Ordering</strong></td><td>FIFO: strict per group. Standard: best-effort</td><td>FIFO topics: strict. Standard: best-effort</td><td>No ordering guarantees</td></tr>
+            <tr><td><strong>Deduplication</strong></td><td>FIFO: built-in (5-min window). Standard: none</td><td>FIFO topics: built-in</td><td>No built-in deduplication</td></tr>
+            <tr><td><strong>Retry handling</strong></td><td>Visibility timeout + re-delivery + DLQ</td><td>Delivery retry policy per subscription + DLQ</td><td>Retry policy (up to 24h) + DLQ per target</td></tr>
+            <tr><td><strong>DLQ support</strong></td><td>Yes &mdash; redrive policy on queue</td><td>Yes &mdash; on subscription (SQS/Lambda targets)</td><td>Yes &mdash; per rule target</td></tr>
+            <tr><td><strong>Typical integrations</strong></td><td>EC2/ECS workers, Lambda (event source mapping)</td><td>SQS, Lambda, HTTP/S, email, SMS, mobile push</td><td>90+ AWS services, Lambda, SQS, SNS, Step Functions, ECS, API destinations</td></tr>
+            <tr><td><strong>Transformation</strong></td><td>None</td><td>None</td><td>Input transformers on rules</td></tr>
+            <tr><td><strong>Latency</strong></td><td>Depends on polling frequency</td><td>&lt; 30ms typical push</td><td>~500ms typical</td></tr>
+            <tr><td><strong>Throughput</strong></td><td>Standard: near-unlimited. FIFO: up to 70K TPS</td><td>Standard: high. FIFO: limited</td><td>Default soft limits; can be increased</td></tr>
+            <tr><td><strong>Key limitation</strong></td><td>No fanout; no content filtering</td><td>No durable buffering; limited filtering vs EventBridge</td><td>Higher latency; no persistent buffering</td></tr>
+            <tr><td><strong>SAA-C03 scenario clue</strong></td><td>&ldquo;decouple,&rdquo; &ldquo;buffer,&rdquo; &ldquo;async workers,&rdquo; &ldquo;retry&rdquo;</td><td>&ldquo;fan out,&rdquo; &ldquo;multiple subscribers,&rdquo; &ldquo;broadcast&rdquo;</td><td>&ldquo;event-driven,&rdquo; &ldquo;route by content,&rdquo; &ldquo;AWS service events&rdquo;</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p><strong>These services combine.</strong> They are not mutually exclusive. Two common combined patterns:</p>
+
+      <div class="info-box">
+        <p><strong>SNS + SQS fanout:</strong> Publish to an SNS topic. Subscribe multiple SQS queues. Each queue provides durable, independent buffering for its consumer. This gives you fanout (SNS) plus durable work queues (SQS) &mdash; the best of both services. Example: an <code>OrderPlaced</code> message fans out to separate queues for shipping, analytics, and email, each processing at its own rate.</p>
+      </div>
+
+      <div class="info-box">
+        <p><strong>EventBridge + targets:</strong> EventBridge routes events based on content. A rule might send <code>OrderPlaced</code> events to an SQS queue for batch processing and <code>PaymentFailed</code> events to an SNS topic for immediate alerts. EventBridge handles the smart routing; downstream services handle the processing and buffering.</p>
+      </div>
+
+      <!-- Part 1F: Delivery Semantics, Ordering, Retries -->
+      <h3>Delivery Semantics, Ordering, Retries &amp; Failure Handling</h3>
+
+      <p><strong>Delivery guarantee terminology:</strong></p>
+      <ul>
+        <li><strong>At-most-once:</strong> A message is delivered zero or one time. If delivery fails, no retry. Simple but risks data loss.</li>
+        <li><strong>At-least-once:</strong> A message is delivered one or more times. Retries ensure delivery, but duplicates are possible. This is what SQS Standard, SNS Standard, and EventBridge provide.</li>
+        <li><strong>Exactly-once:</strong> Each message is delivered and processed exactly one time. SQS FIFO provides exactly-once <em>within SQS</em>, but your downstream business operations can still run twice if the delete call fails and the message is redelivered.</li>
+      </ul>
+
+      <p><strong>Why idempotency is essential.</strong> Because at-least-once delivery means duplicates are possible, any consumer that performs a non-reversible operation (charging a credit card, creating a database record) should be <strong>idempotent</strong> &mdash; processing the same message twice must produce the same result. Common techniques: use a unique message/event ID as a deduplication key in your database, or use conditional writes that check whether the operation has already been performed.</p>
+
+      <p><strong>Concrete example &mdash; duplicate payment protection:</strong> A payment service receives an <code>OrderPlaced</code> message from SQS. It charges the customer&rsquo;s card and writes a record to the database with the order ID. Due to a network hiccup, the consumer fails to delete the message, and SQS redelivers it. Without idempotency, the customer is charged twice. With idempotency, the consumer checks: &ldquo;Does a payment record for order-12345 already exist?&rdquo; If yes, it skips the charge and deletes the message. The order ID acts as a deduplication key.</p>
+
+      <p><strong>SQS failure handling flow:</strong></p>
+      <ol>
+        <li>Consumer receives a message. Visibility timeout starts.</li>
+        <li>Consumer fails to process it before the timeout expires.</li>
+        <li>Message becomes visible again. Another consumer (or the same one) picks it up.</li>
+        <li>This repeats up to <strong>maxReceiveCount</strong> times (configured in the redrive policy).</li>
+        <li>After maxReceiveCount failures, the message is moved to the <strong>dead-letter queue (DLQ)</strong>.</li>
+        <li>An alarm on DLQ depth alerts the operations team.</li>
+        <li>After diagnosing and fixing the issue, the team can <strong>redrive</strong> messages from the DLQ back to the source queue.</li>
+      </ol>
+
+      <p><strong>DLQ is not automatic recovery.</strong> Moving a message to a DLQ isolates the problem but does not fix it. Redriving messages without understanding the original failure can cause the same error again. Replaying from a DLQ also requires idempotency &mdash; the consumer may have partially processed the message before it failed.</p>
+
+      <p><strong>SNS delivery failures vs. SQS processing failures.</strong> An SNS delivery failure means SNS could not push the message to a subscriber (e.g., the SQS queue policy denied it, the HTTP endpoint was down). An SQS processing failure means a consumer received the message but could not complete its work. These are different failure modes with different solutions: fix the subscription configuration for SNS failures; fix the consumer code or downstream dependency for SQS failures.</p>
+
+      <p><strong>EventBridge target delivery.</strong> EventBridge retries failed target deliveries for up to 24 hours with exponential backoff (configurable). If retries are exhausted, events go to a configured DLQ. But EventBridge does not know whether the target&rsquo;s internal processing succeeded &mdash; it only knows whether it delivered the event to the target. A Lambda function that receives the event but throws an error is a different problem from EventBridge failing to invoke the Lambda.</p>
+
+      <p><strong>Message delivery &ne; business completion.</strong> Across all three services, successfully sending a message does not mean the business operation finished. The producer knows the message was accepted; it does not know the consumer completed its task. Monitoring (queue depth, error rates, DLQ size, consumer logs) bridges this gap.</p>
+
+      <p><strong>One failed consumer should not block unrelated consumers.</strong> In an SNS-to-SQS fanout, if the analytics consumer fails, its queue fills up &mdash; but the shipping and email consumers continue processing from their own queues. This isolation is a key benefit of the fanout-to-separate-queues pattern.</p>
+
+      <!-- Part 1G: Filtering, Fanout, and Routing -->
+      <h3>Filtering, Fanout &amp; Routing Patterns</h3>
+
+      <h4>Pattern 1: Work Queue (SQS)</h4>
+      <p>A producer sends messages to a queue, and <strong>competing consumers</strong> share the work. Each message is processed by exactly one consumer (under normal delivery). Multiple consumers poll the same queue, and SQS distributes messages among them &mdash; like multiple bank tellers serving one line of customers.</p>
+      <ul>
+        <li>Good for: background job processing, order fulfillment, image resizing.</li>
+        <li>Retry handling: visibility timeout + DLQ isolate failures.</li>
+        <li>Scaling: add more consumers to process faster, but respect downstream limits.</li>
+        <li>Key distinction: competing consumers is <em>not</em> the same as fanout. Each message goes to one worker, not all workers.</li>
+      </ul>
+
+      <h4>Pattern 2: Pub/Sub Fanout (SNS or SNS + SQS)</h4>
+      <p>A publisher sends a message to an SNS topic, and <strong>every subscriber</strong> receives a copy. This is broadcast, not competition. If three systems need to react to the same event, each gets its own copy.</p>
+      <ul>
+        <li>Good for: notifying multiple independent systems, event broadcasting.</li>
+        <li><strong>SNS-to-SQS fanout:</strong> Subscribe separate SQS queues to one SNS topic. Each consumer gets its own durable buffer with independent backlogs, retry behavior, and DLQ. This is the recommended pattern when consumers process at different speeds or have different failure modes.</li>
+        <li>Subscribing fast-changing consumers directly to SNS (e.g., HTTP endpoints) is simpler but does not provide the same durable buffering that separate SQS queues offer.</li>
+        <li>Each consumer&rsquo;s backlog is isolated &mdash; a slow analytics consumer does not block shipping.</li>
+      </ul>
+
+      <h4>Pattern 3: Event Routing (EventBridge)</h4>
+      <p>Events are published to an event bus, and <strong>rules</strong> evaluate each event&rsquo;s content to determine which targets receive it. Different downstream actions trigger based on different event fields &mdash; this is content-based routing, not just topic-level filtering.</p>
+      <ul>
+        <li>Good for: reacting to AWS service events, routing different event types to different workflows, SaaS integration.</li>
+        <li>Rule filtering prevents targets from receiving irrelevant events.</li>
+        <li>Multiple rules can match the same event, sending it to different targets.</li>
+        <li>Targets still need monitoring and failure handling &mdash; EventBridge delivering an event does not mean the target completed its job.</li>
+        <li>Event routing creates loosely coupled workflows &mdash; add new rules without changing publishers or existing rules.</li>
+      </ul>
+
+      <h4>When to use which pattern</h4>
+      <div class="comparison-table-wrapper">
+        <table class="comparison-table">
+          <thead>
+            <tr><th>Requirement</th><th>Best Pattern</th><th>Why</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Buffer work for async processing</td><td>Work Queue (SQS)</td><td>Durable buffer, consumer-controlled rate</td></tr>
+            <tr><td>One event, multiple independent reactions</td><td>Pub/Sub Fanout (SNS + SQS)</td><td>Each consumer gets its own copy and buffer</td></tr>
+            <tr><td>Route by event content to different targets</td><td>Event Routing (EventBridge)</td><td>Rules match on any JSON field</td></tr>
+            <tr><td>Distribute work among competing workers</td><td>Work Queue (SQS)</td><td>Messages distributed, not duplicated</td></tr>
+            <tr><td>React to AWS infrastructure events</td><td>Event Routing (EventBridge)</td><td>90+ AWS services emit events natively</td></tr>
+            <tr><td>Fast notification push to endpoints</td><td>Pub/Sub (SNS)</td><td>&lt; 30ms push delivery</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Part 1H: Security, Scalability, Operational -->
+      <h3>Security, Scalability &amp; Operational Considerations</h3>
+
+      <p><strong>IAM and resource-based policies.</strong> All three services use IAM for access control. Producers need permission to send messages (e.g., <code>sqs:SendMessage</code>, <code>sns:Publish</code>, <code>events:PutEvents</code>). Consumers need permission to receive and process (e.g., <code>sqs:ReceiveMessage</code>, <code>sqs:DeleteMessage</code>). SQS queues and SNS topics also support <strong>resource-based policies</strong> that grant cross-account or cross-service access &mdash; for example, allowing an SNS topic to send messages to an SQS queue. Always apply least-privilege: a consumer should only access the queues it needs.</p>
+
+      <p><strong>Encryption.</strong> All three services support encryption at rest using AWS KMS and in-transit encryption via TLS. When using KMS, ensure that producers, consumers, and the services themselves have the required key permissions. A common gotcha: an SNS topic encrypted with a KMS key cannot deliver to an SQS queue unless the queue&rsquo;s key policy allows SNS to use the key.</p>
+
+      <p><strong>Monitoring signals:</strong></p>
+      <ul>
+        <li><strong>Queue depth</strong> (ApproximateNumberOfMessagesVisible): growing backlog means consumers cannot keep up.</li>
+        <li><strong>Message age</strong> (ApproximateAgeOfOldestMessage): old messages indicate stalled processing.</li>
+        <li><strong>DLQ depth:</strong> messages in the DLQ indicate repeated processing failures.</li>
+        <li><strong>Error rates:</strong> SNS delivery failures and EventBridge failed invocations need their own alarms.</li>
+      </ul>
+
+      <p><strong>Scaling considerations.</strong> Queue-based buffering absorbs spikes, but consumers still have limits. Scaling workers based on queue depth helps, but you must respect downstream constraints: database connection limits, API rate limits, and memory/CPU capacity. Scaling to 1,000 workers that all hit the same database can create worse problems than a growing queue.</p>
+
+      <p><strong>Reprocessing and idempotency.</strong> When messages are reprocessed (from retries, DLQ redrive, or duplicate delivery), duplicate side effects can occur unless consumers are idempotent. This is an operational requirement, not just a design principle.</p>
+
+      <p><strong>Diagnosing problems.</strong> A growing queue might be a messaging problem (messages not arriving correctly) or an application problem (consumer code crashing). Check consumer error logs, DLQ contents, and downstream service health before blaming the messaging layer.</p>
+
+      <!-- Part 1I: Architecture Decision Guide -->
+      <h3>Architecture Decision Guide</h3>
+
+      <div class="comparison-table-wrapper">
+        <table class="comparison-table">
+          <thead>
+            <tr><th>Requirement</th><th>Recommended Service</th><th>Why It Fits</th><th>Main Trade-off</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Buffer background work until workers are available</td><td>SQS</td><td>Durable queue retains messages up to 14 days</td><td>No fanout &mdash; one consumer per message</td></tr>
+            <tr><td>Absorb bursts of messages</td><td>SQS</td><td>Queue absorbs spikes; consumers process at own pace</td><td>Consumers must still scale for sustained load</td></tr>
+            <tr><td>Distribute work among competing consumers</td><td>SQS</td><td>Multiple consumers poll; each message goes to one</td><td>No ordering (Standard) unless FIFO</td></tr>
+            <tr><td>Per-message ordering for related events</td><td>SQS FIFO</td><td>Strict ordering within message groups</td><td>Lower throughput; still need idempotency</td></tr>
+            <tr><td>Fan out to multiple independent systems</td><td>SNS (+ SQS queues)</td><td>SNS broadcasts; SQS buffers per consumer</td><td>Additional queue management per subscriber</td></tr>
+            <tr><td>Each subscriber gets own durable backlog</td><td>SNS &rarr; multiple SQS queues</td><td>Independent retry/DLQ per queue</td><td>More resources to manage</td></tr>
+            <tr><td>Route events by content to different targets</td><td>EventBridge</td><td>Rules match on any JSON field</td><td>~500ms latency; no persistent buffering</td></tr>
+            <tr><td>React to AWS service events</td><td>EventBridge</td><td>90+ AWS services emit events to default bus</td><td>Must verify event structure per source</td></tr>
+            <tr><td>Separate slow consumer from fast one</td><td>SNS &rarr; separate SQS queues</td><td>Independent backlogs; no mutual blocking</td><td>Fanout increases message volume</td></tr>
+            <tr><td>Retry failed processing without losing failure info</td><td>SQS + DLQ</td><td>DLQ captures failures; redrive replays them</td><td>Replay needs root cause fix + idempotency</td></tr>
+            <tr><td>Schedule a task at a future time</td><td>EventBridge Scheduler</td><td>One-time or recurring scheduled invocations</td><td>Not an event bus &mdash; no content-based routing</td></tr>
+            <tr><td>Prevent duplicate business effects on retry</td><td>Application-level idempotency</td><td>Deduplication key + conditional writes</td><td>Requires application design, not just infra</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p><strong>Core SAA-C03 decision framework:</strong> If the scenario says &ldquo;decouple,&rdquo; &ldquo;buffer,&rdquo; or &ldquo;async workers&rdquo; &rarr; <strong>SQS</strong>. If it says &ldquo;fan out,&rdquo; &ldquo;notify multiple systems,&rdquo; or &ldquo;broadcast&rdquo; &rarr; <strong>SNS</strong> (often with SQS queues). If it says &ldquo;route by event content,&rdquo; &ldquo;react to AWS events,&rdquo; or &ldquo;event-driven integration&rdquo; &rarr; <strong>EventBridge</strong>. If it says &ldquo;schedule&rdquo; &rarr; <strong>EventBridge Scheduler</strong>.</p>
+
+    </section>
+
+    <!-- MSG SECTION 2: Real-World Scenarios -->
+    <section class="topic-section" id="msg-real-world">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain2)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        When Real Architects Actually Use This
+      </h2>
+
+      <!-- Scenario A -->
+      <div class="real-world-scenario">
+        <h4>Scenario A: Buffering Order Processing</h4>
+        <p><strong>Business requirement:</strong> An e-commerce platform receives bursts of 10,000 orders during flash sales, but order-processing workers can only handle 1,000 per minute.</p>
+        <p><strong>Recommended service:</strong> <strong>Amazon SQS (Standard queue)</strong></p>
+        <p><strong>How it flows:</strong> The order API sends each order as a message to an SQS queue. Workers poll the queue, process orders at a sustainable rate, and delete messages after successful processing. A DLQ captures any orders that fail repeatedly.</p>
+        <p><strong>Why SQS:</strong> It provides durable message buffering &mdash; no orders are lost during the burst. Workers control their own pace. If a worker crashes, the message reappears after the visibility timeout for another worker to retry.</p>
+        <p><strong>Failure handling:</strong> Visibility timeout must be longer than the longest expected processing time. DLQ maxReceiveCount should allow enough retries (e.g., 3&ndash;5) before isolating failures. Monitor queue depth and message age to trigger scaling.</p>
+        <p><strong>Trade-off:</strong> SQS buffers but does not speed up processing. If the burst is sustained, you must scale consumers. Workers must be idempotent because Standard queues can deliver duplicates.</p>
+        <p><strong>Why not SNS:</strong> SNS does not buffer &mdash; it pushes immediately and does not provide a durable backlog for workers.</p>
+        <p><strong>Exam clue:</strong> &ldquo;Decouple producers from consumers&rdquo; + &ldquo;handle traffic spikes&rdquo; + &ldquo;process asynchronously&rdquo; = SQS.</p>
+      </div>
+
+      <!-- Scenario B -->
+      <div class="real-world-scenario">
+        <h4>Scenario B: Notify Multiple Independent Systems</h4>
+        <p><strong>Business requirement:</strong> When a customer places an order, shipping, analytics, and customer communications must all react independently.</p>
+        <p><strong>Recommended service:</strong> <strong>SNS topic &rarr; three SQS queues</strong></p>
+        <p><strong>How it flows:</strong> The order service publishes to an SNS topic. Three SQS queues subscribe to the topic. Each queue feeds its own set of workers: shipping processes fulfillment, analytics records metrics, and notification sends a confirmation email.</p>
+        <p><strong>Why SNS + SQS:</strong> SNS provides fanout (one message reaches all subscribers). Separate SQS queues give each consumer its own durable backlog, independent retry behavior, and isolated failure handling. If analytics falls behind, shipping and email continue unaffected.</p>
+        <p><strong>Failure handling:</strong> Each queue has its own DLQ. A shipping failure does not affect the analytics queue. SNS subscription filter policies can reduce unnecessary processing if some consumers only care about certain order types.</p>
+        <p><strong>Trade-off:</strong> More queues to manage. Each subscriber receives a copy of every message (unless filtered), so storage and processing costs scale with subscriber count.</p>
+        <p><strong>Why not SQS alone:</strong> A single SQS queue delivers each message to one consumer, not all three. You would need custom fan-out logic.</p>
+        <p><strong>Exam clue:</strong> &ldquo;Multiple systems need to receive the same message&rdquo; + &ldquo;independent processing&rdquo; = SNS fanout to SQS queues.</p>
+      </div>
+
+      <!-- Scenario C -->
+      <div class="real-world-scenario">
+        <h4>Scenario C: Route Different Event Types</h4>
+        <p><strong>Business requirement:</strong> A company publishes structured application events (order placed, payment failed, delivery completed) and needs different workflows triggered based on event type and content.</p>
+        <p><strong>Recommended service:</strong> <strong>Amazon EventBridge</strong></p>
+        <p><strong>How it flows:</strong> The application publishes events to a custom EventBridge bus. Three rules are configured: <code>OrderPlaced</code> events trigger a Step Functions workflow, <code>PaymentFailed</code> events send an alert via SNS, and <code>DeliveryCompleted</code> events invoke a Lambda for customer surveys.</p>
+        <p><strong>Why EventBridge:</strong> Rules match on event content (type, fields, values) &mdash; each rule independently evaluates every event and routes matches to the right target. No consumer receives irrelevant events. Adding a new event type only requires a new rule.</p>
+        <p><strong>Failure handling:</strong> EventBridge retries target delivery with exponential backoff. Configure a DLQ for each rule target to capture undeliverable events.</p>
+        <p><strong>Trade-off:</strong> ~500ms latency (vs. &lt;30ms for SNS). No persistent message buffering &mdash; if you need durable work queues, route to SQS as a target.</p>
+        <p><strong>Why not SQS:</strong> SQS has no content-based filtering &mdash; every consumer receives every message and must filter in application code.</p>
+        <p><strong>Exam clue:</strong> &ldquo;Route events based on content/type&rdquo; + &ldquo;different actions for different events&rdquo; = EventBridge.</p>
+      </div>
+
+      <!-- Scenario D -->
+      <div class="real-world-scenario">
+        <h4>Scenario D: Preserve Message Ordering</h4>
+        <p><strong>Business requirement:</strong> A financial processing application requires that all transactions for the same account are processed in the exact order they occurred.</p>
+        <p><strong>Recommended service:</strong> <strong>SQS FIFO queue</strong> with account ID as the message group ID.</p>
+        <p><strong>How it flows:</strong> The transaction service sends messages to a FIFO queue with the account ID as the message group ID. All transactions for account-12345 are processed in order. Transactions for account-67890 are processed in parallel (different group).</p>
+        <p><strong>Why SQS FIFO:</strong> Strict ordering within message groups ensures that deposit-then-withdrawal for the same account happens in the correct sequence. Deduplication prevents double-processing of the same transaction within a 5-minute window.</p>
+        <p><strong>Failure handling:</strong> If a message fails, no subsequent messages in that message group are delivered until the failed message is successfully processed or moved to the DLQ. Consumers must still be idempotent &mdash; FIFO deduplication protects against duplicate <em>enqueueing</em>, but downstream operations (database writes) need their own protection.</p>
+        <p><strong>Trade-off:</strong> Lower throughput than Standard queues (up to 70K TPS with high-throughput mode). Blocking within a message group on failure means a poison message can stall all messages for that group until resolved.</p>
+        <p><strong>Exam clue:</strong> &ldquo;Process in order&rdquo; + &ldquo;per entity&rdquo; = SQS FIFO with entity ID as message group ID.</p>
+      </div>
+
+      <!-- Scenario E -->
+      <div class="real-world-scenario">
+        <h4>Scenario E: Isolate a Slow Consumer</h4>
+        <p><strong>Business requirement:</strong> A notification system has a fast operational consumer (responds in milliseconds) and a slow reporting consumer (batch processing, takes minutes). The slow consumer must not delay the fast one.</p>
+        <p><strong>Recommended service:</strong> <strong>SNS topic &rarr; two separate SQS queues</strong></p>
+        <p><strong>How it flows:</strong> Events publish to an SNS topic. The fast consumer&rsquo;s SQS queue is processed immediately. The slow consumer&rsquo;s SQS queue accumulates messages and processes them in batches without affecting the fast queue.</p>
+        <p><strong>Why separate queues:</strong> Each queue provides an independent backlog. The slow consumer&rsquo;s growing queue does not block, slow, or affect the fast consumer&rsquo;s queue. Each has its own visibility timeout, DLQ, and scaling behavior.</p>
+        <p><strong>Trade-off:</strong> Two queues to manage instead of one. Both receive copies of all messages, so storage costs are higher.</p>
+        <p><strong>Exam clue:</strong> &ldquo;One slow consumer should not affect another&rdquo; = separate SQS queues via SNS fanout.</p>
+      </div>
+
+      <!-- Scenario F -->
+      <div class="real-world-scenario">
+        <h4>Scenario F: Handle Poison Messages</h4>
+        <p><strong>Business requirement:</strong> A worker repeatedly fails to process a specific malformed message, causing it to cycle through the queue and delay other messages.</p>
+        <p><strong>Recommended service:</strong> <strong>SQS + DLQ with redrive policy</strong></p>
+        <p><strong>How it flows:</strong> The redrive policy sets maxReceiveCount to 3. After three failed processing attempts, SQS automatically moves the message to the DLQ. A CloudWatch alarm on DLQ depth alerts the team. After fixing the consumer or the data, the team redrives messages from the DLQ back to the source queue.</p>
+        <p><strong>Why DLQ:</strong> Without a DLQ, the poison message cycles indefinitely through the queue, consuming worker capacity and blocking processing of healthy messages (especially in FIFO queues). The DLQ isolates the problem while healthy messages continue processing.</p>
+        <p><strong>Failure handling:</strong> DLQ messages still have a retention period &mdash; they expire too if not addressed. Redriving requires that the root cause is fixed and that consumers are idempotent (the message may have been partially processed before each failure).</p>
+        <p><strong>Trade-off:</strong> A DLQ does not fix the problem &mdash; it only quarantines it. Without monitoring and alerting, messages can silently expire in the DLQ.</p>
+        <p><strong>Exam clue:</strong> &ldquo;Messages fail repeatedly&rdquo; + &ldquo;isolate problem messages&rdquo; = SQS DLQ with redrive policy.</p>
+      </div>
+
+      <!-- Scenario G -->
+      <div class="real-world-scenario">
+        <h4>Scenario G: Respond to AWS Service Events</h4>
+        <p><strong>Business requirement:</strong> A company wants to automatically remediate when an EC2 instance changes to a &ldquo;stopped&rdquo; state in production, and log all security group changes for auditing.</p>
+        <p><strong>Recommended service:</strong> <strong>Amazon EventBridge</strong></p>
+        <p><strong>How it flows:</strong> AWS services emit events to the default EventBridge bus. Rule 1 matches EC2 instance state-change events where the state is &ldquo;stopped&rdquo; and the tag &ldquo;env&rdquo; = &ldquo;production&rdquo; &rarr; invokes a remediation Lambda. Rule 2 matches AWS CloudTrail events for security group changes &rarr; sends to an audit SQS queue.</p>
+        <p><strong>Why EventBridge:</strong> AWS service events are natively available on the default bus. Rules provide content-based filtering without any custom plumbing. Each rule operates independently.</p>
+        <p><strong>Trade-off:</strong> Event patterns must match the exact structure of AWS service events &mdash; test patterns carefully.</p>
+        <p><strong>Exam clue:</strong> &ldquo;React to AWS service state changes&rdquo; + &ldquo;automate response&rdquo; = EventBridge.</p>
+      </div>
+
+      <!-- Scenario H -->
+      <div class="real-world-scenario">
+        <h4>Scenario H: Schedule a Future Task</h4>
+        <p><strong>Business requirement:</strong> A company needs to invoke a Lambda function every day at 2 AM to generate reports, and also send a one-time reminder email 48 hours after a customer signs up.</p>
+        <p><strong>Recommended service:</strong> <strong>EventBridge Scheduler</strong></p>
+        <p><strong>How it flows:</strong> A recurring schedule invokes the report Lambda daily at 2 AM UTC. For each new customer, the application creates a one-time schedule set for 48 hours in the future, targeting a Lambda that sends the reminder.</p>
+        <p><strong>Why Scheduler:</strong> Scheduler is purpose-built for time-based invocations (cron and one-time). It supports millions of schedules with at-least-once invocation. It is not an event bus &mdash; it triggers actions at a specific time, not in response to published events.</p>
+        <p><strong>Trade-off:</strong> Scheduler invocations are at-least-once, so the target must handle duplicates. No content-based routing &mdash; use event buses for that.</p>
+        <p><strong>Why not an event bus:</strong> An event bus routes events that happen; it does not watch the clock and fire at a scheduled time.</p>
+        <p><strong>Exam clue:</strong> &ldquo;At a scheduled time&rdquo; or &ldquo;recurring daily/weekly&rdquo; = EventBridge Scheduler, not an event bus.</p>
+      </div>
+
+      <!-- Scenario I -->
+      <div class="real-world-scenario">
+        <h4>Scenario I: Scale Consumers Safely</h4>
+        <p><strong>Business requirement:</strong> A company&rsquo;s SQS queue backlog is growing. The team wants to increase processing capacity by adding more consumer instances.</p>
+        <p><strong>Recommended approach:</strong> <strong>Auto Scaling group</strong> with a scaling policy based on the <code>ApproximateNumberOfMessagesVisible</code> CloudWatch metric.</p>
+        <p><strong>How it flows:</strong> When queue depth exceeds a threshold, Auto Scaling launches additional consumer instances. As the backlog drains, instances scale back down.</p>
+        <p><strong>Why metric-based scaling:</strong> Queue depth is a direct signal of workload demand. Scaling in response to it matches consumer capacity to actual message volume.</p>
+        <p><strong>Failure handling:</strong> More consumers does not always help. If the bottleneck is downstream (database connections, API rate limits), adding consumers can create new failures (connection pool exhaustion, throttling). Scale the downstream resource too, or throttle consumers.</p>
+        <p><strong>Trade-off:</strong> Auto Scaling adds and removes instances with some delay. During sudden spikes, there is a lag before new capacity comes online. Over-aggressive scaling can overwhelm downstream systems.</p>
+        <p><strong>Exam clue:</strong> &ldquo;Queue backlog growing&rdquo; + &ldquo;scale processing&rdquo; = scale consumers based on SQS queue metrics, but consider downstream limits.</p>
+      </div>
+
+      <!-- Scenario J -->
+      <div class="real-world-scenario">
+        <h4>Scenario J: Prevent Duplicate Payment Effects</h4>
+        <p><strong>Business requirement:</strong> A payment processing consumer may receive the same order message more than once (at-least-once delivery). Charging a customer twice is unacceptable.</p>
+        <p><strong>Recommended approach:</strong> <strong>Application-level idempotency</strong> using the order ID as a deduplication key.</p>
+        <p><strong>How it flows:</strong> The consumer receives a message with order ID <code>ord-98765</code>. Before charging, it checks a database: &ldquo;Has <code>ord-98765</code> already been charged?&rdquo; If yes, skip and delete the message. If no, process the payment, record it, then delete the message. The database check and insert should use a conditional write or unique constraint to prevent race conditions.</p>
+        <p><strong>Why idempotency:</strong> No messaging service can guarantee that your downstream business operations execute exactly once across retries, network failures, and distributed systems. SQS FIFO deduplication prevents duplicate <em>enqueueing</em> within a 5-minute window, but it does not protect against a consumer processing a message, failing to delete it, and receiving it again. Only the application can prevent duplicate business effects.</p>
+        <p><strong>Trade-off:</strong> Idempotency adds complexity (deduplication table, conditional writes, key management) but is essential for any operation where duplicates cause real harm.</p>
+        <p><strong>Exam clue:</strong> &ldquo;Prevent duplicate processing&rdquo; + &ldquo;at-least-once delivery&rdquo; = application-level idempotency. Do not rely solely on FIFO deduplication for business-critical uniqueness.</p>
+      </div>
+
+    </section>
+
+    <!-- MSG SECTION 3: SVG Diagram -->
+    <section class="topic-section" id="msg-diagram">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain2)" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 3v18"/></svg>
+        SQS vs SNS vs EventBridge &mdash; Architecture Patterns
+      </h2>
+
+      <svg role="img" aria-label="SQS vs SNS vs EventBridge architecture patterns diagram" viewBox="0 0 900 820" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:900px;height:auto;margin:1.5rem auto;display:block;font-family:inherit;">
+        <title>SQS vs SNS vs EventBridge Architecture Patterns</title>
+        <desc>Three architectural patterns: SQS work queue with competing consumers, SNS pub/sub fanout to separate SQS queues, and EventBridge event routing with rules and targets.</desc>
+
+        <defs>
+          <marker id="msg-arrow" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="10" markerHeight="7" orient="auto-start-reverse"><polygon points="0 0, 10 3.5, 0 7" fill="var(--domain2)"/></marker>
+          <filter id="msg-sketch"><feTurbulence type="turbulence" baseFrequency="0.03" numOctaves="3" result="noise"/><feDisplacementMap in="SourceGraphic" in2="noise" scale="1.2" xChannelSelector="R" yChannelSelector="G"/></filter>
+        </defs>
+
+        <!-- Pattern A: SQS Work Queue -->
+        <g filter="url(#msg-sketch)">
+          <text x="450" y="30" text-anchor="middle" font-size="16" font-weight="bold" fill="var(--text)">Pattern A: SQS Work Queue</text>
+
+          <!-- Producer -->
+          <rect x="40" y="55" width="130" height="50" rx="8" fill="var(--card-bg)" stroke="var(--domain2)" stroke-width="2"/>
+          <text x="105" y="85" text-anchor="middle" font-size="13" fill="var(--text)">Producer</text>
+
+          <!-- Arrow to queue -->
+          <line x1="170" y1="80" x2="260" y2="80" stroke="var(--domain2)" stroke-width="2" marker-end="url(#msg-arrow)"/>
+          <text x="215" y="72" text-anchor="middle" font-size="10" fill="var(--text-muted)">send</text>
+
+          <!-- SQS Queue -->
+          <rect x="265" y="50" width="180" height="60" rx="10" fill="var(--card-bg)" stroke="#ff9900" stroke-width="2.5" stroke-dasharray="6,3"/>
+          <text x="355" y="77" text-anchor="middle" font-size="13" font-weight="bold" fill="#ff9900">SQS Queue</text>
+          <text x="355" y="100" text-anchor="middle" font-size="10" fill="var(--text-muted)">durable buffer</text>
+
+          <!-- Arrow to workers -->
+          <line x1="445" y1="65" x2="560" y2="50" stroke="var(--domain2)" stroke-width="2" marker-end="url(#msg-arrow)"/>
+          <line x1="445" y1="80" x2="560" y2="80" stroke="var(--domain2)" stroke-width="2" marker-end="url(#msg-arrow)"/>
+          <line x1="445" y1="95" x2="560" y2="110" stroke="var(--domain2)" stroke-width="2" marker-end="url(#msg-arrow)"/>
+          <text x="502" y="63" text-anchor="middle" font-size="10" fill="var(--text-muted)">poll</text>
+
+          <!-- Workers -->
+          <rect x="565" y="30" width="120" height="36" rx="6" fill="var(--card-bg)" stroke="var(--domain2)" stroke-width="1.5"/>
+          <text x="625" y="53" text-anchor="middle" font-size="11" fill="var(--text)">Worker 1</text>
+          <rect x="565" y="72" width="120" height="36" rx="6" fill="var(--card-bg)" stroke="var(--domain2)" stroke-width="1.5"/>
+          <text x="625" y="95" text-anchor="middle" font-size="11" fill="var(--text)">Worker 2</text>
+          <rect x="565" y="114" width="120" height="36" rx="6" fill="var(--card-bg)" stroke="var(--domain2)" stroke-width="1.5"/>
+          <text x="625" y="137" text-anchor="middle" font-size="11" fill="var(--text)">Worker 3</text>
+
+          <!-- DLQ -->
+          <line x1="355" y1="110" x2="355" y2="155" stroke="#e74c3c" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#msg-arrow)"/>
+          <rect x="290" y="158" width="130" height="35" rx="6" fill="var(--card-bg)" stroke="#e74c3c" stroke-width="1.5"/>
+          <text x="355" y="180" text-anchor="middle" font-size="10" fill="#e74c3c">DLQ (failed msgs)</text>
+
+          <!-- Labels -->
+          <text x="720" y="53" font-size="10" fill="var(--text-muted)">Each message &rarr;</text>
+          <text x="720" y="66" font-size="10" fill="var(--text-muted)">one worker only</text>
+          <text x="720" y="105" font-size="10" fill="var(--text-muted)">Delete after</text>
+          <text x="720" y="118" font-size="10" fill="var(--text-muted)">success</text>
+        </g>
+
+        <!-- Pattern B: SNS Pub/Sub Fanout -->
+        <g filter="url(#msg-sketch)" transform="translate(0,220)">
+          <text x="450" y="30" text-anchor="middle" font-size="16" font-weight="bold" fill="var(--text)">Pattern B: SNS Pub/Sub Fanout</text>
+
+          <!-- Publisher -->
+          <rect x="40" y="95" width="130" height="50" rx="8" fill="var(--card-bg)" stroke="var(--domain2)" stroke-width="2"/>
+          <text x="105" y="125" text-anchor="middle" font-size="13" fill="var(--text)">Publisher</text>
+
+          <!-- Arrow to SNS -->
+          <line x1="170" y1="120" x2="250" y2="120" stroke="var(--domain2)" stroke-width="2" marker-end="url(#msg-arrow)"/>
+          <text x="210" y="112" text-anchor="middle" font-size="10" fill="var(--text-muted)">publish</text>
+
+          <!-- SNS Topic -->
+          <polygon points="320,80 390,80 410,120 390,160 320,160 300,120" fill="var(--card-bg)" stroke="#e74c3c" stroke-width="2.5"/>
+          <text x="355" y="116" text-anchor="middle" font-size="12" font-weight="bold" fill="#e74c3c">SNS</text>
+          <text x="355" y="132" text-anchor="middle" font-size="10" fill="#e74c3c">Topic</text>
+
+          <!-- Arrows to SQS queues -->
+          <line x1="410" y1="100" x2="500" y2="60" stroke="var(--domain2)" stroke-width="2" marker-end="url(#msg-arrow)"/>
+          <line x1="410" y1="120" x2="500" y2="120" stroke="var(--domain2)" stroke-width="2" marker-end="url(#msg-arrow)"/>
+          <line x1="410" y1="140" x2="500" y2="180" stroke="var(--domain2)" stroke-width="2" marker-end="url(#msg-arrow)"/>
+          <text x="455" y="80" text-anchor="middle" font-size="9" fill="var(--text-muted)">push copy</text>
+
+          <!-- SQS Queues -->
+          <rect x="505" y="42" width="150" height="36" rx="6" fill="var(--card-bg)" stroke="#ff9900" stroke-width="1.5" stroke-dasharray="5,3"/>
+          <text x="580" y="65" text-anchor="middle" font-size="11" fill="#ff9900">ShippingQueue</text>
+
+          <rect x="505" y="102" width="150" height="36" rx="6" fill="var(--card-bg)" stroke="#ff9900" stroke-width="1.5" stroke-dasharray="5,3"/>
+          <text x="580" y="125" text-anchor="middle" font-size="11" fill="#ff9900">AnalyticsQueue</text>
+
+          <rect x="505" y="162" width="150" height="36" rx="6" fill="var(--card-bg)" stroke="#ff9900" stroke-width="1.5" stroke-dasharray="5,3"/>
+          <text x="580" y="185" text-anchor="middle" font-size="11" fill="#ff9900">NotificationQueue</text>
+
+          <!-- Workers -->
+          <line x1="655" y1="60" x2="720" y2="60" stroke="var(--domain2)" stroke-width="1.5" marker-end="url(#msg-arrow)"/>
+          <text x="760" y="65" font-size="11" fill="var(--text)">Shipping</text>
+          <line x1="655" y1="120" x2="720" y2="120" stroke="var(--domain2)" stroke-width="1.5" marker-end="url(#msg-arrow)"/>
+          <text x="760" y="125" font-size="11" fill="var(--text)">Analytics</text>
+          <line x1="655" y1="180" x2="720" y2="180" stroke="var(--domain2)" stroke-width="1.5" marker-end="url(#msg-arrow)"/>
+          <text x="760" y="185" font-size="11" fill="var(--text)">Email</text>
+
+          <!-- Labels -->
+          <text x="580" y="216" text-anchor="middle" font-size="10" fill="var(--text-muted)">Each queue = independent backlog, retry &amp; DLQ</text>
+        </g>
+
+        <!-- Pattern C: EventBridge Event Routing -->
+        <g filter="url(#msg-sketch)" transform="translate(0,480)">
+          <text x="450" y="30" text-anchor="middle" font-size="16" font-weight="bold" fill="var(--text)">Pattern C: EventBridge Event Routing</text>
+
+          <!-- Event Source -->
+          <rect x="30" y="85" width="140" height="50" rx="8" fill="var(--card-bg)" stroke="var(--domain2)" stroke-width="2"/>
+          <text x="100" y="107" text-anchor="middle" font-size="12" fill="var(--text)">App / AWS</text>
+          <text x="100" y="122" text-anchor="middle" font-size="12" fill="var(--text)">Service</text>
+
+          <!-- Arrow to bus -->
+          <line x1="170" y1="110" x2="250" y2="110" stroke="var(--domain2)" stroke-width="2" marker-end="url(#msg-arrow)"/>
+          <text x="210" y="102" text-anchor="middle" font-size="10" fill="var(--text-muted)">events</text>
+
+          <!-- EventBridge Bus -->
+          <rect x="255" y="75" width="180" height="70" rx="12" fill="var(--card-bg)" stroke="#8e44ad" stroke-width="2.5"/>
+          <text x="345" y="105" text-anchor="middle" font-size="13" font-weight="bold" fill="#8e44ad">EventBridge</text>
+          <text x="345" y="122" text-anchor="middle" font-size="11" fill="#8e44ad">Event Bus</text>
+
+          <!-- Rules and arrows -->
+          <line x1="435" y1="90" x2="530" y2="60" stroke="#8e44ad" stroke-width="2" marker-end="url(#msg-arrow)"/>
+          <line x1="435" y1="110" x2="530" y2="110" stroke="#8e44ad" stroke-width="2" marker-end="url(#msg-arrow)"/>
+          <line x1="435" y1="130" x2="530" y2="160" stroke="#8e44ad" stroke-width="2" marker-end="url(#msg-arrow)"/>
+
+          <!-- Rule labels -->
+          <text x="483" y="65" text-anchor="middle" font-size="9" fill="#8e44ad">Rule 1</text>
+          <text x="483" y="103" text-anchor="middle" font-size="9" fill="#8e44ad">Rule 2</text>
+          <text x="483" y="152" text-anchor="middle" font-size="9" fill="#8e44ad">Rule 3</text>
+
+          <!-- Targets -->
+          <rect x="535" y="42" width="175" height="36" rx="6" fill="var(--card-bg)" stroke="#8e44ad" stroke-width="1.5"/>
+          <text x="622" y="58" text-anchor="middle" font-size="10" fill="#8e44ad">OrderPlaced &rarr;</text>
+          <text x="622" y="72" text-anchor="middle" font-size="10" fill="var(--text)">Order Workflow</text>
+
+          <rect x="535" y="92" width="175" height="36" rx="6" fill="var(--card-bg)" stroke="#8e44ad" stroke-width="1.5"/>
+          <text x="622" y="108" text-anchor="middle" font-size="10" fill="#8e44ad">PaymentFailed &rarr;</text>
+          <text x="622" y="122" text-anchor="middle" font-size="10" fill="var(--text)">Ops Alert (SNS)</text>
+
+          <rect x="535" y="142" width="175" height="36" rx="6" fill="var(--card-bg)" stroke="#8e44ad" stroke-width="1.5"/>
+          <text x="622" y="158" text-anchor="middle" font-size="10" fill="#8e44ad">DeliveryDone &rarr;</text>
+          <text x="622" y="172" text-anchor="middle" font-size="10" fill="var(--text)">Customer Survey (&#x39B;)</text>
+
+          <!-- Note -->
+          <text x="622" y="200" text-anchor="middle" font-size="10" fill="var(--text-muted)">Rules match on event content &mdash; different events &rarr; different targets</text>
+        </g>
+
+        <!-- Legend -->
+        <g transform="translate(0,710)">
+          <rect x="120" y="0" width="660" height="100" rx="10" fill="var(--card-bg)" stroke="var(--border)" stroke-width="1.5"/>
+          <text x="450" y="24" text-anchor="middle" font-size="13" font-weight="bold" fill="var(--text)">Comparison Legend</text>
+          <rect x="150" y="38" width="16" height="16" rx="3" fill="var(--card-bg)" stroke="#ff9900" stroke-width="2"/>
+          <text x="174" y="52" font-size="11" fill="var(--text)"><tspan font-weight="bold">SQS:</tspan> Buffer &amp; distribute work to competing consumers</text>
+          <rect x="150" y="60" width="16" height="16" rx="3" fill="var(--card-bg)" stroke="#e74c3c" stroke-width="2"/>
+          <text x="174" y="74" font-size="11" fill="var(--text)"><tspan font-weight="bold">SNS:</tspan> Broadcast notifications to all subscribers (fanout)</text>
+          <rect x="150" y="82" width="16" height="16" rx="3" fill="var(--card-bg)" stroke="#8e44ad" stroke-width="2"/>
+          <text x="174" y="96" font-size="11" fill="var(--text)"><tspan font-weight="bold">EventBridge:</tspan> Filter &amp; route events by content to matching targets</text>
+        </g>
+      </svg>
+
+      <p><strong>Key takeaway:</strong> SQS buffers work for competing consumers (one message &rarr; one worker). SNS broadcasts to all subscribers (one message &rarr; all subscribers), ideally through separate SQS queues for durable independent processing. EventBridge routes events by content to the right targets using rules (different events &rarr; different actions).</p>
+
+    </section>
+
+    <!-- MSG SECTION 4: Exam Gotchas -->
+    <section class="topic-section" id="msg-gotchas">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain2)" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Exam Gotchas
+      </h2>
+
+      <div class="gotcha-list">
+
+        <div class="gotcha-item">
+          <p><strong>1. Choosing SNS when the requirement is durable message buffering.</strong></p>
+          <p><em>Wrong assumption:</em> SNS can hold messages until workers are ready.</p>
+          <p><em>Correct behavior:</em> SNS pushes immediately and does not buffer. Use <strong>SQS</strong> for durable work queues.</p>
+          <p><em>Exam clue:</em> &ldquo;Buffer,&rdquo; &ldquo;retain messages,&rdquo; &ldquo;workers process later&rdquo; = SQS, not SNS.</p>
+          <p><strong>Memory rule:</strong> SNS pushes; SQS buffers.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <p><strong>2. Choosing SQS when the requirement is fanout to multiple independent systems.</strong></p>
+          <p><em>Wrong assumption:</em> A single SQS queue delivers messages to all consumers.</p>
+          <p><em>Correct behavior:</em> SQS delivers each message to one consumer (competing consumers). For fanout, use <strong>SNS &rarr; multiple SQS queues</strong>.</p>
+          <p><em>Exam clue:</em> &ldquo;Multiple systems must each receive the same message&rdquo; = SNS fanout.</p>
+          <p><strong>Memory rule:</strong> SQS = one consumer per message. SNS = all subscribers get a copy.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <p><strong>3. Choosing SNS instead of EventBridge for content-based routing.</strong></p>
+          <p><em>Wrong assumption:</em> SNS filter policies can handle complex event-field routing.</p>
+          <p><em>Correct behavior:</em> SNS filters on message attributes (limited). <strong>EventBridge</strong> matches on any JSON field with complex patterns.</p>
+          <p><em>Exam clue:</em> &ldquo;Route based on event type/content/fields&rdquo; = EventBridge.</p>
+          <p><strong>Memory rule:</strong> Simple attribute filtering = SNS. Deep content-based routing = EventBridge.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <p><strong>4. Confusing EventBridge event buses with EventBridge Scheduler.</strong></p>
+          <p><em>Wrong assumption:</em> EventBridge Scheduler routes events from an event bus.</p>
+          <p><em>Correct behavior:</em> The event bus routes events that happen. <strong>Scheduler</strong> invokes targets at scheduled times (cron/one-time).</p>
+          <p><em>Exam clue:</em> &ldquo;At 2 AM daily&rdquo; = Scheduler. &ldquo;When an order event arrives&rdquo; = event bus.</p>
+          <p><strong>Memory rule:</strong> Bus = reacts to events. Scheduler = reacts to the clock.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <p><strong>5. Assuming publishing a message means consumers completed their work.</strong></p>
+          <p><em>Wrong assumption:</em> A successful Publish/SendMessage means the business operation finished.</p>
+          <p><em>Correct behavior:</em> It means the service accepted the message. Consumer processing is a separate, asynchronous step.</p>
+          <p><strong>Memory rule:</strong> Message accepted &ne; business completed.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <p><strong>6. Assuming Standard SQS queues guarantee strict ordering.</strong></p>
+          <p><em>Correct behavior:</em> Standard queues offer best-effort ordering. For strict ordering, use <strong>SQS FIFO</strong> with message group IDs.</p>
+          <p><strong>Memory rule:</strong> Standard = best-effort order. FIFO = strict order per group.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <p><strong>7. Assuming SQS Standard delivers every message exactly once.</strong></p>
+          <p><em>Correct behavior:</em> Standard queues provide at-least-once delivery. Duplicates are possible. Consumers must be idempotent.</p>
+          <p><strong>Memory rule:</strong> Standard = at-least-once = duplicates possible.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <p><strong>8. Assuming FIFO makes downstream business effects exactly once automatically.</strong></p>
+          <p><em>Correct behavior:</em> FIFO deduplication prevents duplicate enqueueing (5-min window). If a consumer processes a message, fails to delete it, and receives it again, the business operation can repeat.</p>
+          <p><strong>Memory rule:</strong> FIFO dedup = enqueueing protection. Business idempotency = your responsibility.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <p><strong>9. Confusing visibility timeout with message retention.</strong></p>
+          <p><em>Correct behavior:</em> <strong>Visibility timeout</strong> = how long a message is hidden during processing (default 30s, max 12h). <strong>Retention</strong> = how long the message exists in the queue (default 4 days, max 14 days).</p>
+          <p><strong>Memory rule:</strong> Visibility = processing window. Retention = message lifespan.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <p><strong>10. Forgetting to delete successfully processed SQS messages.</strong></p>
+          <p><em>Correct behavior:</em> SQS does not auto-delete after delivery. Undeleted messages reappear after the visibility timeout and get reprocessed.</p>
+          <p><strong>Memory rule:</strong> Receive &rarr; process &rarr; <em>delete</em>. Skip the delete = duplicate processing.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <p><strong>11. Assuming failed messages go to a DLQ automatically.</strong></p>
+          <p><em>Correct behavior:</em> A DLQ requires explicit configuration (redrive policy with maxReceiveCount). Without it, failed messages cycle forever until retention expires.</p>
+          <p><strong>Memory rule:</strong> No redrive policy = no DLQ routing.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <p><strong>12. Confusing SQS processing failure with SNS delivery failure.</strong></p>
+          <p><em>Correct behavior:</em> SQS failure = consumer could not process. SNS failure = SNS could not deliver to subscriber. Different problems, different DLQ configurations.</p>
+          <p><strong>Memory rule:</strong> SQS DLQ = processing failures. SNS DLQ = delivery failures.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <p><strong>13. Treating DLQ as automatic recovery.</strong></p>
+          <p><em>Correct behavior:</em> A DLQ quarantines problem messages. It does not fix or reprocess them. You must diagnose the failure, fix it, then redrive. Redriving without fixing = same failure again.</p>
+          <p><strong>Memory rule:</strong> DLQ = quarantine. Fix first, redrive second.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <p><strong>14. Assuming SNS subscribers automatically have independent durable backlogs.</strong></p>
+          <p><em>Correct behavior:</em> SNS pushes to subscribers. For durable, independent backlogs, subscribe separate SQS queues to the SNS topic.</p>
+          <p><strong>Memory rule:</strong> Durable per-subscriber backlogs = SNS &rarr; separate SQS queues.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <p><strong>15. Confusing competing consumers with pub/sub fanout.</strong></p>
+          <p><em>Correct behavior:</em> SQS competing consumers: one message &rarr; one worker. SNS fanout: one message &rarr; all subscribers.</p>
+          <p><strong>Memory rule:</strong> Competing = distribute. Fanout = broadcast.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <p><strong>16. Assuming EventBridge routes to only one target per event.</strong></p>
+          <p><em>Correct behavior:</em> Multiple rules can match the same event, each sending it to different targets. A single rule can also have up to five targets.</p>
+          <p><strong>Memory rule:</strong> One event can trigger multiple rules and multiple targets.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <p><strong>17. Assuming EventBridge matching a rule means the target completed its operation.</strong></p>
+          <p><em>Correct behavior:</em> EventBridge delivers the event to the target. Whether the target succeeds internally is a separate concern.</p>
+          <p><strong>Memory rule:</strong> Rule matched &ne; target succeeded.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <p><strong>18. Ignoring event-pattern details when a rule fails to match.</strong></p>
+          <p><em>Correct behavior:</em> Event patterns must match the exact field names, structure, and values. A typo or wrong nesting means no match &mdash; events silently pass through.</p>
+          <p><strong>Memory rule:</strong> No match = no delivery = no error. Test patterns carefully.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <p><strong>19. Assuming every service has identical retry and DLQ behavior.</strong></p>
+          <p><em>Correct behavior:</em> SQS retries via visibility timeout. SNS retries per delivery policy. EventBridge retries with exponential backoff up to 24h. Each has different DLQ configuration.</p>
+          <p><strong>Memory rule:</strong> Retry behavior is service-specific. Know the differences.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <p><strong>20. Scaling consumers without considering downstream capacity.</strong></p>
+          <p><em>Correct behavior:</em> More workers + same database connection limit = connection pool exhaustion. Scale downstream resources too, or throttle consumers.</p>
+          <p><strong>Memory rule:</strong> Scale consumers AND downstream capacity together.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <p><strong>21. Assuming visibility timeout prevents all duplicate processing.</strong></p>
+          <p><em>Correct behavior:</em> Visibility timeout prevents <em>simultaneous</em> processing by multiple consumers, but a consumer that finishes just as the timeout expires can still see the message redelivered to another consumer.</p>
+          <p><strong>Memory rule:</strong> Visibility timeout reduces duplicates but does not eliminate them.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <p><strong>22. Forgetting idempotency when retries can trigger duplicate business effects.</strong></p>
+          <p><em>Correct behavior:</em> At-least-once delivery + no idempotency = duplicate charges, duplicate emails, duplicate records.</p>
+          <p><strong>Memory rule:</strong> At-least-once = must design for idempotency.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <p><strong>23. Using FIFO when Standard satisfies the requirements.</strong></p>
+          <p><em>Correct behavior:</em> FIFO has lower throughput and higher cost. If ordering is not required, Standard is the better choice.</p>
+          <p><em>Exam clue:</em> &ldquo;Highest throughput&rdquo; + &ldquo;no ordering requirement&rdquo; = Standard queue.</p>
+          <p><strong>Memory rule:</strong> Don&rsquo;t pay for FIFO ordering you don&rsquo;t need.</p>
+        </div>
+
+        <div class="gotcha-item">
+          <p><strong>24. Choosing a queue when the requirement is event-content filtering and routing.</strong></p>
+          <p><em>Correct behavior:</em> SQS has no content filtering. If the requirement is &ldquo;route different events to different targets based on content,&rdquo; use <strong>EventBridge</strong>.</p>
+          <p><strong>Memory rule:</strong> Content-based routing = EventBridge. Buffered processing = SQS.</p>
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- MSG SECTION 5: Practice Questions -->
+    <section class="topic-section" id="msg-practice">
+      <h2>
+        <svg class="topic-icon" viewBox="0 0 24 24" fill="none" stroke="var(--domain2)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Practice Questions &mdash; SQS vs SNS vs EventBridge
+      </h2>
+
+      <div class="practice-q">
+        <p class="q-text">Q1. A media company&rsquo;s video-processing application receives thousands of upload requests during peak hours. Each uploaded video must be transcoded asynchronously by a fleet of EC2 worker instances. If a worker crashes during transcoding, the job must be retried automatically. Failed jobs that exceed five retry attempts must be isolated for investigation without blocking other jobs. Which architecture meets these requirements?</p>
+        <ul class="q-options">
+          <li><span class="q-letter">A.</span> Publish upload events to an SNS topic. Subscribe the worker instances directly to the topic so each worker receives every job.</li>
+          <li><span class="q-letter">B.</span> Send upload messages to an SQS Standard queue with a visibility timeout longer than the maximum transcoding time. Configure a dead-letter queue with a maxReceiveCount of 5. Workers poll the queue, transcode, and delete the message on success.</li>
+          <li><span class="q-letter">C.</span> Send upload events to an EventBridge custom event bus. Configure a rule that invokes each worker instance directly as a target.</li>
+          <li><span class="q-letter">D.</span> Send upload messages to an SQS FIFO queue with message group ID set to a single static value so all jobs are processed in strict order.</li>
+        </ul>
+        <button class="reveal-btn">Show Answer</button>
+        <div class="answer-reveal">
+          <p><strong>Correct Answer: B</strong></p>
+          <p>SQS Standard provides durable message buffering, automatic retry via visibility timeout, and DLQ isolation for repeatedly failing jobs. Workers poll at their own pace, and if one crashes, the message reappears after the visibility timeout for another worker. A is wrong &mdash; SNS pushes every message to every subscriber; you need one worker per job, not all workers processing every job. C is wrong &mdash; EventBridge routes events but does not provide durable buffering or consumer-controlled polling. D is wrong &mdash; a single static message group ID forces strict serial processing, destroying parallelism; video transcoding does not require ordering.</p>
+          <p><strong>Memory rule:</strong> &ldquo;Async workers&rdquo; + &ldquo;retry on failure&rdquo; + &ldquo;isolate poison messages&rdquo; = SQS queue + DLQ.</p>
+        </div>
+      </div>
+
+      <div class="practice-q">
+        <p class="q-text">Q2. An e-commerce company needs to notify three independent downstream systems whenever an order is placed: a shipping service, an analytics pipeline, and a customer notification service. Each system processes at a different speed, and a failure in one system must not affect the others. Each system needs its own retry logic and failure isolation. Which architecture meets these requirements with the LEAST operational overhead?</p>
+        <ul class="q-options">
+          <li><span class="q-letter">A.</span> Send the order event to a single SQS queue. Have all three systems poll the same queue.</li>
+          <li><span class="q-letter">B.</span> Send the order event to three separate SQS queues from the order service, one for each downstream system.</li>
+          <li><span class="q-letter">C.</span> Publish the order event to an SNS topic. Subscribe three separate SQS queues (one per system) to the topic. Each system polls its own queue independently.</li>
+          <li><span class="q-letter">D.</span> Publish the order event to an SNS topic. Subscribe each downstream system&rsquo;s HTTP endpoint directly to the topic.</li>
+        </ul>
+        <button class="reveal-btn">Show Answer</button>
+        <div class="answer-reveal">
+          <p><strong>Correct Answer: C</strong></p>
+          <p>The SNS-to-SQS fanout pattern delivers a copy of each message to all three SQS queues. Each system polls its own queue independently, with its own visibility timeout, DLQ, and retry behavior. A failure in analytics does not affect shipping. A is wrong &mdash; a single SQS queue delivers each message to only one consumer, not all three. B is wrong &mdash; it works but requires the order service to send to three queues (tighter coupling and more code changes when adding a fourth system). C uses SNS for decoupled fanout with less operational overhead. D is wrong &mdash; direct HTTP subscriptions do not provide durable buffering; if an endpoint is down, messages may be lost without separate DLQ configuration.</p>
+          <p><strong>Memory rule:</strong> &ldquo;One event, multiple independent consumers, each with own retry&rdquo; = SNS &rarr; separate SQS queues.</p>
+        </div>
+      </div>
+
+      <div class="practice-q">
+        <p class="q-text">Q3. A financial services company publishes structured application events to a central system. When an event has <code>type: &ldquo;FraudDetected&rdquo;</code>, it must trigger a security investigation Lambda function. When an event has <code>type: &ldquo;TransactionCompleted&rdquo;</code> and <code>amount</code> greater than 10,000, it must send an alert to an operations SNS topic. Other event types require no action. Which service provides this content-based routing with the LEAST custom code?</p>
+        <ul class="q-options">
+          <li><span class="q-letter">A.</span> Send all events to an SQS queue. A single Lambda consumer reads every message and uses application logic to route based on event type and amount.</li>
+          <li><span class="q-letter">B.</span> Publish all events to an SNS topic with message filtering. Create subscription filter policies that match on event type and numeric amount thresholds.</li>
+          <li><span class="q-letter">C.</span> Send events to an Amazon EventBridge custom event bus. Create one rule matching <code>type: &ldquo;FraudDetected&rdquo;</code> targeting the security Lambda, and another rule matching <code>type: &ldquo;TransactionCompleted&rdquo;</code> with a numeric condition on <code>amount</code> targeting the operations SNS topic.</li>
+          <li><span class="q-letter">D.</span> Use Amazon EventBridge Scheduler to poll the event source every minute and invoke the appropriate targets based on the event content.</li>
+        </ul>
+        <button class="reveal-btn">Show Answer</button>
+        <div class="answer-reveal">
+          <p><strong>Correct Answer: C</strong></p>
+          <p>EventBridge event patterns support matching on any JSON field, including numeric conditions (greater-than, less-than). Two rules handle both routing requirements with zero custom code. A is wrong &mdash; it works but requires custom routing logic inside a Lambda, adding code to maintain. B is wrong &mdash; SNS filter policies support basic attribute matching but do not natively support numeric greater-than conditions on message body fields the way EventBridge patterns do. D is wrong &mdash; EventBridge Scheduler triggers actions at scheduled times; it does not evaluate event content or route events from an event bus.</p>
+          <p><strong>Memory rule:</strong> &ldquo;Route by event content/fields&rdquo; + &ldquo;least custom code&rdquo; = EventBridge rules with event patterns.</p>
         </div>
       </div>
 

@@ -934,5 +934,47 @@
     ],
     "correctAnswer": 2,
     "explanation": "CRR with RTC provides a 15-minute SLA for new objects. Batch Replication copies existing objects. CRR does not automatically replicate existing objects (A). SRR copies within the same Region, not cross-Region (B). Lifecycle policies move between classes in the same bucket, not Regions (D)."
+  },
+  {
+    "id": "d2-msg-01",
+    "domain": "domain2",
+    "topic": "sqs-sns-eventbridge",
+    "question": "A media company's video-processing application receives thousands of upload requests during peak hours. Each uploaded video must be transcoded asynchronously by a fleet of EC2 worker instances. If a worker crashes during transcoding, the job must be retried automatically. Failed jobs that exceed five retry attempts must be isolated for investigation without blocking other jobs. Which architecture meets these requirements?",
+    "options": [
+      "Publish upload events to an SNS topic. Subscribe the worker instances directly to the topic so each worker receives every job.",
+      "Send upload messages to an SQS Standard queue with a visibility timeout longer than the maximum transcoding time. Configure a dead-letter queue with a maxReceiveCount of 5. Workers poll the queue, transcode, and delete the message on success.",
+      "Send upload events to an EventBridge custom event bus. Configure a rule that invokes each worker instance directly as a target.",
+      "Send upload messages to an SQS FIFO queue with message group ID set to a single static value so all jobs are processed in strict order."
+    ],
+    "correctAnswer": 1,
+    "explanation": "SQS Standard provides durable buffering, automatic retry via visibility timeout, and DLQ isolation for repeatedly failing jobs. SNS pushes every message to every subscriber (A). EventBridge does not provide durable consumer-controlled polling (C). A single FIFO message group forces serial processing, destroying parallelism (D)."
+  },
+  {
+    "id": "d2-msg-02",
+    "domain": "domain2",
+    "topic": "sqs-sns-eventbridge",
+    "question": "An e-commerce company needs to notify three independent downstream systems whenever an order is placed: a shipping service, an analytics pipeline, and a customer notification service. Each system processes at a different speed, and a failure in one system must not affect the others. Each system needs its own retry logic and failure isolation. Which architecture meets these requirements with the LEAST operational overhead?",
+    "options": [
+      "Send the order event to a single SQS queue. Have all three systems poll the same queue.",
+      "Send the order event to three separate SQS queues from the order service, one for each downstream system.",
+      "Publish the order event to an SNS topic. Subscribe three separate SQS queues (one per system) to the topic. Each system polls its own queue independently.",
+      "Publish the order event to an SNS topic. Subscribe each downstream system's HTTP endpoint directly to the topic."
+    ],
+    "correctAnswer": 2,
+    "explanation": "SNS-to-SQS fanout delivers a copy to all three queues. Each system polls independently with its own DLQ and retry. A single queue delivers each message to only one consumer (A). Three separate queues from the order service requires tighter coupling (B). Direct HTTP subscriptions lack durable buffering (D)."
+  },
+  {
+    "id": "d2-msg-03",
+    "domain": "domain2",
+    "topic": "sqs-sns-eventbridge",
+    "question": "A financial services company publishes structured application events to a central system. When an event has type 'FraudDetected', it must trigger a security investigation Lambda function. When an event has type 'TransactionCompleted' and amount greater than 10,000, it must send an alert to an operations SNS topic. Other event types require no action. Which service provides this content-based routing with the LEAST custom code?",
+    "options": [
+      "Send all events to an SQS queue. A single Lambda consumer reads every message and uses application logic to route based on event type and amount.",
+      "Publish all events to an SNS topic with message filtering. Create subscription filter policies that match on event type and numeric amount thresholds.",
+      "Send events to an Amazon EventBridge custom event bus. Create one rule matching type 'FraudDetected' targeting the security Lambda, and another rule matching type 'TransactionCompleted' with a numeric condition on amount targeting the operations SNS topic.",
+      "Use Amazon EventBridge Scheduler to poll the event source every minute and invoke the appropriate targets based on the event content."
+    ],
+    "correctAnswer": 2,
+    "explanation": "EventBridge event patterns support matching on any JSON field including numeric conditions. Two rules handle both requirements with zero custom code. SQS requires custom routing logic (A). SNS filter policies don't natively support numeric greater-than on body fields like EventBridge (B). Scheduler triggers on time, not event content (D)."
   }
 ]

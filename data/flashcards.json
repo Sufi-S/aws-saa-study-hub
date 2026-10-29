@@ -1143,5 +1143,95 @@
     "term": "S3 Replica vs Backup",
     "definition": "A replica (via CRR/SRR) is a continuously updated copy of eligible new objects. A backup (snapshot, export) is a point-in-time copy. Replicas propagate changes (including overwrites). Backups preserve a fixed state. Both serve different recovery needs.",
     "gotcha": "Replication propagates overwrites — a corrupted source file replicates the corruption. Backups/versioning preserve the pre-corruption state."
+  },
+  {
+    "term": "Amazon SQS",
+    "definition": "Fully managed message queue service that buffers messages between producers and consumers. Consumers poll the queue to receive messages, process them, then delete them. Provides durable, decoupled asynchronous communication.",
+    "gotcha": "SQS is pull-based (consumers poll). It does NOT push messages to consumers like SNS does. Each message is processed by one consumer (competing consumers), not broadcast to all."
+  },
+  {
+    "term": "SQS Standard Queue",
+    "definition": "Default SQS queue type with near-unlimited throughput, at-least-once delivery, and best-effort ordering. Messages may occasionally be delivered out of order or more than once.",
+    "gotcha": "At-least-once means duplicates are possible. Consumers must be idempotent. Best-effort ordering means messages are generally in order but not guaranteed."
+  },
+  {
+    "term": "SQS FIFO Queue",
+    "definition": "SQS queue type that guarantees strict ordering within message groups and exactly-once processing within SQS. Throughput: 300 TPS (3,000 with batching), or 70,000 TPS with high-throughput mode. Queue name must end in .fifo.",
+    "gotcha": "Exactly-once is within SQS only. If a consumer processes a message but fails to delete it, the business operation can repeat. Downstream idempotency is still needed."
+  },
+  {
+    "term": "SQS Visibility Timeout",
+    "definition": "The period during which a message is hidden from other consumers after being received. Default: 30 seconds, max: 12 hours. If the consumer finishes and deletes the message, it's gone. If the consumer fails, the message reappears after the timeout for retry.",
+    "gotcha": "Visibility timeout ≠ message retention. Timeout is the processing window; retention is the message lifespan. Set timeout longer than your maximum processing time."
+  },
+  {
+    "term": "SQS Message Retention",
+    "definition": "How long SQS keeps an unprocessed message before automatically deleting it. Default: 4 days. Minimum: 1 minute. Maximum: 14 days.",
+    "gotcha": "If no consumer processes the message within the retention period, it is permanently lost. Plan retention, visibility timeout, and DLQ together."
+  },
+  {
+    "term": "SQS Long Polling",
+    "definition": "A polling method where the ReceiveMessage call waits up to 20 seconds for a message to arrive before returning. Reduces empty responses and API costs compared to short polling.",
+    "gotcha": "Long polling is almost always preferred over short polling. Set WaitTimeSeconds > 0 (max 20). Saves cost and reduces unnecessary API calls."
+  },
+  {
+    "term": "Dead-Letter Queue (DLQ)",
+    "definition": "A separate queue where messages are sent after exceeding a configured number of failed processing attempts (maxReceiveCount in the redrive policy). Isolates poison messages so they don't block the main queue.",
+    "gotcha": "DLQs are NOT automatic — you must configure a redrive policy. DLQ messages still expire based on their own retention period. DLQ quarantines problems but does not fix them."
+  },
+  {
+    "term": "SQS Redrive Policy",
+    "definition": "Configuration that specifies the DLQ ARN and maxReceiveCount. After a message is received maxReceiveCount times without being deleted, SQS moves it to the DLQ.",
+    "gotcha": "Redriving from DLQ back to source queue requires fixing the root cause first. Without idempotency, redrived messages may cause duplicate business effects."
+  },
+  {
+    "term": "Idempotency",
+    "definition": "A design property where processing the same message multiple times produces the same result. Essential for at-least-once delivery systems. Common technique: use a unique message/order ID as a deduplication key with conditional database writes.",
+    "gotcha": "No messaging service guarantees exactly-once business execution across downstream systems. Idempotency is YOUR application's responsibility, not the queue's."
+  },
+  {
+    "term": "SQS Message Group ID",
+    "definition": "A tag on FIFO queue messages that groups related messages. Messages within the same group are processed in strict order. Different groups can be processed in parallel.",
+    "gotcha": "A poison message in one group blocks all subsequent messages in that group until resolved. Use fine-grained group IDs (e.g., customer ID) to limit blast radius."
+  },
+  {
+    "term": "Amazon SNS",
+    "definition": "Fully managed pub/sub notification service. Publishers send messages to topics, and SNS pushes copies to all subscribers (SQS, Lambda, HTTP/S, email, SMS). One message → all subscribers.",
+    "gotcha": "SNS pushes immediately and does NOT buffer messages. If a subscriber is unavailable, the message may be lost without DLQ configuration. SNS is not a durable work queue."
+  },
+  {
+    "term": "SNS Subscription Filter Policy",
+    "definition": "A JSON policy on an SNS subscription that filters which messages the subscriber receives based on message attributes. Reduces unnecessary processing by only delivering relevant messages.",
+    "gotcha": "SNS filters on message attributes (key-value pairs), which is simpler than EventBridge's content-based JSON field matching. For complex routing, EventBridge is more powerful."
+  },
+  {
+    "term": "SNS-to-SQS Fanout Pattern",
+    "definition": "Publish to an SNS topic with multiple SQS queues as subscribers. Each queue gets its own copy, providing durable independent buffering with separate retry, DLQ, and scaling per consumer.",
+    "gotcha": "This is the standard pattern when multiple consumers need independent durable backlogs. Direct SNS-to-HTTP subscriptions don't provide the same buffering guarantees."
+  },
+  {
+    "term": "EventBridge Event Bus",
+    "definition": "A channel in Amazon EventBridge that receives events. The default bus captures AWS service events. Custom buses receive application events. Partner buses receive SaaS events. Rules on the bus evaluate and route events to targets.",
+    "gotcha": "EventBridge has ~500ms latency (vs <30ms for SNS). No persistent buffering. 'Route by content' = EventBridge. 'Simple broadcast' = SNS. 90+ AWS services emit events natively to the default bus."
+  },
+  {
+    "term": "EventBridge Event Pattern",
+    "definition": "A JSON-based filter on an EventBridge rule that matches events by source, detail-type, and any fields in the event body. Supports exact match, prefix, numeric comparisons, and more.",
+    "gotcha": "Patterns must match the exact field structure. A typo or wrong nesting means no match — events silently pass through with no error. Test patterns carefully."
+  },
+  {
+    "term": "EventBridge Rule and Target",
+    "definition": "A rule evaluates incoming events against an event pattern. When matched, it sends the event to one or more targets (Lambda, SQS, SNS, Step Functions, ECS, etc.). Multiple rules can match the same event.",
+    "gotcha": "A rule matching an event does NOT mean the target completed its operation. EventBridge delivers the event; the target's internal success is a separate concern."
+  },
+  {
+    "term": "EventBridge Scheduler",
+    "definition": "A service for scheduling one-time or recurring target invocations (like cron jobs). Supports millions of schedules. Invokes targets at specified times, not in response to events.",
+    "gotcha": "Scheduler ≠ event bus. Scheduler reacts to the CLOCK. Event bus reacts to EVENTS. 'Run at 2 AM daily' = Scheduler. 'When OrderPlaced event arrives' = event bus."
+  },
+  {
+    "term": "Work Queue vs Pub/Sub vs Event Routing",
+    "definition": "Work queue (SQS): one message → one competing consumer, buffered. Pub/sub (SNS): one message → all subscribers, pushed. Event routing (EventBridge): events matched by content → specific targets.",
+    "gotcha": "These are complementary, not mutually exclusive. SNS + SQS fanout combines broadcast with durable queues. EventBridge can route to SQS for buffering."
   }
 ]
